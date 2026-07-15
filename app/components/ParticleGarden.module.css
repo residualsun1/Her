@@ -15,7 +15,7 @@
 
 .canvas {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   inset: 0;
   display: block;
   width: 100%;
@@ -28,6 +28,22 @@
     drop-shadow(0 0 13px rgb(66 119 255 / 0.12));
   cursor: grab;
   touch-action: none;
+}
+
+.trailCanvas {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0.72;
+  filter:
+    saturate(1.28)
+    blur(0.35px)
+    drop-shadow(0 0 8px rgb(74 158 255 / 0.3));
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 .canvas:active {
@@ -44,7 +60,7 @@
   object-fit: contain;
   object-position: 50% 50%;
   opacity: var(--image-clarity-live, var(--image-clarity, 0.52));
-  filter: saturate(0.78) contrast(1.12) brightness(0.78);
+  filter: saturate(0.76) contrast(1.13) brightness(0.72);
   pointer-events: none;
   -webkit-mask-image: radial-gradient(
     ellipse 66% 72% at 50% 46%,
@@ -69,15 +85,23 @@
 }
 
 .precomposed .imageBase {
-  opacity: 0.82;
-  filter: saturate(0.92) contrast(1.06) brightness(0.86);
+  opacity: var(--image-clarity-live, var(--image-clarity, 0.52));
+  filter: saturate(0.82) contrast(1.1) brightness(0.76);
 }
 
 .precomposed .canvas {
-  opacity: 0.24;
+  opacity: 0.94;
+}
+
+.precomposed .trailCanvas {
+  opacity: 0.8;
 }
 
 .canvasHidden {
+  opacity: 0;
+}
+
+.precomposed .canvasHidden {
   opacity: 0;
 }
 

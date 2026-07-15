@@ -235,8 +235,8 @@ export function HerApp() {
     possibleTopics: ["winter memories", "home", "quiet rituals"],
   });
   const [audioLevel, setAudioLevel] = useState(0.06);
-  const [interactionStrength, setInteractionStrength] = useState(1.15);
-  const [danceStrength, setDanceStrength] = useState(0.85);
+  const [interactionStrength, setInteractionStrength] = useState(1.25);
+  const [danceStrength, setDanceStrength] = useState(0.95);
   const [imageClarity, setImageClarity] = useState(0.52);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1345,7 +1345,7 @@ export function HerApp() {
               <img src={gardenItems[(gardenIndex - 1 + gardenItems.length) % gardenItems.length].imageUrl} alt="Previous memory" />
             </div>
             <div className={styles.centerMemory} onClick={openGardenConversation} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openGardenConversation(); } }} role="button" tabIndex={0}>
-              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.08} interactionStrength={0.9} imageClarity={0.48} precomposed={gardenItems[gardenIndex].precomposed} />
+              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.1} interactionStrength={1.1} imageClarity={0.5} precomposed={gardenItems[gardenIndex].precomposed} />
               <div className={styles.memoryCaption}><span>{pad(gardenIndex + 1)} / {pad(gardenItems.length)}</span><h2>{gardenItems[gardenIndex].title}</h2><small>open this memory ↗</small></div>
             </div>
             <div className={styles.sideMemory} onClick={() => chooseGardenItem(gardenIndex + 1)}>

@@ -17,9 +17,9 @@ export interface ParticleGardenProps {
   audioLevel?: number;
   /** Multiplier for the pointer gravity well. */
   interactionStrength?: number;
-  /** Strength of the faint continuity layer below the reconstructed point cloud. */
+  /** Strength of the continuous subject layer below the reconstructed point cloud. */
   imageClarity?: number;
-  /** True when the supplied asset is already a finished particle reference. */
+  /** True when the supplied asset is already a finished particle reference and needs layered preservation. */
   precomposed?: boolean;
   className?: string;
   onReady?: (detail: ParticleGardenReadyDetail) => void;
@@ -96,7 +96,7 @@ void main() {
     0.82,
     length(vec2(aHome.x * 0.9, (aHome.y - 0.12) * 0.72))
   );
-  float deform = mix(0.2, 1.0, pow(1.0 - core, 1.05));
+  float deform = mix(0.42, 1.0, pow(1.0 - core, 1.05));
   deform = mix(deform, 1.0, aMeta.w);
 
   // The dense surface is always alive; the face moves less, but never becomes a static photo.
@@ -109,7 +109,7 @@ void main() {
 
   // Edge duplicates form the turbulent blue-white halo visible in the references.
   float haloBreath = 0.76 + 0.24 * sin(uTime * 0.52 + aMeta.y * TAU);
-  float haloDistance = (0.028 + aMeta.y * 0.105) * haloBreath;
+  float haloDistance = (0.034 + aMeta.y * 0.124) * haloBreath;
   float haloCurl = sin(uTime * 0.38 + aMeta.x * TAU + aHome.y * 3.0);
   base += aMeta.w * (
     radial * haloDistance +
@@ -168,14 +168,14 @@ void main() {
   float perspective = 1.0 + depth * 0.2;
   gl_Position = vec4(base * perspective, depth, 1.0);
 
-  float surfaceSize = mix(1.02, 1.34, 1.0 - core);
+  float surfaceSize = mix(1.12, 1.38, 1.0 - core);
   float edgeSize = aMeta.z * 0.68 + aMeta.w * 0.5;
   float audioSize = uAudio * (0.72 + aMeta.z * 0.82 + aMeta.w * 0.68);
-  gl_PointSize = clamp((surfaceSize + edgeSize + audioSize) * uDpr * (1.0 + depth * 0.16), 0.86 * uDpr, 5.6 * uDpr);
+  gl_PointSize = clamp((surfaceSize + edgeSize + audioSize) * uDpr * (1.0 + depth * 0.16), 0.96 * uDpr, 5.8 * uDpr);
 
   vec3 liftedColor = pow(max(aColor.rgb, vec3(0.0)), vec3(0.9));
   float shimmer = 0.88 + 0.12 * sin(uTime * 0.82 + aMeta.x * TAU);
-  float surfaceOpacity = mix(0.32, 0.96, 1.0 - core);
+  float surfaceOpacity = mix(0.74, 0.98, 1.0 - core);
   vColor = vec4(liftedColor * shimmer, aColor.a * surfaceOpacity);
   vHalo = aMeta.w;
   vSpark = clamp(aMeta.z + audioPulse * 0.58 + ring * uPointer.z * 0.72, 0.0, 1.0);
@@ -316,7 +316,7 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
   context.drawImage(image, 0, 0, columns, rows);
   const pixels = context.getImageData(0, 0, columns, rows).data;
   const points: number[] = [];
-  const haloLimit = Math.floor(pointBudget * 0.15);
+  const haloLimit = Math.floor(pointBudget * 0.2);
   let haloCount = 0;
 
   const luminanceAt = (column: number, row: number) => {
@@ -428,6 +428,7 @@ export function ParticleGarden({
   onReady,
 }: ParticleGardenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const trailCanvasRef = useRef<HTMLCanvasElement>(null);
   const [showFallback, setShowFallback] = useState(false);
   const inputsRef = useRef<MutableInput>({
     audio: clamp(audioLevel, 0, 1),
@@ -454,7 +455,13 @@ export function ParticleGarden({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) {
+    const trailCanvas = trailCanvasRef.current;
+    if (!canvas || !trailCanvas) {
+      return;
+    }
+
+    const trailContext = trailCanvas.getContext("2d", { alpha: true });
+    if (!trailContext) {
       return;
     }
 
@@ -466,6 +473,7 @@ export function ParticleGarden({
     let imageAspect = 1;
     let currentAudio = 0;
     let lastContinuity = -1;
+    let trailFrame = 0;
     let lastFrameTime = performance.now();
     const startTime = lastFrameTime;
     const pointerTarget: PointerState = { x: 2, y: 2, active: 0 };
@@ -482,6 +490,7 @@ export function ParticleGarden({
       depth: false,
       powerPreference: "high-performance",
       premultipliedAlpha: false,
+      preserveDrawingBuffer: true,
     });
 
     if (!gl) {
@@ -560,6 +569,14 @@ export function ParticleGarden({
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
+      }
+      const trailDpr = Math.min(dpr, 1.25);
+      const trailWidth = Math.max(1, Math.round(canvas.clientWidth * trailDpr));
+      const trailHeight = Math.max(1, Math.round(canvas.clientHeight * trailDpr));
+      if (trailCanvas.width !== trailWidth || trailCanvas.height !== trailHeight) {
+        trailCanvas.width = trailWidth;
+        trailCanvas.height = trailHeight;
+        trailContext.clearRect(0, 0, trailWidth, trailHeight);
       }
       gl.viewport(0, 0, width, height);
     };
@@ -709,8 +726,8 @@ export function ParticleGarden({
 
       const dragActivity = clamp(Math.hypot(dragCurrent.x, dragCurrent.y), 0, 1);
       const continuityFactor = clamp(
-        1 - pointerCurrent.active * 0.45 - dragActivity * 0.7,
-        0.16,
+        1 - pointerCurrent.active * 0.2 - dragActivity * 0.28,
+        0.54,
         1,
       );
       const liveContinuity = inputsRef.current.clarity * continuityFactor;
@@ -743,6 +760,34 @@ export function ParticleGarden({
         );
         gl.drawArrays(gl.POINTS, 0, pointCount);
         gl.bindVertexArray(null);
+
+        trailFrame += 1;
+        if (!reducedMotion && trailFrame % 2 === 0) {
+          trailContext.save();
+          trailContext.globalCompositeOperation = "destination-out";
+          trailContext.globalAlpha = 0.105;
+          trailContext.fillStyle = "#000";
+          trailContext.fillRect(0, 0, trailCanvas.width, trailCanvas.height);
+          trailContext.globalCompositeOperation = "lighter";
+          trailContext.globalAlpha = clamp(
+            0.075 + pointerCurrent.active * 0.08 + dragActivity * 0.12 + currentAudio * 0.055,
+            0.075,
+            0.28,
+          );
+          trailContext.filter = "blur(0.65px)";
+          trailContext.drawImage(
+            canvas,
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+            0,
+            0,
+            trailCanvas.width,
+            trailCanvas.height,
+          );
+          trailContext.restore();
+        }
       }
 
       animationFrame = window.requestAnimationFrame(render);
@@ -761,6 +806,7 @@ export function ParticleGarden({
       canvas.removeEventListener("pointercancel", handlePointerCancel);
       canvas.removeEventListener("pointerleave", handlePointerLeave);
       canvas.parentElement?.style.removeProperty("--image-clarity-live");
+      trailContext.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
       if (image) {
         image.onload = null;
         image.onerror = null;
@@ -789,6 +835,7 @@ export function ParticleGarden({
       aria-label="由上传图片生成、可随声音与指针流动的粒子记忆"
     >
       {imageUrl && <img className={`${styles.imageBase} ${showFallback ? styles.imageBaseFallback : ""}`} src={imageUrl} alt="" aria-hidden="true" />}
+      <canvas ref={trailCanvasRef} className={styles.trailCanvas} aria-hidden="true" />
       <canvas ref={canvasRef} className={`${styles.canvas} ${showFallback ? styles.canvasHidden : ""}`} aria-hidden="true" />
       <span className={styles.vignette} aria-hidden="true" />
     </div>

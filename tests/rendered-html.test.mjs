@@ -68,9 +68,11 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(particle, /imageBase/);
   assert.match(particle, /alpha: true/);
   assert.match(particle, /uniform vec2 uDrag/);
-  assert.match(particle, /pointBudget \* 0\.15/);
+  assert.match(particle, /pointBudget \* 0\.2/);
   assert.match(particle, /--image-clarity-live/);
   assert.match(particle, /precomposed/);
+  assert.match(particle, /trailCanvasRef/);
+  assert.match(particle, /destination-out/);
   assert.match(store, /indexedDB/);
   await assert.rejects(access(new URL("app/_sites-preview/SkeletonPreview.tsx", root)));
 });
