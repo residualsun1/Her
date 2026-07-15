@@ -24,7 +24,7 @@ test("server-renders the Her memory garden shell", async () => {
   assert.match(html, /<title>Her — AI Memory Garden<\/title>/i);
   assert.match(html, /THE GARDEN/);
   assert.match(html, /Save Memory/);
-  assert.match(html, /That quiet little tree/);
+  assert.match(html, /There’s something gentle in this portrait/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
@@ -52,11 +52,12 @@ test("mock provider routes keep the demo runnable without API keys", async () =>
 });
 
 test("starter preview is removed and project modules are present", async () => {
-  const [page, layout, packageJson, particle, store] = await Promise.all([
+  const [page, layout, packageJson, particle, particleStyles, store] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
     readFile(new URL("app/components/ParticleGarden.tsx", root), "utf8"),
+    readFile(new URL("app/components/ParticleGarden.module.css", root), "utf8"),
     readFile(new URL("app/lib/memory/store.ts", root), "utf8"),
   ]);
 
@@ -68,11 +69,16 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(particle, /imageBase/);
   assert.match(particle, /alpha: true/);
   assert.match(particle, /uniform vec2 uDrag/);
+  assert.match(particle, /uniform float uDispersion/);
+  assert.match(particle, /uniform float uParticleSize/);
+  assert.match(particle, /uniform float uMouseRadius/);
+  assert.match(particle, /DEFAULT_PARTICLE_TUNING/);
   assert.match(particle, /pointBudget \* 0\.2/);
-  assert.match(particle, /--image-clarity-live/);
   assert.match(particle, /precomposed/);
   assert.match(particle, /trailCanvasRef/);
   assert.match(particle, /destination-out/);
+  assert.match(particleStyles, /\.imageBase[\s\S]*?opacity:\s*0;/);
+  assert.match(particleStyles, /\.fallback \.imageBase/);
   assert.match(store, /indexedDB/);
   await assert.rejects(access(new URL("app/_sites-preview/SkeletonPreview.tsx", root)));
 });

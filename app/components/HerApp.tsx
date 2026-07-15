@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { ParticleGarden } from "./ParticleGarden";
+import { DEFAULT_PARTICLE_TUNING, ParticleGarden, type ParticleTuning } from "./ParticleGarden";
 import { memoryStore } from "@/app/lib/memory/store";
 import type {
   CalendarDate,
@@ -182,8 +182,8 @@ const DEFAULT_TURNS: ChatTurn[] = [
   {
     id: "welcome",
     role: "assistant",
-    original: "That quiet little tree looks as if it has been waiting for someone to notice it.",
-    translation: "那棵安静的小树看起来像是一直在等一个人注意到它。",
+    original: "There’s something gentle in this portrait—as if the evening has paused for a moment.",
+    translation: "这张照片里有一种温柔，仿佛夜晚为这一刻暂停了。",
     language: "en",
     createdAt: 0,
   },
@@ -210,9 +210,9 @@ const localDateKey = (date = new Date()) =>
 export function HerApp() {
   const [view, setView] = useState<View>("conversation");
   const [memoryTab, setMemoryTab] = useState<MemoryTab>("cards");
-  const [imageUrl, setImageUrl] = useState("/demo/memory-tree.png");
-  const [imagePrecomposed, setImagePrecomposed] = useState(true);
-  const [imageTitle, setImageTitle] = useState("Winter light");
+  const [imageUrl, setImageUrl] = useState("/demo/memory-portrait-raw.png");
+  const [imagePrecomposed, setImagePrecomposed] = useState(false);
+  const [imageTitle, setImageTitle] = useState("A quiet evening");
   const [gardenItems, setGardenItems] = useState<GardenVisualItem[]>(SAMPLE_GARDEN);
   const [gardenIndex, setGardenIndex] = useState(0);
   const [turns, setTurns] = useState<ChatTurn[]>(DEFAULT_TURNS);
@@ -231,13 +231,13 @@ export function HerApp() {
   const [visionEnabled, setVisionEnabled] = useState(true);
   const [saveVoice, setSaveVoice] = useState(true);
   const [imageContext, setImageContext] = useState<{ description: string; possibleTopics: string[] } | null>({
-    description: "A small tree glows against a dark blue winter scene.",
-    possibleTopics: ["winter memories", "home", "quiet rituals"],
+    description: "A person sits indoors in a quiet evening scene.",
+    possibleTopics: ["quiet evenings", "home", "the feeling behind a portrait"],
   });
   const [audioLevel, setAudioLevel] = useState(0.06);
   const [interactionStrength, setInteractionStrength] = useState(1.25);
-  const [danceStrength, setDanceStrength] = useState(0.95);
-  const [imageClarity, setImageClarity] = useState(0.52);
+  const [imageClarity, setImageClarity] = useState(0.72);
+  const [particleTuning, setParticleTuning] = useState<ParticleTuning>({ ...DEFAULT_PARTICLE_TUNING });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -287,7 +287,10 @@ export function HerApp() {
   const currentAssistant = [...turns].reverse().find((turn) => turn.role === "assistant");
   const currentSalonLine = salonLineIndex >= 0 ? salonLines[salonLineIndex] : null;
   const currentSalonRole = SALON_ROLES.find((role) => role.id === currentSalonLine?.speakerId);
-  const visualAudioLevel = Math.min(1, audioLevel * (0.4 + danceStrength * 1.2));
+  const visualAudioLevel = Math.min(1, audioLevel);
+  const updateParticleTuning = useCallback((key: keyof ParticleTuning, value: number) => {
+    setParticleTuning((current) => ({ ...current, [key]: value }));
+  }, []);
 
   const flashNotice = useCallback((message: string) => {
     setNotice(message);
@@ -1230,6 +1233,7 @@ export function HerApp() {
             interactionStrength={interactionStrength}
             imageClarity={imageClarity}
             precomposed={imagePrecomposed}
+            tuning={particleTuning}
             className={styles.particleCanvas}
             onReady={(info) => setParticleInfo(`${info.pointCount.toLocaleString()} particles`)}
           />
@@ -1345,7 +1349,7 @@ export function HerApp() {
               <img src={gardenItems[(gardenIndex - 1 + gardenItems.length) % gardenItems.length].imageUrl} alt="Previous memory" />
             </div>
             <div className={styles.centerMemory} onClick={openGardenConversation} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openGardenConversation(); } }} role="button" tabIndex={0}>
-              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.1} interactionStrength={1.1} imageClarity={0.5} precomposed={gardenItems[gardenIndex].precomposed} />
+              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.1} interactionStrength={1.1} imageClarity={0.72} precomposed={gardenItems[gardenIndex].precomposed} tuning={particleTuning} />
               <div className={styles.memoryCaption}><span>{pad(gardenIndex + 1)} / {pad(gardenItems.length)}</span><h2>{gardenItems[gardenIndex].title}</h2><small>open this memory ↗</small></div>
             </div>
             <div className={styles.sideMemory} onClick={() => chooseGardenItem(gardenIndex + 1)}>
@@ -1442,9 +1446,20 @@ export function HerApp() {
           <label>Reply language<select value={replyLanguage} onChange={(event) => setReplyLanguage(event.target.value as "en" | "zh")}><option value="en">English first</option><option value="zh">中文优先</option></select></label>
           <label className={styles.toggleRow}><span><b>Let AI understand the image</b><small>A compressed copy is sent only with consent.</small></span><input type="checkbox" checked={visionEnabled} onChange={(event) => setVisionEnabled(event.target.checked)} /></label>
           <label className={styles.toggleRow}><span><b>Save my voice on this device</b><small>Turn audio is never uploaded for cloud storage.</small></span><input type="checkbox" checked={saveVoice} onChange={(event) => setSaveVoice(event.target.checked)} /></label>
-          <label>Dance strength <output>{danceStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={danceStrength} onChange={(event) => setDanceStrength(Number(event.target.value))} /></label>
-          <label>Subject clarity <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.34" max="0.7" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
-          <label>Mouse field <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /></label>
+          <div className={styles.settingsSectionLabel}><span>PARTICLE FIELD</span><button onClick={() => { setParticleTuning({ ...DEFAULT_PARTICLE_TUNING }); setImageClarity(0.72); setInteractionStrength(1.25); }}>RESET</button></div>
+          <label>Dispersion <output>{particleTuning.dispersion.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.dispersion} onChange={(event) => updateParticleTuning("dispersion", Number(event.target.value))} /></label>
+          <label>Particle Size <output>{particleTuning.particleSize.toFixed(1)}</output><input type="range" min="1" max="5" step="0.1" value={particleTuning.particleSize} onChange={(event) => updateParticleTuning("particleSize", Number(event.target.value))} /></label>
+          <label>Contrast <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.6" max="2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /></label>
+          <label>Flow Speed <output>{particleTuning.flowSpeed.toFixed(1)}</output><input type="range" min="0" max="2" step="0.1" value={particleTuning.flowSpeed} onChange={(event) => updateParticleTuning("flowSpeed", Number(event.target.value))} /></label>
+          <label>Flow Amplitude <output>{particleTuning.flowAmplitude.toFixed(1)}</output><input type="range" min="0" max="2.5" step="0.1" value={particleTuning.flowAmplitude} onChange={(event) => updateParticleTuning("flowAmplitude", Number(event.target.value))} /></label>
+          <label>Depth Strength <output>{particleTuning.depthStrength.toFixed(1)}</output><input type="range" min="0" max="100" step="1" value={particleTuning.depthStrength} onChange={(event) => updateParticleTuning("depthStrength", Number(event.target.value))} /></label>
+          <label>Mouse Radius <output>{particleTuning.mouseRadius.toFixed(1)}</output><input type="range" min="40" max="220" step="5" value={particleTuning.mouseRadius} onChange={(event) => updateParticleTuning("mouseRadius", Number(event.target.value))} /></label>
+          <label>Color Shift Speed <output>{particleTuning.colorShiftSpeed.toFixed(1)}</output><input type="range" min="0" max="4" step="0.1" value={particleTuning.colorShiftSpeed} onChange={(event) => updateParticleTuning("colorShiftSpeed", Number(event.target.value))} /></label>
+          <div className={styles.settingsSectionLabel}><span>AUDIO DANCE</span></div>
+          <label>Dance Strength <output>{particleTuning.danceStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.danceStrength} onChange={(event) => updateParticleTuning("danceStrength", Number(event.target.value))} /></label>
+          <label>Depth Wave <output>{particleTuning.depthWave.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.depthWave} onChange={(event) => updateParticleTuning("depthWave", Number(event.target.value))} /></label>
+          <label>Subject Detail <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.45" max="0.92" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
+          <label>Mouse Force <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /></label>
           <p className={styles.synthDisclosure}>{providerMode === "mock" ? "Offline preview mode is active: no external model is being called. " : "Live text mode is active. "}Voice playback in this runnable Demo uses an explicitly disclosed browser synthetic voice until a configured streaming TTS provider is added.</p>
         </aside>
       )}
