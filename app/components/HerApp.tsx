@@ -3,7 +3,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { DEFAULT_PARTICLE_TUNING, ParticleGarden, type ParticleTuning } from "./ParticleGarden";
+import {
+  DEFAULT_PARTICLE_TUNING,
+  DEFAULT_SUBJECT_TUNING,
+  ParticleGarden,
+  type ParticleTuning,
+  type SubjectTuning,
+} from "./ParticleGarden";
 import { memoryStore } from "@/app/lib/memory/store";
 import type {
   CalendarDate,
@@ -238,6 +244,7 @@ export function HerApp() {
   const [interactionStrength, setInteractionStrength] = useState(1.25);
   const [imageClarity, setImageClarity] = useState(0.72);
   const [particleTuning, setParticleTuning] = useState<ParticleTuning>({ ...DEFAULT_PARTICLE_TUNING });
+  const [subjectTuning, setSubjectTuning] = useState<SubjectTuning>({ ...DEFAULT_SUBJECT_TUNING });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -290,6 +297,12 @@ export function HerApp() {
   const visualAudioLevel = Math.min(1, audioLevel);
   const updateParticleTuning = useCallback((key: keyof ParticleTuning, value: number) => {
     setParticleTuning((current) => ({ ...current, [key]: value }));
+  }, []);
+  const updateSubjectTuning = useCallback(<Key extends keyof SubjectTuning>(
+    key: Key,
+    value: SubjectTuning[Key],
+  ) => {
+    setSubjectTuning((current) => ({ ...current, [key]: value }));
   }, []);
 
   const flashNotice = useCallback((message: string) => {
@@ -687,6 +700,7 @@ export function HerApp() {
     uploadUrlsRef.current.push(objectUrl);
     setImageUrl(objectUrl);
     setImagePrecomposed(false);
+    setSubjectTuning((current) => ({ ...current, focusX: 0, focusY: 0 }));
     setImageTitle(file.name.replace(/\.[^.]+$/, ""));
     setView("conversation");
     setTurns([]);
@@ -1234,6 +1248,7 @@ export function HerApp() {
             imageClarity={imageClarity}
             precomposed={imagePrecomposed}
             tuning={particleTuning}
+            subjectTuning={subjectTuning}
             className={styles.particleCanvas}
             onReady={(info) => setParticleInfo(`${info.pointCount.toLocaleString()} particles`)}
           />
@@ -1349,7 +1364,7 @@ export function HerApp() {
               <img src={gardenItems[(gardenIndex - 1 + gardenItems.length) % gardenItems.length].imageUrl} alt="Previous memory" />
             </div>
             <div className={styles.centerMemory} onClick={openGardenConversation} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openGardenConversation(); } }} role="button" tabIndex={0}>
-              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.1} interactionStrength={1.1} imageClarity={0.72} precomposed={gardenItems[gardenIndex].precomposed} tuning={particleTuning} />
+              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.1} interactionStrength={1.1} imageClarity={0.72} precomposed={gardenItems[gardenIndex].precomposed} tuning={particleTuning} subjectTuning={subjectTuning} />
               <div className={styles.memoryCaption}><span>{pad(gardenIndex + 1)} / {pad(gardenItems.length)}</span><h2>{gardenItems[gardenIndex].title}</h2><small>open this memory ↗</small></div>
             </div>
             <div className={styles.sideMemory} onClick={() => chooseGardenItem(gardenIndex + 1)}>
@@ -1446,7 +1461,18 @@ export function HerApp() {
           <label>Reply language<select value={replyLanguage} onChange={(event) => setReplyLanguage(event.target.value as "en" | "zh")}><option value="en">English first</option><option value="zh">中文优先</option></select></label>
           <label className={styles.toggleRow}><span><b>Let AI understand the image</b><small>A compressed copy is sent only with consent.</small></span><input type="checkbox" checked={visionEnabled} onChange={(event) => setVisionEnabled(event.target.checked)} /></label>
           <label className={styles.toggleRow}><span><b>Save my voice on this device</b><small>Turn audio is never uploaded for cloud storage.</small></span><input type="checkbox" checked={saveVoice} onChange={(event) => setSaveVoice(event.target.checked)} /></label>
-          <div className={styles.settingsSectionLabel}><span>PARTICLE FIELD</span><button onClick={() => { setParticleTuning({ ...DEFAULT_PARTICLE_TUNING }); setImageClarity(0.72); setInteractionStrength(1.25); }}>RESET</button></div>
+          <div className={styles.settingsSectionLabel}><span>SUBJECT PREPARATION</span><button onClick={() => { setSubjectTuning({ ...DEFAULT_SUBJECT_TUNING }); setParticleTuning({ ...DEFAULT_PARTICLE_TUNING }); setImageClarity(0.72); setInteractionStrength(1.25); }}>RESET ALL</button></div>
+          <label className={styles.toggleRow}><span><b>Auto Subject Focus</b><small>Find, enlarge, and center the most visually distinct subject locally on this device.</small></span><input type="checkbox" checked={subjectTuning.autoFocus} onChange={(event) => updateSubjectTuning("autoFocus", event.target.checked)} /></label>
+          <label>Subject Scale <output>{subjectTuning.scale.toFixed(2)}×</output><input type="range" min="0.75" max="1.6" step="0.05" value={subjectTuning.scale} onChange={(event) => updateSubjectTuning("scale", Number(event.target.value))} /></label>
+          <label>Focus X <output>{Math.round(subjectTuning.focusX * 100)}%</output><input type="range" min="-0.45" max="0.45" step="0.01" value={subjectTuning.focusX} onChange={(event) => updateSubjectTuning("focusX", Number(event.target.value))} /></label>
+          <label>Focus Y <output>{Math.round(subjectTuning.focusY * 100)}%</output><input type="range" min="-0.45" max="0.45" step="0.01" value={subjectTuning.focusY} onChange={(event) => updateSubjectTuning("focusY", Number(event.target.value))} /></label>
+          <label>Background Suppression <output>{Math.round(subjectTuning.backgroundSuppression * 100)}%</output><input type="range" min="0" max="1" step="0.02" value={subjectTuning.backgroundSuppression} onChange={(event) => updateSubjectTuning("backgroundSuppression", Number(event.target.value))} /></label>
+          <label>Subject Exposure <output>{subjectTuning.exposure.toFixed(2)}×</output><input type="range" min="0.75" max="2.2" step="0.05" value={subjectTuning.exposure} onChange={(event) => updateSubjectTuning("exposure", Number(event.target.value))} /></label>
+          <label>Shadow Lift <output>{Math.round(subjectTuning.shadowLift * 100)}%</output><input type="range" min="0" max="0.45" step="0.01" value={subjectTuning.shadowLift} onChange={(event) => updateSubjectTuning("shadowLift", Number(event.target.value))} /></label>
+          <label>Subject Fill <output>{subjectTuning.surfaceFill.toFixed(2)}×</output><input type="range" min="0.6" max="1.6" step="0.05" value={subjectTuning.surfaceFill} onChange={(event) => updateSubjectTuning("surfaceFill", Number(event.target.value))} /></label>
+          <label>Edge Preservation <output>{Math.round(subjectTuning.edgePreservation * 100)}%</output><input type="range" min="0" max="1" step="0.02" value={subjectTuning.edgePreservation} onChange={(event) => updateSubjectTuning("edgePreservation", Number(event.target.value))} /></label>
+          <p className={styles.settingsHint}>Auto focus changes the crop and particle budget before rendering. Focus X/Y remain available as a gentle manual correction without removing flow, trails, or mouse disturbance.</p>
+          <div className={styles.settingsSectionLabel}><span>PARTICLE FIELD</span><button onClick={() => setParticleTuning({ ...DEFAULT_PARTICLE_TUNING })}>RESET FIELD</button></div>
           <label>Dispersion <output>{particleTuning.dispersion.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.dispersion} onChange={(event) => updateParticleTuning("dispersion", Number(event.target.value))} /></label>
           <label>Particle Size <output>{particleTuning.particleSize.toFixed(1)}</output><input type="range" min="1" max="5" step="0.1" value={particleTuning.particleSize} onChange={(event) => updateParticleTuning("particleSize", Number(event.target.value))} /></label>
           <label>Contrast <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.6" max="2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /></label>

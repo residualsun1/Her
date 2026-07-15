@@ -52,10 +52,11 @@ test("mock provider routes keep the demo runnable without API keys", async () =>
 });
 
 test("starter preview is removed and project modules are present", async () => {
-  const [page, layout, packageJson, particle, particleStyles, store] = await Promise.all([
+  const [page, layout, packageJson, herApp, particle, particleStyles, store] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
+    readFile(new URL("app/components/HerApp.tsx", root), "utf8"),
     readFile(new URL("app/components/ParticleGarden.tsx", root), "utf8"),
     readFile(new URL("app/components/ParticleGarden.module.css", root), "utf8"),
     readFile(new URL("app/lib/memory/store.ts", root), "utf8"),
@@ -64,6 +65,9 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(page, /<HerApp \/>/);
   assert.match(layout, /AI Memory Garden/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+  assert.match(herApp, /Auto Subject Focus/);
+  assert.match(herApp, /Background Suppression/);
+  assert.match(herApp, /Subject Exposure/);
   assert.match(particle, /webgl2/);
   assert.match(particle, /imageClarity/);
   assert.match(particle, /imageBase/);
@@ -73,6 +77,10 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(particle, /uniform float uParticleSize/);
   assert.match(particle, /uniform float uMouseRadius/);
   assert.match(particle, /DEFAULT_PARTICLE_TUNING/);
+  assert.match(particle, /DEFAULT_SUBJECT_TUNING/);
+  assert.match(particle, /function analyzeSubject/);
+  assert.match(particle, /layout\(location = 3\) in float aSubject/);
+  assert.match(particle, /backgroundSuppression/);
   assert.match(particle, /pointBudget \* 0\.2/);
   assert.match(particle, /precomposed/);
   assert.match(particle, /trailCanvasRef/);
