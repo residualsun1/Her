@@ -43,8 +43,8 @@
   height: 88%;
   object-fit: contain;
   object-position: 50% 50%;
-  opacity: var(--image-clarity-live, var(--image-clarity, 0.26));
-  filter: saturate(0.72) contrast(1.14) brightness(0.74);
+  opacity: var(--image-clarity-live, var(--image-clarity, 0.52));
+  filter: saturate(0.78) contrast(1.12) brightness(0.78);
   pointer-events: none;
   -webkit-mask-image: radial-gradient(
     ellipse 66% 72% at 50% 46%,
@@ -66,6 +66,15 @@
 .imageBaseFallback {
   opacity: 0.88;
   filter: saturate(0.82) contrast(1.06) brightness(0.82);
+}
+
+.precomposed .imageBase {
+  opacity: 0.82;
+  filter: saturate(0.92) contrast(1.06) brightness(0.86);
+}
+
+.precomposed .canvas {
+  opacity: 0.24;
 }
 
 .canvasHidden {

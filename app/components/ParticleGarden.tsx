@@ -19,6 +19,8 @@ export interface ParticleGardenProps {
   interactionStrength?: number;
   /** Strength of the faint continuity layer below the reconstructed point cloud. */
   imageClarity?: number;
+  /** True when the supplied asset is already a finished particle reference. */
+  precomposed?: boolean;
   className?: string;
   onReady?: (detail: ParticleGardenReadyDetail) => void;
 }
@@ -94,7 +96,7 @@ void main() {
     0.82,
     length(vec2(aHome.x * 0.9, (aHome.y - 0.12) * 0.72))
   );
-  float deform = mix(0.36, 1.0, pow(1.0 - core, 1.05));
+  float deform = mix(0.2, 1.0, pow(1.0 - core, 1.05));
   deform = mix(deform, 1.0, aMeta.w);
 
   // The dense surface is always alive; the face moves less, but never becomes a static photo.
@@ -166,13 +168,14 @@ void main() {
   float perspective = 1.0 + depth * 0.2;
   gl_Position = vec4(base * perspective, depth, 1.0);
 
+  float surfaceSize = mix(1.02, 1.34, 1.0 - core);
   float edgeSize = aMeta.z * 0.68 + aMeta.w * 0.5;
   float audioSize = uAudio * (0.72 + aMeta.z * 0.82 + aMeta.w * 0.68);
-  gl_PointSize = clamp((1.28 + edgeSize + audioSize) * uDpr * (1.0 + depth * 0.16), 1.0 * uDpr, 5.6 * uDpr);
+  gl_PointSize = clamp((surfaceSize + edgeSize + audioSize) * uDpr * (1.0 + depth * 0.16), 0.86 * uDpr, 5.6 * uDpr);
 
   vec3 liftedColor = pow(max(aColor.rgb, vec3(0.0)), vec3(0.9));
   float shimmer = 0.88 + 0.12 * sin(uTime * 0.82 + aMeta.x * TAU);
-  float surfaceOpacity = mix(0.88, 0.96, 1.0 - core);
+  float surfaceOpacity = mix(0.32, 0.96, 1.0 - core);
   vColor = vec4(liftedColor * shimmer, aColor.a * surfaceOpacity);
   vHalo = aMeta.w;
   vSpark = clamp(aMeta.z + audioPulse * 0.58 + ring * uPointer.z * 0.72, 0.0, 1.0);
@@ -419,7 +422,8 @@ export function ParticleGarden({
   imageUrl,
   audioLevel = 0,
   interactionStrength = 1,
-  imageClarity = 0.26,
+  imageClarity = 0.52,
+  precomposed = false,
   className,
   onReady,
 }: ParticleGardenProps) {
@@ -768,7 +772,11 @@ export function ParticleGarden({
     };
   }, [imageUrl]);
 
-  const rootClassName = className ? `${styles.root} ${className}` : styles.root;
+  const rootClassName = [
+    styles.root,
+    precomposed ? styles.precomposed : "",
+    className ?? "",
+  ].filter(Boolean).join(" ");
   const rootStyle = {
     "--image-clarity": clamp(imageClarity, 0, 1),
   } as CSSProperties;
