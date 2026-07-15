@@ -109,7 +109,6 @@ uniform float uDepthWave;
 
 out vec4 vColor;
 out float vHalo;
-out float vOutline;
 out float vSpark;
 out float vField;
 
@@ -137,9 +136,6 @@ void main() {
   );
   vec2 radial = normalize(aHome + vec2(0.0001));
   vec2 curlDirection = vec2(-radial.y, radial.x);
-  float isHalo = step(0.75, aMeta.w);
-  float isOutline = 1.0 - step(0.24, abs(aMeta.w - 0.5));
-  float isAccent = max(isHalo, isOutline);
   float core = 1.0 - smoothstep(
     0.35,
     0.82,
@@ -147,12 +143,12 @@ void main() {
   );
   float subjectDeform = mix(0.42, 0.12, uSubjectDetail);
   float deform = mix(subjectDeform, 1.0, pow(1.0 - core, 1.05));
-  deform = mix(deform, 1.0, isHalo);
+  deform = mix(deform, 1.0, aMeta.w);
 
   float outerMetric = length(vec2(aHome.x * 0.82, aHome.y));
   float envelopeNoise = sin(aHome.x * 4.1 + aMeta.x * TAU) * 0.055;
   envelopeNoise += cos(aHome.y * 5.2 + aMeta.y * TAU) * 0.045;
-  float imageEnvelope = 1.0 - smoothstep(0.58, 1.16, outerMetric + envelopeNoise);
+  float imageEnvelope = 1.0 - smoothstep(0.68, 1.04, outerMetric + envelopeNoise);
 
   // The dense surface is always alive; the face moves less, but never becomes a static photo.
   float motionTime = uTime * uMotion * max(uFlowSpeed, 0.0);
@@ -166,7 +162,7 @@ void main() {
   float haloBreath = 0.76 + 0.24 * sin(uTime * 0.52 + aMeta.y * TAU);
   float haloDistance = (0.034 + aMeta.y * 0.124) * haloBreath * (uDispersion / 1.5);
   float haloCurl = sin(uTime * 0.38 + aMeta.x * TAU + aHome.y * 3.0);
-  base += isHalo * (
+  base += aMeta.w * (
     radial * haloDistance +
     curlDirection * haloDistance * haloCurl * 0.62 +
     randomDirection * haloDistance * 0.34
@@ -177,31 +173,17 @@ void main() {
   float audioWave = sin(uTime * (2.2 + aMeta.y * 2.1) + aMeta.x * TAU);
   float audioEnergy = uAudio * (uDanceStrength / 7.5);
   float audioPulse = audioEnergy * (0.55 + 0.45 * audioWave);
-  base += radial * audioPulse * (0.005 + aMeta.z * 0.016 + isHalo * 0.036) * deform;
+  base += radial * audioPulse * (0.005 + aMeta.z * 0.016 + aMeta.w * 0.036) * deform;
   float luminance = dot(aColor.rgb, vec3(0.2126, 0.7152, 0.0722));
   float depthScale = uDepthStrength / 50.0;
   float depthWave = sin(aHome.x * (4.0 + uDepthWave * 0.2) + aHome.y * (3.4 + uDepthWave * 0.16) + motionTime * 0.8 + aMeta.x * TAU);
-  float domeRadius = max(0.0, 1.0 - dot(aHome * vec2(0.7, 0.62), aHome * vec2(0.7, 0.62)));
-  float domeDepth = sqrt(domeRadius) * 0.18 * depthScale;
-  float depth = (luminance - 0.5) * 0.12 * depthScale + domeDepth;
+  float depth = (luminance - 0.5) * 0.12 * depthScale;
   depth += depthWave * (0.012 + uDepthWave * 0.0028 + audioEnergy * 0.15) * deform * depthScale;
-  depth += isHalo * sin(uTime * 0.7 + aMeta.y * TAU) * 0.08;
-
-  // A large drag collapses the dome into the flowing light ribbon seen in the reference.
-  float dragMagnitude = length(uDrag);
-  float ribbonMix = smoothstep(0.5, 0.84, dragMagnitude) * uMotion;
-  vec2 ribbonAxis = normalize(vec2(1.0, uDrag.y * 0.7 + 0.08));
-  vec2 ribbonNormal = vec2(-ribbonAxis.y, ribbonAxis.x);
-  float ribbonAlong = dot(base, ribbonAxis);
-  float ribbonAcross = dot(base, ribbonNormal);
-  float ribbonWave = sin(ribbonAlong * 9.0 + motionTime * 1.2 + aMeta.x * TAU) * (0.026 + audioEnergy * 0.09);
-  vec2 ribbonPosition = ribbonAxis * ribbonAlong + ribbonNormal * (ribbonAcross * 0.16 + ribbonWave);
-  base = mix(base, ribbonPosition, ribbonMix);
-  depth += ribbonMix * (sin(ribbonAlong * 7.0 + motionTime + aMeta.y * TAU) * 0.28 + ribbonAcross * 0.22);
+  depth += aMeta.w * sin(uTime * 0.7 + aMeta.y * TAU) * 0.08;
 
   // Drag rotates the complete point cloud in 3D, then spring inertia returns it home.
-  float yaw = uDrag.x * 1.42;
-  float pitch = -uDrag.y * 1.08;
+  float yaw = uDrag.x * 1.18;
+  float pitch = -uDrag.y * 0.86;
   vec3 position = vec3(base, depth);
   float cosYaw = cos(yaw);
   float sinYaw = sin(yaw);
@@ -235,36 +217,28 @@ void main() {
   float ring = exp(-pow((pointerDistance - ringRadius) / max(mouseRadius * 0.12, 0.001), 2.0));
   float ripple = sin((pointerDistance / mouseRadius) * TAU * 2.0 - uTime * 3.6) * field;
   float pointResponse = (0.55 + aMeta.z * 0.45) * uPointer.z * uInteraction;
-  pointResponse *= mix(mix(0.58, 1.0, 1.0 - core), 1.0, isAccent);
-  base += tangent * field * 0.074 * pointResponse;
-  base -= pointerDirection * (pointerCore * 0.145 + field * 0.018) * pointResponse;
+  pointResponse *= mix(mix(0.58, 1.0, 1.0 - core), 1.0, aMeta.w);
+  base += (pointerDirection * field * 0.052 + tangent * field * 0.07) * pointResponse;
+  base -= pointerDirection * pointerCore * 0.13 * pointResponse;
   base += pointerDirection * ripple * 0.012 * pointResponse;
 
   float perspective = 1.0 + depth * 0.2;
   gl_Position = vec4(base * perspective, depth, 1.0);
 
-  float surfaceSize = mix(0.48, 0.96 + uSubjectDetail * 0.16, core);
-  surfaceSize = mix(surfaceSize, 0.42, isHalo);
-  surfaceSize = mix(surfaceSize, 1.18, isOutline);
-  float edgeSize = aMeta.z * 0.1 + isOutline * 0.12;
-  float audioSize = audioEnergy * (0.26 + aMeta.z * 0.36 + isHalo * 0.3);
+  float surfaceSize = mix(0.76 + uSubjectDetail * 0.18, 1.02, 1.0 - core);
+  float edgeSize = aMeta.z * 0.22 + aMeta.w * 0.18;
+  float audioSize = audioEnergy * (0.3 + aMeta.z * 0.42 + aMeta.w * 0.34);
   gl_PointSize = clamp(uParticleSize * (surfaceSize + edgeSize + audioSize) * uDpr * (1.0 + depth * 0.16), 0.7 * uDpr, 6.4 * uDpr);
 
-  float darkFactor = 1.0 - smoothstep(0.035, 0.35, luminance);
-  float structuralLift = darkFactor * (0.14 + aMeta.z * 0.62 + isOutline * 0.58);
-  vec3 structuralColor = mix(aColor.rgb, vec3(0.78, 0.82, 0.9), clamp(structuralLift, 0.0, 0.84));
-  vec3 haloColor = mix(vec3(1.0, 0.94, 0.82), vec3(0.78, 0.88, 1.0), 0.18 + aMeta.y * 0.14);
-  structuralColor = mix(structuralColor, haloColor, isHalo * 0.72 + isOutline * 0.52);
-  vec3 contrastedColor = clamp((structuralColor - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  vec3 contrastedColor = clamp((aColor.rgb - 0.5) * uContrast + 0.5, 0.0, 1.0);
   vec3 liftedColor = pow(max(contrastedColor, vec3(0.0)), vec3(0.9));
   float hueAngle = sin(uTime * uColorShiftSpeed * 0.18 + aMeta.x * TAU) * 0.12 * (0.25 + (1.0 - core) * 0.75);
   liftedColor = max(rotateHue(liftedColor, hueAngle), vec3(0.0));
   float shimmer = 0.88 + 0.12 * sin(uTime * 0.82 + aMeta.x * TAU);
   float surfaceOpacity = mix(0.82 + uSubjectDetail * 0.17, 0.92, 1.0 - core);
-  float envelopeOpacity = mix(imageEnvelope, max(imageEnvelope, 0.38), isAccent);
+  float envelopeOpacity = mix(imageEnvelope, max(imageEnvelope, 0.44), aMeta.w);
   vColor = vec4(liftedColor * shimmer, aColor.a * surfaceOpacity * envelopeOpacity);
-  vHalo = isHalo;
-  vOutline = isOutline;
+  vHalo = aMeta.w;
   vSpark = clamp(aMeta.z + audioPulse * 0.58 + ring * uPointer.z * 0.72, 0.0, 1.0);
   vField = ring * uPointer.z;
 }
@@ -275,7 +249,6 @@ precision highp float;
 
 in vec4 vColor;
 in float vHalo;
-in float vOutline;
 in float vSpark;
 in float vField;
 
@@ -291,15 +264,14 @@ void main() {
   float core = 1.0 - smoothstep(0.05, 0.29, distanceFromCenter);
   float glow = 1.0 - smoothstep(0.13, 0.5, distanceFromCenter);
   float intensity = core * (0.78 + vSpark * 0.38) + glow * (0.2 + vSpark * 0.2);
-  float haloOpacity = mix(1.0, 0.5, vHalo);
-  haloOpacity = mix(haloOpacity, 0.82, vOutline);
+  float haloOpacity = mix(1.0, 0.48, vHalo);
   float alpha = vColor.a * intensity * haloOpacity;
 
   if (alpha < 0.008) {
     discard;
   }
 
-  vec3 fieldTint = mix(vColor.rgb, vec3(0.94, 0.98, 1.0), vField * 0.72);
+  vec3 fieldTint = mix(vColor.rgb, vec3(0.58, 0.86, 1.0), vField * 0.72);
   outColor = vec4(fieldTint * (0.9 + vSpark * 0.48 + vField * 0.54), alpha);
 }
 `;
@@ -372,23 +344,22 @@ function choosePointBudget(width: number, height: number, reducedMotion: boolean
   const lowPower =
     cores <= 4 || memory <= 4 || performanceNavigator.connection?.saveData === true;
   const compact = width < 700 || height < 700;
-  const areaBudget = Math.floor((width * height) / (lowPower ? 5.5 : compact ? 4.2 : 3.2));
+  const areaBudget = Math.floor((width * height) / (lowPower ? 8 : compact ? 6 : 5));
 
   if (reducedMotion) {
-    return clamp(areaBudget, 32_000, 72_000);
+    return clamp(areaBudget, 20_000, 42_000);
   }
 
   return lowPower
-    ? clamp(areaBudget, 60_000, 120_000)
+    ? clamp(areaBudget, 38_000, 72_000)
     : compact
-      ? clamp(areaBudget, 90_000, 180_000)
-      : clamp(areaBudget, 140_000, 280_000);
+      ? clamp(areaBudget, 52_000, 96_000)
+      : clamp(areaBudget, 68_000, 132_000);
 }
 
 function sampleImage(image: HTMLImageElement, pointBudget: number) {
   const imageAspect = image.naturalWidth / Math.max(image.naturalHeight, 1);
-  const baseSampleBudget = Math.max(2, Math.floor(pointBudget * 0.46));
-  const columns = Math.max(2, Math.round(Math.sqrt(baseSampleBudget * imageAspect)));
+  const columns = Math.max(2, Math.round(Math.sqrt(pointBudget * imageAspect)));
   const rows = Math.max(2, Math.round(columns / imageAspect));
   const samplingCanvas = document.createElement("canvas");
   samplingCanvas.width = columns;
@@ -405,12 +376,9 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
   context.clearRect(0, 0, columns, rows);
   context.drawImage(image, 0, 0, columns, rows);
   const pixels = context.getImageData(0, 0, columns, rows).data;
-  const surfacePoints: number[] = [];
-  const accentPoints: number[] = [];
+  const points: number[] = [];
   const haloLimit = Math.floor(pointBudget * 0.2);
-  const outlineLimit = Math.floor(pointBudget * 0.14);
   let haloCount = 0;
-  let outlineCount = 0;
 
   const luminanceAt = (column: number, row: number) => {
     const safeColumn = clamp(column, 0, columns - 1);
@@ -424,7 +392,6 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
   };
 
   const pushPoint = (
-    target: number[],
     x: number,
     y: number,
     red: number,
@@ -434,9 +401,9 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
     seedA: number,
     seedB: number,
     edge: number,
-    layer: number,
+    halo: number,
   ) => {
-    target.push(x, y, red, green, blue, alpha, seedA, seedB, edge, layer);
+    points.push(x, y, red, green, blue, alpha, seedA, seedB, edge, halo);
   };
 
   for (let row = 0; row < rows; row += 1) {
@@ -461,63 +428,32 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
       const homeY = 1 - ((row + 0.5) / rows) * 2;
       const coreMetric = Math.hypot(homeX * 0.9, (homeY - 0.12) * 0.72);
       const coreProtection = 1 - smoothstep(0.35, 0.82, coreMetric);
+      const jitterScale = 0.16 + (1 - coreProtection) * 0.84;
+      const jitterX = ((seedA - 0.5) / columns) * jitterScale;
+      const jitterY = ((seedB - 0.5) / rows) * jitterScale;
+      const x = homeX + jitterX;
+      const y = homeY + jitterY;
       const outerMetric = Math.hypot(homeX * 0.82, homeY);
       const envelopeNoise = Math.sin(homeX * 4.1 + seedA * Math.PI * 2) * 0.055
         + Math.cos(homeY * 5.2 + seedB * Math.PI * 2) * 0.045;
-      const imageEnvelope = 1 - smoothstep(0.58, 1.16, outerMetric + envelopeNoise);
+      const imageEnvelope = 1 - smoothstep(0.68, 1.04, outerMetric + envelopeNoise);
       if (imageEnvelope < 0.006) {
         continue;
       }
       const visibility = clamp(0.58 + Math.sqrt(luminance) * 0.38, 0.54, 0.98);
-      const structureWeight = clamp(0.5 + Math.sqrt(luminance) * 0.25 + edge * 0.58, 0.48, 1.38);
-      const duplicateCount = clamp(
-        1 + Math.floor(coreProtection * structureWeight * 2.8 + random01(index * 4.77) * 0.4),
-        1,
-        4,
+
+      pushPoint(
+        x,
+        y,
+        red,
+        green,
+        blue,
+        sourceAlpha * visibility * Math.pow(imageEnvelope, 0.76),
+        seedA,
+        seedB,
+        edge,
+        0,
       );
-      const surfaceAlpha = sourceAlpha * visibility * Math.pow(imageEnvelope, 0.7);
-
-      for (let duplicate = 0; duplicate < duplicateCount; duplicate += 1) {
-        const pointSeedA = random01(index * 7.13 + duplicate * 13.7 + 1);
-        const pointSeedB = random01(index * 9.41 + duplicate * 17.3 + 19);
-        const jitterScale = 0.34 + (1 - coreProtection) * 0.72;
-        const jitterX = ((pointSeedA - 0.5) / columns) * jitterScale;
-        const jitterY = ((pointSeedB - 0.5) / rows) * jitterScale;
-        pushPoint(
-          surfacePoints,
-          homeX + jitterX,
-          homeY + jitterY,
-          red,
-          green,
-          blue,
-          surfaceAlpha * (duplicateCount > 1 ? 0.82 : 1),
-          pointSeedA,
-          pointSeedB,
-          edge,
-          0,
-        );
-      }
-
-      const outlineChance = clamp((edge - 0.18) * (0.72 + coreProtection * 0.64), 0, 0.92);
-      if (outlineCount < outlineLimit && random01(index * 6.37 + 5) < outlineChance) {
-        const outlineSeedA = random01(index * 8.19 + 23);
-        const outlineSeedB = random01(index * 11.03 + 31);
-        const outlineJitter = 0.24 + (1 - coreProtection) * 0.3;
-        pushPoint(
-          accentPoints,
-          homeX + ((outlineSeedA - 0.5) / columns) * outlineJitter,
-          homeY + ((outlineSeedB - 0.5) / rows) * outlineJitter,
-          red,
-          green,
-          blue,
-          sourceAlpha * Math.pow(imageEnvelope, 0.52) * (0.58 + edge * 0.4),
-          outlineSeedA,
-          outlineSeedB,
-          edge,
-          0.5,
-        );
-        outlineCount += 1;
-      }
 
       const outer = smoothstep(0.48, 0.94, outerMetric + envelopeNoise * 0.6);
       const haloChance = clamp(outer * 0.44 + edge * (1 - coreProtection) * 0.32, 0, 0.58);
@@ -525,9 +461,8 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
         const haloSeedA = random01(index * 3.17 + 7);
         const haloSeedB = random01(index * 5.03 + 13);
         pushPoint(
-          accentPoints,
-          homeX,
-          homeY,
+          x,
+          y,
           red,
           green,
           blue,
@@ -542,18 +477,10 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
     }
   }
 
-  const surfacePointCount = surfacePoints.length / FLOATS_PER_POINT;
-  const accentPointCount = accentPoints.length / FLOATS_PER_POINT;
-  const data = new Float32Array(surfacePoints.length + accentPoints.length);
-  data.set(surfacePoints, 0);
-  data.set(accentPoints, surfacePoints.length);
-
   return {
-    data,
+    data: new Float32Array(points),
     imageAspect,
-    pointCount: surfacePointCount + accentPointCount,
-    surfacePointCount,
-    accentPointCount,
+    pointCount: points.length / FLOATS_PER_POINT,
   };
 }
 
@@ -615,8 +542,6 @@ export function ParticleGarden({
     let disposed = false;
     let animationFrame = 0;
     let pointCount = 0;
-    let surfacePointCount = 0;
-    let accentPointCount = 0;
     let imageAspect = 1;
     let currentAudio = 0;
     let trailFrame = 0;
@@ -710,6 +635,7 @@ export function ParticleGarden({
     gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendEquation(gl.FUNC_ADD);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 
     let dpr = 1;
     const resize = () => {
@@ -813,8 +739,6 @@ export function ParticleGarden({
           const budget = choosePointBudget(canvas.clientWidth, canvas.clientHeight, reducedMotion);
           const sampled = sampleImage(image, budget);
           pointCount = sampled.pointCount;
-          surfacePointCount = sampled.surfacePointCount;
-          accentPointCount = sampled.accentPointCount;
           imageAspect = sampled.imageAspect;
           setShowFallback(false);
           gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -916,12 +840,7 @@ export function ParticleGarden({
           dragCurrent.x * (reducedMotion ? 0.24 : 1),
           dragCurrent.y * (reducedMotion ? 0.24 : 1),
         );
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.drawArrays(gl.POINTS, 0, surfacePointCount);
-        if (accentPointCount > 0) {
-          gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-          gl.drawArrays(gl.POINTS, surfacePointCount, accentPointCount);
-        }
+        gl.drawArrays(gl.POINTS, 0, pointCount);
         gl.bindVertexArray(null);
 
         trailFrame += 1;
