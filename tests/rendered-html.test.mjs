@@ -64,6 +64,9 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(layout, /AI Memory Garden/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.match(particle, /webgl2/);
+  assert.match(particle, /imageClarity/);
+  assert.match(particle, /imageBase/);
+  assert.match(particle, /alpha: true/);
   assert.match(store, /indexedDB/);
   await assert.rejects(access(new URL("app/_sites-preview/SkeletonPreview.tsx", root)));
 });

@@ -15,28 +15,46 @@
 
 .canvas {
   position: absolute;
+  z-index: 1;
   inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  background: #000;
-  filter: saturate(1.08) contrast(1.035);
+  background: transparent;
+  filter: saturate(1.04) contrast(1.02);
 }
 
-.fallback {
+.imageBase {
   position: absolute;
-  inset: 0;
+  z-index: 0;
+  inset: 6%;
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 88%;
+  height: 88%;
   object-fit: contain;
-  opacity: 0;
-  filter: saturate(0.88) contrast(1.06) brightness(0.72);
+  object-position: 50% 50%;
+  opacity: var(--image-clarity, 0.76);
+  filter: saturate(0.72) contrast(1.1) brightness(0.78);
+  -webkit-mask-image: radial-gradient(
+    ellipse 66% 72% at 50% 46%,
+    #000 0 50%,
+    rgb(0 0 0 / 0.92) 64%,
+    rgb(0 0 0 / 0.38) 82%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 66% 72% at 50% 46%,
+    #000 0 50%,
+    rgb(0 0 0 / 0.92) 64%,
+    rgb(0 0 0 / 0.38) 82%,
+    transparent 100%
+  );
   transition: opacity 300ms ease;
 }
 
-.fallbackVisible {
-  opacity: 1;
+.imageBaseFallback {
+  opacity: 0.88;
+  filter: saturate(0.82) contrast(1.06) brightness(0.82);
 }
 
 .canvasHidden {
@@ -46,20 +64,19 @@
 .vignette {
   position: absolute;
   inset: -1px;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
   background:
     radial-gradient(
       ellipse at center,
-      transparent 48%,
-      rgb(0 0 0 / 0.08) 66%,
-      rgb(0 0 0 / 0.72) 100%
-    ),
-    linear-gradient(to bottom, rgb(0 0 0 / 0.2), transparent 14%, transparent 82%, rgb(0 0 0 / 0.28));
+      transparent 64%,
+      rgb(0 0 0 / 0.04) 78%,
+      rgb(0 0 0 / 0.34) 100%
+    );
 }
 
 @media (prefers-reduced-motion: reduce) {
   .canvas {
-    filter: saturate(1.03) contrast(1.02);
+    filter: saturate(1.01) contrast(1.01);
   }
 }

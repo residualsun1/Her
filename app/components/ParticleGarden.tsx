@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- fallback must support uploaded blob URLs */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import styles from "./ParticleGarden.module.css";
 
 export interface ParticleGardenReadyDetail {
@@ -17,6 +17,8 @@ export interface ParticleGardenProps {
   audioLevel?: number;
   /** Multiplier for the pointer gravity well. */
   interactionStrength?: number;
+  /** Opacity of the stable photographic layer below the particle texture. */
+  imageClarity?: number;
   className?: string;
   onReady?: (detail: ParticleGardenReadyDetail) => void;
 }
@@ -78,6 +80,13 @@ void main() {
     sin(aMeta.x * TAU + aMeta.y * 2.7)
   );
   vec2 radial = normalize(aHome + vec2(0.0001));
+  float core = 1.0 - smoothstep(
+    0.35,
+    0.82,
+    length(vec2(aHome.x * 0.9, (aHome.y - 0.12) * 0.72))
+  );
+  float deform = mix(0.12, 1.0, pow(1.0 - core, 1.2));
+  deform = mix(deform, 1.0, aMeta.w);
 
   // A slow curl-like field keeps the image alive without losing its silhouette.
   float motionTime = uTime * uMotion;
@@ -85,20 +94,20 @@ void main() {
     sin(aHome.y * 7.4 + motionTime * 0.34 + aMeta.x * TAU),
     cos(aHome.x * 6.8 - motionTime * 0.29 + aMeta.y * TAU)
   );
-  base += flow * (0.0018 + aMeta.z * 0.0034) * uMotion;
+  base += flow * (0.0015 + aMeta.z * 0.0028) * uMotion * deform;
 
   // Edge duplicates drift beyond the image boundary and form the particle halo.
   float haloBreath = 0.82 + 0.18 * sin(uTime * 0.42 + aMeta.y * TAU);
   float haloDistance = (0.025 + aMeta.y * 0.085) * haloBreath;
   base += aMeta.w * (radial * haloDistance + randomDirection * haloDistance * 0.52);
-  base += randomDirection * aMeta.z * 0.007 * (0.75 + 0.25 * sin(motionTime + aMeta.x * TAU));
+  base += randomDirection * aMeta.z * 0.0055 * deform * (0.75 + 0.25 * sin(motionTime + aMeta.x * TAU));
 
   // Audio produces a restrained outward pulse and simulated depth movement.
   float audioWave = sin(uTime * (2.2 + aMeta.y * 2.1) + aMeta.x * TAU);
   float audioPulse = uAudio * (0.55 + 0.45 * audioWave);
-  base += radial * audioPulse * (0.006 + aMeta.z * 0.018 + aMeta.w * 0.014);
+  base += radial * audioPulse * (0.004 + aMeta.z * 0.012 + aMeta.w * 0.014) * deform;
   float depth = sin(aHome.x * 5.0 + aHome.y * 4.2 + uTime * 0.8 + aMeta.x * TAU);
-  depth *= 0.015 + uAudio * 0.11;
+  depth *= (0.015 + uAudio * 0.11) * deform;
 
   // The pointer attracts a wide ring, swirls it, and repels the tiny core.
   vec2 toPointer = uPointer.xy - base;
@@ -106,21 +115,23 @@ void main() {
   vec2 pointerDirection = toPointer / pointerDistance;
   vec2 tangent = vec2(-pointerDirection.y, pointerDirection.x);
   float field = exp(-pointerDistance * pointerDistance * 12.0);
-  float core = exp(-pointerDistance * pointerDistance * 115.0);
-  float pointResponse = (0.52 + aMeta.z * 0.48) * uPointer.z * uInteraction;
+  float pointerCore = exp(-pointerDistance * pointerDistance * 115.0);
+  float pointResponse = (0.52 + aMeta.z * 0.48) * uPointer.z * uInteraction * deform;
   base += (pointerDirection * field * 0.065 + tangent * field * 0.038) * pointResponse;
-  base -= pointerDirection * core * 0.042 * pointResponse;
+  base -= pointerDirection * pointerCore * 0.042 * pointResponse;
 
   float perspective = 1.0 + depth * 0.22;
   gl_Position = vec4(base * perspective, depth, 1.0);
 
-  float edgeSize = 0.8 + aMeta.z * 0.95 + aMeta.w * 0.5;
-  float audioSize = uAudio * (1.2 + aMeta.z * 1.8);
-  gl_PointSize = clamp((1.35 + edgeSize + audioSize) * uDpr * (1.0 + depth), 1.0, 10.0 * uDpr);
+  float edgeSize = aMeta.z * 0.55 + aMeta.w * 0.4;
+  float audioSize = uAudio * (0.55 + aMeta.z * 0.7 + aMeta.w * 0.45);
+  float coreSize = mix(0.72, 1.0, 1.0 - core);
+  gl_PointSize = clamp((0.82 + edgeSize + audioSize) * coreSize * uDpr * (1.0 + depth), 0.75 * uDpr, 4.2 * uDpr);
 
-  vec3 liftedColor = pow(max(aColor.rgb, vec3(0.0)), vec3(0.78));
+  vec3 liftedColor = pow(max(aColor.rgb, vec3(0.0)), vec3(0.92));
   float shimmer = 0.91 + 0.09 * sin(uTime * 0.72 + aMeta.x * TAU);
-  vColor = vec4(liftedColor * shimmer, aColor.a);
+  float surfaceOpacity = mix(0.46, 0.86, 1.0 - core);
+  vColor = vec4(liftedColor * shimmer, aColor.a * surfaceOpacity);
   vHalo = aMeta.w;
   vSpark = clamp(aMeta.z + audioPulse * 0.48, 0.0, 1.0);
 }
@@ -144,8 +155,8 @@ void main() {
 
   float core = 1.0 - smoothstep(0.05, 0.29, distanceFromCenter);
   float glow = 1.0 - smoothstep(0.13, 0.5, distanceFromCenter);
-  float intensity = core * (0.72 + vSpark * 0.42) + glow * (0.24 + vSpark * 0.2);
-  float haloOpacity = mix(1.0, 0.38, vHalo);
+  float intensity = core * (0.68 + vSpark * 0.32) + glow * (0.18 + vSpark * 0.16);
+  float haloOpacity = mix(1.0, 0.34, vHalo);
   float alpha = vColor.a * intensity * haloOpacity;
 
   if (alpha < 0.008) {
@@ -162,6 +173,11 @@ const clamp = (value: number, min: number, max: number) =>
 const random01 = (seed: number) => {
   const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
   return value - Math.floor(value);
+};
+
+const smoothstep = (edge0: number, edge1: number, value: number) => {
+  const normalized = clamp((value - edge0) / Math.max(edge1 - edge0, 0.0001), 0, 1);
+  return normalized * normalized * (3 - 2 * normalized);
 };
 
 function compileShader(
@@ -249,7 +265,7 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
   context.drawImage(image, 0, 0, columns, rows);
   const pixels = context.getImageData(0, 0, columns, rows).data;
   const points: number[] = [];
-  const haloLimit = Math.floor(pointBudget * 0.22);
+  const haloLimit = Math.floor(pointBudget * 0.1);
   let haloCount = 0;
 
   const luminanceAt = (column: number, row: number) => {
@@ -296,11 +312,16 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
       const edge = clamp(Math.hypot(gradientX, gradientY) * 2.8, 0, 1);
       const seedA = random01(index + 1);
       const seedB = random01(index * 1.713 + 19);
-      const jitterX = (seedA - 0.5) / columns;
-      const jitterY = (seedB - 0.5) / rows;
-      const x = ((column + 0.5) / columns) * 2 - 1 + jitterX;
-      const y = 1 - ((row + 0.5) / rows) * 2 + jitterY;
-      const visibility = clamp(0.16 + luminance * 1.08, 0.12, 1);
+      const homeX = ((column + 0.5) / columns) * 2 - 1;
+      const homeY = 1 - ((row + 0.5) / rows) * 2;
+      const coreMetric = Math.hypot(homeX * 0.9, (homeY - 0.12) * 0.72);
+      const coreProtection = 1 - smoothstep(0.35, 0.82, coreMetric);
+      const jitterScale = 0.16 + (1 - coreProtection) * 0.84;
+      const jitterX = ((seedA - 0.5) / columns) * jitterScale;
+      const jitterY = ((seedB - 0.5) / rows) * jitterScale;
+      const x = homeX + jitterX;
+      const y = homeY + jitterY;
+      const visibility = clamp(0.52 + Math.sqrt(luminance) * 0.36, 0.48, 0.9);
 
       pushPoint(
         x,
@@ -315,8 +336,10 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
         0,
       );
 
-      const haloChance = edge * 0.72;
-      if (haloCount < haloLimit && edge > 0.13 && random01(index * 2.31) < haloChance) {
+      const outerMetric = Math.hypot(homeX * 0.82, homeY);
+      const outer = smoothstep(0.48, 0.94, outerMetric);
+      const haloChance = clamp(outer * 0.28 + edge * (1 - coreProtection) * 0.22, 0, 0.38);
+      if (haloCount < haloLimit && haloChance > 0.035 && random01(index * 2.31) < haloChance) {
         const haloSeedA = random01(index * 3.17 + 7);
         const haloSeedB = random01(index * 5.03 + 13);
         pushPoint(
@@ -347,6 +370,7 @@ export function ParticleGarden({
   imageUrl,
   audioLevel = 0,
   interactionStrength = 1,
+  imageClarity = 0.76,
   className,
   onReady,
 }: ParticleGardenProps) {
@@ -389,7 +413,7 @@ export function ParticleGarden({
     const pointerCurrent: PointerState = { x: 2, y: 2, active: 0 };
 
     const gl = canvas.getContext("webgl2", {
-      alpha: false,
+      alpha: true,
       antialias: false,
       depth: false,
       powerPreference: "high-performance",
@@ -451,7 +475,7 @@ export function ParticleGarden({
       pointer: gl.getUniformLocation(program, "uPointer"),
     };
 
-    gl.clearColor(0, 0, 0, 1);
+    gl.clearColor(0, 0, 0, 0);
     gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendEquation(gl.FUNC_ADD);
@@ -486,7 +510,7 @@ export function ParticleGarden({
       }
       pointerTarget.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
       pointerTarget.y = 1 - ((event.clientY - bounds.top) / bounds.height) * 2;
-      pointerTarget.active = event.buttons > 0 ? 1 : 0.62;
+      pointerTarget.active = event.buttons > 0 ? 1 : 0.2;
     };
     const handlePointerDown = (event: PointerEvent) => {
       updatePointer(event);
@@ -495,7 +519,7 @@ export function ParticleGarden({
     };
     const handlePointerUp = (event: PointerEvent) => {
       updatePointer(event);
-      pointerTarget.active = 0.62;
+      pointerTarget.active = 0.2;
       if (canvas.hasPointerCapture?.(event.pointerId)) {
         canvas.releasePointerCapture(event.pointerId);
       }
@@ -634,14 +658,18 @@ export function ParticleGarden({
   }, [imageUrl]);
 
   const rootClassName = className ? `${styles.root} ${className}` : styles.root;
+  const rootStyle = {
+    "--image-clarity": clamp(imageClarity, 0, 1),
+  } as CSSProperties;
 
   return (
     <div
       className={rootClassName}
+      style={rootStyle}
       role="img"
       aria-label="由上传图片生成、可随声音与指针流动的粒子记忆"
     >
-      {imageUrl && <img className={`${styles.fallback} ${showFallback ? styles.fallbackVisible : ""}`} src={imageUrl} alt="" aria-hidden="true" />}
+      {imageUrl && <img className={`${styles.imageBase} ${showFallback ? styles.imageBaseFallback : ""}`} src={imageUrl} alt="" aria-hidden="true" />}
       <canvas ref={canvasRef} className={`${styles.canvas} ${showFallback ? styles.canvasHidden : ""}`} aria-hidden="true" />
       <span className={styles.vignette} aria-hidden="true" />
     </div>
