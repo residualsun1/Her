@@ -23,14 +23,6 @@ export type ParticleTuning = {
   depthWave: number;
 };
 
-export type SubjectTuning = {
-  backgroundSuppression: number;
-  exposure: number;
-  shadowLift: number;
-  surfaceFill: number;
-  edgePreservation: number;
-};
-
 export const DEFAULT_PARTICLE_TUNING: ParticleTuning = {
   dispersion: 1.5,
   particleSize: 2.8,
@@ -42,14 +34,6 @@ export const DEFAULT_PARTICLE_TUNING: ParticleTuning = {
   colorShiftSpeed: 2,
   danceStrength: 7.5,
   depthWave: 5,
-};
-
-export const DEFAULT_SUBJECT_TUNING: SubjectTuning = {
-  backgroundSuppression: 0.74,
-  exposure: 1.34,
-  shadowLift: 0.12,
-  surfaceFill: 1.12,
-  edgePreservation: 0.72,
 };
 
 export interface ParticleGardenProps {
@@ -65,8 +49,6 @@ export interface ParticleGardenProps {
   precomposed?: boolean;
   /** Live controls mirroring the visual parameters shown in the reference video. */
   tuning?: Partial<ParticleTuning>;
-  /** Subject-aware preparation applied before the image becomes a particle field. */
-  subjectTuning?: Partial<SubjectTuning>;
   className?: string;
   onReady?: (detail: ParticleGardenReadyDetail) => void;
 }
@@ -76,8 +58,6 @@ type MutableInput = {
   interaction: number;
   clarity: number;
   tuning: ParticleTuning;
-  subject: SubjectTuning;
-  precomposed: boolean;
 };
 
 type PointerState = {
@@ -98,20 +78,13 @@ type NavigatorWithPerformanceHints = Navigator & {
   };
 };
 
-type SubjectAnalysis = {
-  width: number;
-  height: number;
-  saliency: Float32Array;
-};
-
-const FLOATS_PER_POINT = 11;
+const FLOATS_PER_POINT = 10;
 const VERTEX_SHADER = `#version 300 es
 precision highp float;
 
 layout(location = 0) in vec2 aHome;
 layout(location = 1) in vec4 aColor;
 layout(location = 2) in vec4 aMeta;
-layout(location = 3) in float aSubject;
 
 uniform float uTime;
 uniform float uAudio;
@@ -133,7 +106,6 @@ uniform float uMouseRadius;
 uniform float uColorShiftSpeed;
 uniform float uDanceStrength;
 uniform float uDepthWave;
-uniform float uSubjectFill;
 
 out vec4 vColor;
 out float vHalo;
@@ -253,9 +225,7 @@ void main() {
   float perspective = 1.0 + depth * 0.2;
   gl_Position = vec4(base * perspective, depth, 1.0);
 
-  float subjectFill = clamp(uSubjectFill, 0.6, 1.6);
   float surfaceSize = mix(0.76 + uSubjectDetail * 0.18, 1.02, 1.0 - core);
-  surfaceSize *= mix(0.92, subjectFill, aSubject);
   float edgeSize = aMeta.z * 0.22 + aMeta.w * 0.18;
   float audioSize = audioEnergy * (0.3 + aMeta.z * 0.42 + aMeta.w * 0.34);
   gl_PointSize = clamp(uParticleSize * (surfaceSize + edgeSize + audioSize) * uDpr * (1.0 + depth * 0.16), 0.7 * uDpr, 6.4 * uDpr);
@@ -266,7 +236,6 @@ void main() {
   liftedColor = max(rotateHue(liftedColor, hueAngle), vec3(0.0));
   float shimmer = 0.88 + 0.12 * sin(uTime * 0.82 + aMeta.x * TAU);
   float surfaceOpacity = mix(0.82 + uSubjectDetail * 0.17, 0.92, 1.0 - core);
-  surfaceOpacity *= mix(0.76, min(1.18, 0.9 + subjectFill * 0.2), aSubject);
   float envelopeOpacity = mix(imageEnvelope, max(imageEnvelope, 0.44), aMeta.w);
   vColor = vec4(liftedColor * shimmer, aColor.a * surfaceOpacity * envelopeOpacity);
   vHalo = aMeta.w;
@@ -388,170 +357,7 @@ function choosePointBudget(width: number, height: number, reducedMotion: boolean
       : clamp(areaBudget, 68_000, 132_000);
 }
 
-function boxBlur(values: Float32Array, width: number, height: number, radius: number) {
-  const stride = width + 1;
-  const integral = new Float64Array((width + 1) * (height + 1));
-
-  for (let row = 0; row < height; row += 1) {
-    let rowSum = 0;
-    for (let column = 0; column < width; column += 1) {
-      rowSum += values[row * width + column];
-      integral[(row + 1) * stride + column + 1] =
-        integral[row * stride + column + 1] + rowSum;
-    }
-  }
-
-  const blurred = new Float32Array(values.length);
-  for (let row = 0; row < height; row += 1) {
-    const top = Math.max(0, row - radius);
-    const bottom = Math.min(height - 1, row + radius);
-    for (let column = 0; column < width; column += 1) {
-      const left = Math.max(0, column - radius);
-      const right = Math.min(width - 1, column + radius);
-      const sum =
-        integral[(bottom + 1) * stride + right + 1] -
-        integral[top * stride + right + 1] -
-        integral[(bottom + 1) * stride + left] +
-        integral[top * stride + left];
-      blurred[row * width + column] =
-        sum / Math.max(1, (right - left + 1) * (bottom - top + 1));
-    }
-  }
-
-  return blurred;
-}
-
-function percentile(values: Float32Array, ratio: number) {
-  const ordered = Array.from(values).sort((left, right) => left - right);
-  return ordered[Math.round(clamp(ratio, 0, 1) * Math.max(0, ordered.length - 1))] ?? 0;
-}
-
-/**
- * A lightweight, local saliency pass. It distinguishes likely subjects from
- * the border background without uploading, cropping, scaling, or repositioning
- * the source image.
- */
-function analyzeSubject(image: HTMLImageElement): SubjectAnalysis {
-  const maxDimension = 180;
-  const scale = Math.min(
-    1,
-    maxDimension / Math.max(image.naturalWidth, image.naturalHeight, 1),
-  );
-  const width = Math.max(24, Math.round(image.naturalWidth * scale));
-  const height = Math.max(24, Math.round(image.naturalHeight * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-  if (!context) {
-    return {
-      width: 1,
-      height: 1,
-      saliency: new Float32Array([1]),
-    };
-  }
-
-  context.drawImage(image, 0, 0, width, height);
-  const pixels = context.getImageData(0, 0, width, height).data;
-  const luminance = new Float32Array(width * height);
-  const borderHistogram = new Uint32Array(512);
-  const borderSize = Math.max(2, Math.round(Math.min(width, height) * 0.08));
-
-  for (let row = 0; row < height; row += 1) {
-    for (let column = 0; column < width; column += 1) {
-      const index = row * width + column;
-      const offset = index * 4;
-      const red = pixels[offset] / 255;
-      const green = pixels[offset + 1] / 255;
-      const blue = pixels[offset + 2] / 255;
-      luminance[index] = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-      if (
-        row < borderSize ||
-        row >= height - borderSize ||
-        column < borderSize ||
-        column >= width - borderSize
-      ) {
-        const key = (pixels[offset] >> 5) * 64 +
-          (pixels[offset + 1] >> 5) * 8 +
-          (pixels[offset + 2] >> 5);
-        borderHistogram[key] += 1;
-      }
-    }
-  }
-
-  const palette = Array.from(borderHistogram, (count, key) => ({ count, key }))
-    .sort((left, right) => right.count - left.count)
-    .slice(0, 10)
-    .map(({ key }) => [
-      (Math.floor(key / 64) * 32 + 16) / 255,
-      (Math.floor((key % 64) / 8) * 32 + 16) / 255,
-      ((key % 8) * 32 + 16) / 255,
-    ] as const);
-
-  const rawSaliency = new Float32Array(width * height);
-  for (let row = 0; row < height; row += 1) {
-    for (let column = 0; column < width; column += 1) {
-      const index = row * width + column;
-      const offset = index * 4;
-      const left = luminance[row * width + Math.max(0, column - 1)];
-      const right = luminance[row * width + Math.min(width - 1, column + 1)];
-      const top = luminance[Math.max(0, row - 1) * width + column];
-      const bottom = luminance[Math.min(height - 1, row + 1) * width + column];
-      const edge = Math.hypot(right - left, bottom - top);
-      const red = pixels[offset] / 255;
-      const green = pixels[offset + 1] / 255;
-      const blue = pixels[offset + 2] / 255;
-      let borderDistance = 1;
-      for (const color of palette) {
-        borderDistance = Math.min(
-          borderDistance,
-          Math.hypot(red - color[0], green - color[1], blue - color[2]) / 1.35,
-        );
-      }
-      rawSaliency[index] = edge * 1.45 + borderDistance * 0.78;
-    }
-  }
-
-  const radius = clamp(Math.round(Math.min(width, height) * 0.055), 2, 10);
-  const coherentSaliency = boxBlur(rawSaliency, width, height, radius);
-  const maskLow = percentile(coherentSaliency, 0.48);
-  const maskHigh = percentile(coherentSaliency, 0.86);
-  const saliency = new Float32Array(width * height);
-
-  for (let row = 0; row < height; row += 1) {
-    for (let column = 0; column < width; column += 1) {
-      const index = row * width + column;
-      const score = coherentSaliency[index];
-      saliency[index] = smoothstep(maskLow, Math.max(maskLow + 0.0001, maskHigh), score);
-    }
-  }
-
-  return { width, height, saliency };
-}
-
-function sampleSubjectMask(analysis: SubjectAnalysis, normalizedX: number, normalizedY: number) {
-  const x = clamp(normalizedX, 0, 1) * (analysis.width - 1);
-  const y = clamp(normalizedY, 0, 1) * (analysis.height - 1);
-  const left = Math.floor(x);
-  const top = Math.floor(y);
-  const right = Math.min(analysis.width - 1, left + 1);
-  const bottom = Math.min(analysis.height - 1, top + 1);
-  const mixX = x - left;
-  const mixY = y - top;
-  const topValue = analysis.saliency[top * analysis.width + left] * (1 - mixX) +
-    analysis.saliency[top * analysis.width + right] * mixX;
-  const bottomValue = analysis.saliency[bottom * analysis.width + left] * (1 - mixX) +
-    analysis.saliency[bottom * analysis.width + right] * mixX;
-  return topValue * (1 - mixY) + bottomValue * mixY;
-}
-
-function sampleImage(
-  image: HTMLImageElement,
-  pointBudget: number,
-  analysis: SubjectAnalysis,
-  subjectTuning: SubjectTuning,
-  precomposed: boolean,
-) {
+function sampleImage(image: HTMLImageElement, pointBudget: number) {
   const imageAspect = image.naturalWidth / Math.max(image.naturalHeight, 1);
   const columns = Math.max(2, Math.round(Math.sqrt(pointBudget * imageAspect)));
   const rows = Math.max(2, Math.round(columns / imageAspect));
@@ -596,9 +402,8 @@ function sampleImage(
     seedB: number,
     edge: number,
     halo: number,
-    subject: number,
   ) => {
-    points.push(x, y, red, green, blue, alpha, seedA, seedB, edge, halo, subject);
+    points.push(x, y, red, green, blue, alpha, seedA, seedB, edge, halo);
   };
 
   for (let row = 0; row < rows; row += 1) {
@@ -610,44 +415,15 @@ function sampleImage(
         continue;
       }
 
-      let red = pixels[offset] / 255;
-      let green = pixels[offset + 1] / 255;
-      let blue = pixels[offset + 2] / 255;
-      const sourceNormalizedX = (column + 0.5) / columns;
-      const sourceNormalizedY = (row + 0.5) / rows;
-      const subject = precomposed
-        ? 1
-        : sampleSubjectMask(analysis, sourceNormalizedX, sourceNormalizedY);
-      const originalLuminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      const red = pixels[offset] / 255;
+      const green = pixels[offset + 1] / 255;
+      const blue = pixels[offset + 2] / 255;
+      const luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
       const gradientX = luminanceAt(column + 1, row) - luminanceAt(column - 1, row);
       const gradientY = luminanceAt(column, row + 1) - luminanceAt(column, row - 1);
       const edge = clamp(Math.hypot(gradientX, gradientY) * 2.8, 0, 1);
       const seedA = random01(index + 1);
       const seedB = random01(index * 1.713 + 19);
-      const suppression = precomposed ? 0 : clamp(subjectTuning.backgroundSuppression, 0, 1);
-      const backgroundKeep = 1 - suppression * (0.9 - edge * 0.18);
-      const keepProbability = backgroundKeep * (1 - subject) + subject;
-      if (seedA > keepProbability) {
-        continue;
-      }
-
-      const exposure = precomposed ? 1 : clamp(subjectTuning.exposure, 0.75, 2.2);
-      const shadowLift = precomposed ? 0 : clamp(subjectTuning.shadowLift, 0, 0.45);
-      const edgePreservation = precomposed
-        ? 0
-        : clamp(subjectTuning.edgePreservation, 0, 1);
-      const gamma = 1 / exposure;
-      const protectedLift = shadowLift * (1 - edge * edgePreservation);
-      const correctChannel = (channel: number) => {
-        const exposed = Math.pow(clamp(channel, 0, 1), gamma);
-        const lifted = exposed + protectedLift * (1 - exposed);
-        const edgeLight = edge * edgePreservation * 0.16;
-        return clamp(lifted + edgeLight, 0, 1);
-      };
-      red += (correctChannel(red) - red) * subject;
-      green += (correctChannel(green) - green) * subject;
-      blue += (correctChannel(blue) - blue) * subject;
-      const luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
       const homeX = ((column + 0.5) / columns) * 2 - 1;
       const homeY = 1 - ((row + 0.5) / rows) * 2;
       const coreMetric = Math.hypot(homeX * 0.9, (homeY - 0.12) * 0.72);
@@ -664,14 +440,7 @@ function sampleImage(
       if (imageEnvelope < 0.006) {
         continue;
       }
-      const visibility = clamp(
-        0.58 + Math.sqrt(luminance) * 0.38 + subject * Math.max(0, originalLuminance - 0.5) * 0.08,
-        0.54,
-        1.06,
-      );
-      const subjectAlpha = (1 - suppression * 0.78) * (1 - subject) + subject;
-      const fill = precomposed ? 1 : clamp(subjectTuning.surfaceFill, 0.6, 1.6);
-      const fillAlpha = 1 + (fill - 1) * subject;
+      const visibility = clamp(0.58 + Math.sqrt(luminance) * 0.38, 0.54, 0.98);
 
       pushPoint(
         x,
@@ -679,20 +448,15 @@ function sampleImage(
         red,
         green,
         blue,
-        sourceAlpha * visibility * subjectAlpha * fillAlpha * Math.pow(imageEnvelope, 0.76),
+        sourceAlpha * visibility * Math.pow(imageEnvelope, 0.76),
         seedA,
         seedB,
         edge,
         0,
-        subject,
       );
 
       const outer = smoothstep(0.48, 0.94, outerMetric + envelopeNoise * 0.6);
-      const haloChance = clamp(
-        outer * 0.44 + edge * (1 - coreProtection) * 0.32 + edge * subject * 0.1,
-        0,
-        0.62,
-      );
+      const haloChance = clamp(outer * 0.44 + edge * (1 - coreProtection) * 0.32, 0, 0.58);
       if (haloCount < haloLimit && haloChance > 0.035 && random01(index * 2.31) < haloChance) {
         const haloSeedA = random01(index * 3.17 + 7);
         const haloSeedB = random01(index * 5.03 + 13);
@@ -702,12 +466,11 @@ function sampleImage(
           red,
           green,
           blue,
-          sourceAlpha * visibility * subjectAlpha * (0.54 + edge * 0.32),
+          sourceAlpha * visibility * (0.54 + edge * 0.32),
           haloSeedA,
           haloSeedB,
           edge,
           1,
-          subject,
         );
         haloCount += 1;
       }
@@ -728,21 +491,17 @@ export function ParticleGarden({
   imageClarity = 0.52,
   precomposed = false,
   tuning,
-  subjectTuning,
   className,
   onReady,
 }: ParticleGardenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const trailCanvasRef = useRef<HTMLCanvasElement>(null);
-  const resampleRef = useRef<(() => void) | null>(null);
   const [showFallback, setShowFallback] = useState(false);
   const inputsRef = useRef<MutableInput>({
     audio: clamp(audioLevel, 0, 1),
     interaction: Math.max(0, interactionStrength),
     clarity: clamp(imageClarity, 0, 1),
     tuning: { ...DEFAULT_PARTICLE_TUNING, ...tuning },
-    subject: { ...DEFAULT_SUBJECT_TUNING, ...subjectTuning },
-    precomposed,
   });
   const onReadyRef = useRef(onReady);
 
@@ -761,13 +520,6 @@ export function ParticleGarden({
   useEffect(() => {
     inputsRef.current.tuning = { ...DEFAULT_PARTICLE_TUNING, ...tuning };
   }, [tuning]);
-
-  useEffect(() => {
-    inputsRef.current.subject = { ...DEFAULT_SUBJECT_TUNING, ...subjectTuning };
-    inputsRef.current.precomposed = precomposed;
-    const timer = window.setTimeout(() => resampleRef.current?.(), 70);
-    return () => window.clearTimeout(timer);
-  }, [precomposed, subjectTuning]);
 
   useEffect(() => {
     onReadyRef.current = onReady;
@@ -854,8 +606,6 @@ export function ParticleGarden({
     gl.vertexAttribPointer(1, 4, gl.FLOAT, false, stride, 2 * Float32Array.BYTES_PER_ELEMENT);
     gl.enableVertexAttribArray(2);
     gl.vertexAttribPointer(2, 4, gl.FLOAT, false, stride, 6 * Float32Array.BYTES_PER_ELEMENT);
-    gl.enableVertexAttribArray(3);
-    gl.vertexAttribPointer(3, 1, gl.FLOAT, false, stride, 10 * Float32Array.BYTES_PER_ELEMENT);
     gl.bindVertexArray(null);
 
     const uniforms = {
@@ -879,7 +629,6 @@ export function ParticleGarden({
       colorShiftSpeed: gl.getUniformLocation(program, "uColorShiftSpeed"),
       danceStrength: gl.getUniformLocation(program, "uDanceStrength"),
       depthWave: gl.getUniformLocation(program, "uDepthWave"),
-      subjectFill: gl.getUniformLocation(program, "uSubjectFill"),
     };
 
     gl.clearColor(0, 0, 0, 0);
@@ -978,45 +727,6 @@ export function ParticleGarden({
     reducedMotionQuery.addEventListener("change", handleMotionPreference);
 
     const image = imageUrl ? new Image() : null;
-    let subjectAnalysis: SubjectAnalysis | null = null;
-    const resample = () => {
-      if (disposed || !image || !image.complete || !subjectAnalysis) {
-        return;
-      }
-      try {
-        const budget = choosePointBudget(canvas.clientWidth, canvas.clientHeight, reducedMotion);
-        const sampled = sampleImage(
-          image,
-          budget,
-          subjectAnalysis,
-          inputsRef.current.subject,
-          inputsRef.current.precomposed,
-        );
-        pointCount = sampled.pointCount;
-        imageAspect = sampled.imageAspect;
-        setShowFallback(false);
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, sampled.data, gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-        onReadyRef.current?.({
-          pointCount,
-          reducedMotion,
-          renderer: "webgl2",
-        });
-      } catch (error) {
-        console.warn(
-          "ParticleGarden could not read the image. Use an uploaded object URL or a CORS-enabled URL.",
-          error,
-        );
-        setShowFallback(true);
-        onReadyRef.current?.({
-          pointCount: 0,
-          reducedMotion,
-          renderer: "webgl2",
-        });
-      }
-    };
-    resampleRef.current = resample;
     if (image && imageUrl) {
       image.decoding = "async";
       image.crossOrigin = "anonymous";
@@ -1025,8 +735,32 @@ export function ParticleGarden({
           return;
         }
 
-        subjectAnalysis = analyzeSubject(image);
-        resample();
+        try {
+          const budget = choosePointBudget(canvas.clientWidth, canvas.clientHeight, reducedMotion);
+          const sampled = sampleImage(image, budget);
+          pointCount = sampled.pointCount;
+          imageAspect = sampled.imageAspect;
+          setShowFallback(false);
+          gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+          gl.bufferData(gl.ARRAY_BUFFER, sampled.data, gl.STATIC_DRAW);
+          gl.bindBuffer(gl.ARRAY_BUFFER, null);
+          onReadyRef.current?.({
+            pointCount,
+            reducedMotion,
+            renderer: "webgl2",
+          });
+        } catch (error) {
+          console.warn(
+            "ParticleGarden could not read the image. Use an uploaded object URL or a CORS-enabled URL.",
+            error,
+          );
+          setShowFallback(true);
+          onReadyRef.current?.({
+            pointCount: 0,
+            reducedMotion,
+            renderer: "webgl2",
+          });
+        }
       };
       image.onerror = () => {
         console.warn("ParticleGarden could not load the supplied image URL.");
@@ -1092,7 +826,6 @@ export function ParticleGarden({
         gl.uniform1f(uniforms.colorShiftSpeed, inputsRef.current.tuning.colorShiftSpeed);
         gl.uniform1f(uniforms.danceStrength, inputsRef.current.tuning.danceStrength);
         gl.uniform1f(uniforms.depthWave, inputsRef.current.tuning.depthWave);
-        gl.uniform1f(uniforms.subjectFill, inputsRef.current.subject.surfaceFill);
         gl.uniform1f(uniforms.dpr, dpr);
         gl.uniform1f(uniforms.imageAspect, imageAspect);
         gl.uniform2f(uniforms.viewport, canvas.width, canvas.height);
@@ -1159,9 +892,6 @@ export function ParticleGarden({
         image.onload = null;
         image.onerror = null;
         image.removeAttribute("src");
-      }
-      if (resampleRef.current === resample) {
-        resampleRef.current = null;
       }
       gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vertexArray);

@@ -5,10 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   DEFAULT_PARTICLE_TUNING,
-  DEFAULT_SUBJECT_TUNING,
   ParticleGarden,
   type ParticleTuning,
-  type SubjectTuning,
 } from "./ParticleGarden";
 import { memoryStore } from "@/app/lib/memory/store";
 import type {
@@ -244,7 +242,6 @@ export function HerApp() {
   const [interactionStrength, setInteractionStrength] = useState(1.25);
   const [imageClarity, setImageClarity] = useState(0.72);
   const [particleTuning, setParticleTuning] = useState<ParticleTuning>({ ...DEFAULT_PARTICLE_TUNING });
-  const [subjectTuning, setSubjectTuning] = useState<SubjectTuning>({ ...DEFAULT_SUBJECT_TUNING });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -297,12 +294,6 @@ export function HerApp() {
   const visualAudioLevel = Math.min(1, audioLevel);
   const updateParticleTuning = useCallback((key: keyof ParticleTuning, value: number) => {
     setParticleTuning((current) => ({ ...current, [key]: value }));
-  }, []);
-  const updateSubjectTuning = useCallback(<Key extends keyof SubjectTuning>(
-    key: Key,
-    value: SubjectTuning[Key],
-  ) => {
-    setSubjectTuning((current) => ({ ...current, [key]: value }));
   }, []);
 
   const flashNotice = useCallback((message: string) => {
@@ -1247,7 +1238,6 @@ export function HerApp() {
             imageClarity={imageClarity}
             precomposed={imagePrecomposed}
             tuning={particleTuning}
-            subjectTuning={subjectTuning}
             className={styles.particleCanvas}
             onReady={(info) => setParticleInfo(`${info.pointCount.toLocaleString()} particles`)}
           />
@@ -1363,7 +1353,7 @@ export function HerApp() {
               <img src={gardenItems[(gardenIndex - 1 + gardenItems.length) % gardenItems.length].imageUrl} alt="Previous memory" />
             </div>
             <div className={styles.centerMemory} onClick={openGardenConversation} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openGardenConversation(); } }} role="button" tabIndex={0}>
-              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.1} interactionStrength={1.1} imageClarity={0.72} precomposed={gardenItems[gardenIndex].precomposed} tuning={particleTuning} subjectTuning={subjectTuning} />
+              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.1} interactionStrength={1.1} imageClarity={0.72} precomposed={gardenItems[gardenIndex].precomposed} tuning={particleTuning} />
               <div className={styles.memoryCaption}><span>{pad(gardenIndex + 1)} / {pad(gardenItems.length)}</span><h2>{gardenItems[gardenIndex].title}</h2><small>open this memory ↗</small></div>
             </div>
             <div className={styles.sideMemory} onClick={() => chooseGardenItem(gardenIndex + 1)}>
@@ -1453,35 +1443,28 @@ export function HerApp() {
       )}
 
       {settingsOpen && (
-        <aside className={styles.settingsPanel} aria-label="Settings">
-          <div className={styles.settingsTitle}><div><span>SESSION SETTINGS</span><h2>How should this memory feel?</h2></div><button onClick={() => setSettingsOpen(false)}>×</button></div>
-          <label>AI Brain<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providerOptions.map((option) => <option key={option.provider} value={option.provider} disabled={providerMode === "live" && !option.configured}>{providerLabel(option.provider)}{providerMode === "live" && !option.configured ? " · key needed" : ""}</option>)}</select></label>
-          <label>Voice<select value={voiceStyle} onChange={(event) => setVoiceStyle(event.target.value)}><option value="intimate">Intimate English</option><option value="reflective">Reflective English</option><option value="bright">Bright English</option></select></label>
-          <label>Reply language<select value={replyLanguage} onChange={(event) => setReplyLanguage(event.target.value as "en" | "zh")}><option value="en">English first</option><option value="zh">中文优先</option></select></label>
-          <label className={styles.toggleRow}><span><b>Let AI understand the image</b><small>A compressed copy is sent only with consent.</small></span><input type="checkbox" checked={visionEnabled} onChange={(event) => setVisionEnabled(event.target.checked)} /></label>
-          <label className={styles.toggleRow}><span><b>Save my voice on this device</b><small>Turn audio is never uploaded for cloud storage.</small></span><input type="checkbox" checked={saveVoice} onChange={(event) => setSaveVoice(event.target.checked)} /></label>
-          <div className={styles.settingsSectionLabel}><span>主体与背景</span><button onClick={() => { setSubjectTuning({ ...DEFAULT_SUBJECT_TUNING }); setParticleTuning({ ...DEFAULT_PARTICLE_TUNING }); setImageClarity(0.72); setInteractionStrength(1.25); }}>全部重置</button></div>
-          <label>背景抑制 <output>{Math.round(subjectTuning.backgroundSuppression * 100)}%</output><input type="range" min="0" max="1" step="0.02" value={subjectTuning.backgroundSuppression} onChange={(event) => updateSubjectTuning("backgroundSuppression", Number(event.target.value))} /></label>
-          <label>主体曝光 <output>{subjectTuning.exposure.toFixed(2)}×</output><input type="range" min="0.75" max="2.2" step="0.05" value={subjectTuning.exposure} onChange={(event) => updateSubjectTuning("exposure", Number(event.target.value))} /></label>
-          <label>暗部提亮 <output>{Math.round(subjectTuning.shadowLift * 100)}%</output><input type="range" min="0" max="0.45" step="0.01" value={subjectTuning.shadowLift} onChange={(event) => updateSubjectTuning("shadowLift", Number(event.target.value))} /></label>
-          <label>主体填充 <output>{subjectTuning.surfaceFill.toFixed(2)}×</output><input type="range" min="0.6" max="1.6" step="0.05" value={subjectTuning.surfaceFill} onChange={(event) => updateSubjectTuning("surfaceFill", Number(event.target.value))} /></label>
-          <label>边缘保留 <output>{Math.round(subjectTuning.edgePreservation * 100)}%</output><input type="range" min="0" max="1" step="0.02" value={subjectTuning.edgePreservation} onChange={(event) => updateSubjectTuning("edgePreservation", Number(event.target.value))} /></label>
-          <p className={styles.settingsHint}>这些参数只调整主体与背景粒子的密度、亮度和轮廓，不会自动聚焦、裁切、放大或改变原图构图。</p>
-          <div className={styles.settingsSectionLabel}><span>PARTICLE FIELD</span><button onClick={() => setParticleTuning({ ...DEFAULT_PARTICLE_TUNING })}>重置粒子</button></div>
-          <label>Dispersion <output>{particleTuning.dispersion.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.dispersion} onChange={(event) => updateParticleTuning("dispersion", Number(event.target.value))} /></label>
-          <label>Particle Size <output>{particleTuning.particleSize.toFixed(1)}</output><input type="range" min="1" max="5" step="0.1" value={particleTuning.particleSize} onChange={(event) => updateParticleTuning("particleSize", Number(event.target.value))} /></label>
-          <label>Contrast <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.6" max="2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /></label>
-          <label>Flow Speed <output>{particleTuning.flowSpeed.toFixed(1)}</output><input type="range" min="0" max="2" step="0.1" value={particleTuning.flowSpeed} onChange={(event) => updateParticleTuning("flowSpeed", Number(event.target.value))} /></label>
-          <label>Flow Amplitude <output>{particleTuning.flowAmplitude.toFixed(1)}</output><input type="range" min="0" max="2.5" step="0.1" value={particleTuning.flowAmplitude} onChange={(event) => updateParticleTuning("flowAmplitude", Number(event.target.value))} /></label>
-          <label>Depth Strength <output>{particleTuning.depthStrength.toFixed(1)}</output><input type="range" min="0" max="100" step="1" value={particleTuning.depthStrength} onChange={(event) => updateParticleTuning("depthStrength", Number(event.target.value))} /></label>
-          <label>Mouse Radius <output>{particleTuning.mouseRadius.toFixed(1)}</output><input type="range" min="40" max="220" step="5" value={particleTuning.mouseRadius} onChange={(event) => updateParticleTuning("mouseRadius", Number(event.target.value))} /></label>
-          <label>Color Shift Speed <output>{particleTuning.colorShiftSpeed.toFixed(1)}</output><input type="range" min="0" max="4" step="0.1" value={particleTuning.colorShiftSpeed} onChange={(event) => updateParticleTuning("colorShiftSpeed", Number(event.target.value))} /></label>
-          <div className={styles.settingsSectionLabel}><span>AUDIO DANCE</span></div>
-          <label>Dance Strength <output>{particleTuning.danceStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.danceStrength} onChange={(event) => updateParticleTuning("danceStrength", Number(event.target.value))} /></label>
-          <label>Depth Wave <output>{particleTuning.depthWave.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.depthWave} onChange={(event) => updateParticleTuning("depthWave", Number(event.target.value))} /></label>
-          <label>Subject Detail <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.45" max="0.92" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
-          <label>Mouse Force <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /></label>
-          <p className={styles.synthDisclosure}>{providerMode === "mock" ? "Offline preview mode is active: no external model is being called. " : "Live text mode is active. "}Voice playback in this runnable Demo uses an explicitly disclosed browser synthetic voice until a configured streaming TTS provider is added.</p>
+        <aside className={styles.settingsPanel} aria-label="设置">
+          <div className={styles.settingsTitle}><div><span>会话设置</span><h2>这段记忆应该如何呈现？</h2></div><button onClick={() => setSettingsOpen(false)}>×</button></div>
+          <label>AI 模型<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providerOptions.map((option) => <option key={option.provider} value={option.provider} disabled={providerMode === "live" && !option.configured}>{providerLabel(option.provider)}{providerMode === "live" && !option.configured ? " · 未配置密钥" : ""}</option>)}</select></label>
+          <label>语音音色<select value={voiceStyle} onChange={(event) => setVoiceStyle(event.target.value)}><option value="intimate">亲密英文</option><option value="reflective">沉思英文</option><option value="bright">明亮英文</option></select></label>
+          <label>回复语言<select value={replyLanguage} onChange={(event) => setReplyLanguage(event.target.value as "en" | "zh")}><option value="en">英文优先</option><option value="zh">中文优先</option></select></label>
+          <label className={styles.toggleRow}><span><b>允许 AI 理解图片</b><small>仅在你同意后发送压缩副本。</small></span><input type="checkbox" checked={visionEnabled} onChange={(event) => setVisionEnabled(event.target.checked)} /></label>
+          <label className={styles.toggleRow}><span><b>在本设备保存我的语音</b><small>每轮语音不会上传到云端存储。</small></span><input type="checkbox" checked={saveVoice} onChange={(event) => setSaveVoice(event.target.checked)} /></label>
+          <div className={styles.settingsSectionLabel}><span>粒子场</span><button onClick={() => { setParticleTuning({ ...DEFAULT_PARTICLE_TUNING }); setImageClarity(0.72); setInteractionStrength(1.25); }}>全部重置</button></div>
+          <label>粒子扩散 <output>{particleTuning.dispersion.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.dispersion} onChange={(event) => updateParticleTuning("dispersion", Number(event.target.value))} /></label>
+          <label>粒子大小 <output>{particleTuning.particleSize.toFixed(1)}</output><input type="range" min="1" max="5" step="0.1" value={particleTuning.particleSize} onChange={(event) => updateParticleTuning("particleSize", Number(event.target.value))} /></label>
+          <label>对比度 <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.6" max="2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /></label>
+          <label>流动速度 <output>{particleTuning.flowSpeed.toFixed(1)}</output><input type="range" min="0" max="2" step="0.1" value={particleTuning.flowSpeed} onChange={(event) => updateParticleTuning("flowSpeed", Number(event.target.value))} /></label>
+          <label>流动幅度 <output>{particleTuning.flowAmplitude.toFixed(1)}</output><input type="range" min="0" max="2.5" step="0.1" value={particleTuning.flowAmplitude} onChange={(event) => updateParticleTuning("flowAmplitude", Number(event.target.value))} /></label>
+          <label>景深强度 <output>{particleTuning.depthStrength.toFixed(1)}</output><input type="range" min="0" max="100" step="1" value={particleTuning.depthStrength} onChange={(event) => updateParticleTuning("depthStrength", Number(event.target.value))} /></label>
+          <label>鼠标影响半径 <output>{particleTuning.mouseRadius.toFixed(1)}</output><input type="range" min="40" max="220" step="5" value={particleTuning.mouseRadius} onChange={(event) => updateParticleTuning("mouseRadius", Number(event.target.value))} /></label>
+          <label>色相漂移速度 <output>{particleTuning.colorShiftSpeed.toFixed(1)}</output><input type="range" min="0" max="4" step="0.1" value={particleTuning.colorShiftSpeed} onChange={(event) => updateParticleTuning("colorShiftSpeed", Number(event.target.value))} /></label>
+          <div className={styles.settingsSectionLabel}><span>声音律动</span></div>
+          <label>律动强度 <output>{particleTuning.danceStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.danceStrength} onChange={(event) => updateParticleTuning("danceStrength", Number(event.target.value))} /></label>
+          <label>景深波动 <output>{particleTuning.depthWave.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.depthWave} onChange={(event) => updateParticleTuning("depthWave", Number(event.target.value))} /></label>
+          <label>主体细节 <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.45" max="0.92" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
+          <label>鼠标力场强度 <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /></label>
+          <p className={styles.synthDisclosure}>{providerMode === "mock" ? "当前为离线预览模式，不会调用外部模型。" : "当前为实时文字模式。"}此 Demo 暂时使用浏览器合成语音；配置流式语音服务后可替换为更丰富的 AI 音色。</p>
         </aside>
       )}
 
