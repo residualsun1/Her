@@ -21,7 +21,17 @@
   width: 100%;
   height: 100%;
   background: transparent;
-  filter: saturate(1.04) contrast(1.02);
+  filter:
+    saturate(1.18)
+    contrast(1.08)
+    drop-shadow(0 0 5px rgb(84 171 255 / 0.22))
+    drop-shadow(0 0 13px rgb(66 119 255 / 0.12));
+  cursor: grab;
+  touch-action: none;
+}
+
+.canvas:active {
+  cursor: grabbing;
 }
 
 .imageBase {
@@ -33,8 +43,9 @@
   height: 88%;
   object-fit: contain;
   object-position: 50% 50%;
-  opacity: var(--image-clarity, 0.76);
-  filter: saturate(0.72) contrast(1.1) brightness(0.78);
+  opacity: var(--image-clarity, 0.06);
+  filter: saturate(0.58) contrast(1.18) brightness(0.64);
+  pointer-events: none;
   -webkit-mask-image: radial-gradient(
     ellipse 66% 72% at 50% 46%,
     #000 0 50%,
@@ -77,6 +88,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .canvas {
-    filter: saturate(1.01) contrast(1.01);
+    filter: saturate(1.08) contrast(1.04) drop-shadow(0 0 5px rgb(84 171 255 / 0.14));
   }
 }
