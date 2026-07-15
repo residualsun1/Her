@@ -19,6 +19,18 @@ export type ParticleTuning = {
   depthStrength: number;
   mouseRadius: number;
   colorShiftSpeed: number;
+  glowIntensity: number;
+  trailLength: number;
+  hueDrift: number;
+  bloomThreshold: number;
+  edgeDispersion: number;
+  edgeDisturbance: number;
+  mouseDisturbance: number;
+  swirlStrength: number;
+  gravityStrength: number;
+  attractionRepulsion: number;
+  turbulence: number;
+  noiseScale: number;
   danceStrength: number;
   depthWave: number;
 };
@@ -32,6 +44,18 @@ export const DEFAULT_PARTICLE_TUNING: ParticleTuning = {
   depthStrength: 50,
   mouseRadius: 110,
   colorShiftSpeed: 2,
+  glowIntensity: 1,
+  trailLength: 0.62,
+  hueDrift: 1,
+  bloomThreshold: 0.62,
+  edgeDispersion: 1,
+  edgeDisturbance: 1,
+  mouseDisturbance: 1,
+  swirlStrength: 1,
+  gravityStrength: 1,
+  attractionRepulsion: 0,
+  turbulence: 1,
+  noiseScale: 1,
   danceStrength: 7.5,
   depthWave: 5,
 };
@@ -104,6 +128,15 @@ uniform float uFlowAmplitude;
 uniform float uDepthStrength;
 uniform float uMouseRadius;
 uniform float uColorShiftSpeed;
+uniform float uHueDrift;
+uniform float uEdgeDispersion;
+uniform float uEdgeDisturbance;
+uniform float uMouseDisturbance;
+uniform float uSwirlStrength;
+uniform float uGravityStrength;
+uniform float uAttractionRepulsion;
+uniform float uTurbulence;
+uniform float uNoiseScale;
 uniform float uDanceStrength;
 uniform float uDepthWave;
 
@@ -146,28 +179,28 @@ void main() {
   deform = mix(deform, 1.0, aMeta.w);
 
   float outerMetric = length(vec2(aHome.x * 0.82, aHome.y));
-  float envelopeNoise = sin(aHome.x * 4.1 + aMeta.x * TAU) * 0.055;
-  envelopeNoise += cos(aHome.y * 5.2 + aMeta.y * TAU) * 0.045;
+  float envelopeNoise = sin(aHome.x * 4.1 * uNoiseScale + aMeta.x * TAU) * 0.055;
+  envelopeNoise += cos(aHome.y * 5.2 * uNoiseScale + aMeta.y * TAU) * 0.045;
   float imageEnvelope = 1.0 - smoothstep(0.68, 1.04, outerMetric + envelopeNoise);
 
   // The dense surface is always alive; the face moves less, but never becomes a static photo.
   float motionTime = uTime * uMotion * max(uFlowSpeed, 0.0);
   vec2 flow = vec2(
-    sin(aHome.y * 7.4 + motionTime * 0.34 + sin(aHome.x * 4.2 - motionTime * 0.17) + aMeta.x * TAU),
-    cos(aHome.x * 6.8 - motionTime * 0.29 + cos(aHome.y * 4.6 + motionTime * 0.15) + aMeta.y * TAU)
+    sin(aHome.y * 7.4 * uNoiseScale + motionTime * 0.34 + sin(aHome.x * 4.2 * uNoiseScale - motionTime * 0.17) * uTurbulence + aMeta.x * TAU),
+    cos(aHome.x * 6.8 * uNoiseScale - motionTime * 0.29 + cos(aHome.y * 4.6 * uNoiseScale + motionTime * 0.15) * uTurbulence + aMeta.y * TAU)
   );
   base += flow * (0.0024 + aMeta.z * 0.0042) * uMotion * uFlowAmplitude * deform;
 
   // Edge duplicates form the turbulent blue-white halo visible in the references.
   float haloBreath = 0.76 + 0.24 * sin(uTime * 0.52 + aMeta.y * TAU);
-  float haloDistance = (0.034 + aMeta.y * 0.124) * haloBreath * (uDispersion / 1.5);
+  float haloDistance = (0.034 + aMeta.y * 0.124) * haloBreath * (uDispersion / 1.5) * uEdgeDispersion;
   float haloCurl = sin(uTime * 0.38 + aMeta.x * TAU + aHome.y * 3.0);
   base += aMeta.w * (
     radial * haloDistance +
-    curlDirection * haloDistance * haloCurl * 0.62 +
-    randomDirection * haloDistance * 0.34
+    curlDirection * haloDistance * haloCurl * 0.62 * uEdgeDisturbance +
+    randomDirection * haloDistance * 0.34 * uEdgeDisturbance
   );
-  base += randomDirection * aMeta.z * 0.008 * deform * uDispersion * (0.72 + 0.28 * sin(motionTime + aMeta.x * TAU));
+  base += randomDirection * aMeta.z * 0.008 * deform * uDispersion * uEdgeDisturbance * (0.72 + 0.28 * sin(motionTime + aMeta.x * TAU));
 
   // Voice and music add breathing, depth and sparkle without erasing the subject.
   float audioWave = sin(uTime * (2.2 + aMeta.y * 2.1) + aMeta.x * TAU);
@@ -218,9 +251,11 @@ void main() {
   float ripple = sin((pointerDistance / mouseRadius) * TAU * 2.0 - uTime * 3.6) * field;
   float pointResponse = (0.55 + aMeta.z * 0.45) * uPointer.z * uInteraction;
   pointResponse *= mix(mix(0.58, 1.0, 1.0 - core), 1.0, aMeta.w);
-  base += (pointerDirection * field * 0.052 + tangent * field * 0.07) * pointResponse;
-  base -= pointerDirection * pointerCore * 0.13 * pointResponse;
-  base += pointerDirection * ripple * 0.012 * pointResponse;
+  base += pointerDirection * field * 0.052 * uMouseDisturbance * pointResponse;
+  base += tangent * field * 0.07 * uSwirlStrength * pointResponse;
+  base -= pointerDirection * pointerCore * 0.13 * uGravityStrength * pointResponse;
+  base += pointerDirection * ripple * 0.012 * uMouseDisturbance * pointResponse;
+  base -= pointerDirection * field * 0.045 * uAttractionRepulsion * pointResponse;
 
   float perspective = 1.0 + depth * 0.2;
   gl_Position = vec4(base * perspective, depth, 1.0);
@@ -232,7 +267,7 @@ void main() {
 
   vec3 contrastedColor = clamp((aColor.rgb - 0.5) * uContrast + 0.5, 0.0, 1.0);
   vec3 liftedColor = pow(max(contrastedColor, vec3(0.0)), vec3(0.9));
-  float hueAngle = sin(uTime * uColorShiftSpeed * 0.18 + aMeta.x * TAU) * 0.12 * (0.25 + (1.0 - core) * 0.75);
+  float hueAngle = sin(uTime * uColorShiftSpeed * 0.18 + aMeta.x * TAU) * 0.12 * uHueDrift * (0.25 + (1.0 - core) * 0.75);
   liftedColor = max(rotateHue(liftedColor, hueAngle), vec3(0.0));
   float shimmer = 0.88 + 0.12 * sin(uTime * 0.82 + aMeta.x * TAU);
   float surfaceOpacity = mix(0.82 + uSubjectDetail * 0.17, 0.92, 1.0 - core);
@@ -252,6 +287,9 @@ in float vHalo;
 in float vSpark;
 in float vField;
 
+uniform float uGlowIntensity;
+uniform float uBloomThreshold;
+
 out vec4 outColor;
 
 void main() {
@@ -263,7 +301,7 @@ void main() {
 
   float core = 1.0 - smoothstep(0.05, 0.29, distanceFromCenter);
   float glow = 1.0 - smoothstep(0.13, 0.5, distanceFromCenter);
-  float intensity = core * (0.78 + vSpark * 0.38) + glow * (0.2 + vSpark * 0.2);
+  float intensity = core * (0.78 + vSpark * 0.38) + glow * (0.2 + vSpark * 0.2) * uGlowIntensity;
   float haloOpacity = mix(1.0, 0.48, vHalo);
   float alpha = vColor.a * intensity * haloOpacity;
 
@@ -272,7 +310,11 @@ void main() {
   }
 
   vec3 fieldTint = mix(vColor.rgb, vec3(0.58, 0.86, 1.0), vField * 0.72);
-  outColor = vec4(fieldTint * (0.9 + vSpark * 0.48 + vField * 0.54), alpha);
+  float colorLuminance = dot(vColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  float baselineBloom = smoothstep(0.62, 1.0, colorLuminance);
+  float selectedBloom = smoothstep(clamp(uBloomThreshold, 0.0, 0.98), 1.0, colorLuminance);
+  float bloomAdjustment = (selectedBloom - baselineBloom) * 0.38;
+  outColor = vec4(fieldTint * (0.9 + vSpark * 0.48 + vField * 0.54) * (1.0 + bloomAdjustment), alpha);
 }
 `;
 
@@ -627,6 +669,17 @@ export function ParticleGarden({
       depthStrength: gl.getUniformLocation(program, "uDepthStrength"),
       mouseRadius: gl.getUniformLocation(program, "uMouseRadius"),
       colorShiftSpeed: gl.getUniformLocation(program, "uColorShiftSpeed"),
+      glowIntensity: gl.getUniformLocation(program, "uGlowIntensity"),
+      bloomThreshold: gl.getUniformLocation(program, "uBloomThreshold"),
+      hueDrift: gl.getUniformLocation(program, "uHueDrift"),
+      edgeDispersion: gl.getUniformLocation(program, "uEdgeDispersion"),
+      edgeDisturbance: gl.getUniformLocation(program, "uEdgeDisturbance"),
+      mouseDisturbance: gl.getUniformLocation(program, "uMouseDisturbance"),
+      swirlStrength: gl.getUniformLocation(program, "uSwirlStrength"),
+      gravityStrength: gl.getUniformLocation(program, "uGravityStrength"),
+      attractionRepulsion: gl.getUniformLocation(program, "uAttractionRepulsion"),
+      turbulence: gl.getUniformLocation(program, "uTurbulence"),
+      noiseScale: gl.getUniformLocation(program, "uNoiseScale"),
       danceStrength: gl.getUniformLocation(program, "uDanceStrength"),
       depthWave: gl.getUniformLocation(program, "uDepthWave"),
     };
@@ -824,6 +877,17 @@ export function ParticleGarden({
         gl.uniform1f(uniforms.depthStrength, inputsRef.current.tuning.depthStrength);
         gl.uniform1f(uniforms.mouseRadius, inputsRef.current.tuning.mouseRadius * dpr);
         gl.uniform1f(uniforms.colorShiftSpeed, inputsRef.current.tuning.colorShiftSpeed);
+        gl.uniform1f(uniforms.glowIntensity, inputsRef.current.tuning.glowIntensity);
+        gl.uniform1f(uniforms.bloomThreshold, inputsRef.current.tuning.bloomThreshold);
+        gl.uniform1f(uniforms.hueDrift, inputsRef.current.tuning.hueDrift);
+        gl.uniform1f(uniforms.edgeDispersion, inputsRef.current.tuning.edgeDispersion);
+        gl.uniform1f(uniforms.edgeDisturbance, inputsRef.current.tuning.edgeDisturbance);
+        gl.uniform1f(uniforms.mouseDisturbance, inputsRef.current.tuning.mouseDisturbance);
+        gl.uniform1f(uniforms.swirlStrength, inputsRef.current.tuning.swirlStrength);
+        gl.uniform1f(uniforms.gravityStrength, inputsRef.current.tuning.gravityStrength);
+        gl.uniform1f(uniforms.attractionRepulsion, inputsRef.current.tuning.attractionRepulsion);
+        gl.uniform1f(uniforms.turbulence, inputsRef.current.tuning.turbulence);
+        gl.uniform1f(uniforms.noiseScale, inputsRef.current.tuning.noiseScale);
         gl.uniform1f(uniforms.danceStrength, inputsRef.current.tuning.danceStrength);
         gl.uniform1f(uniforms.depthWave, inputsRef.current.tuning.depthWave);
         gl.uniform1f(uniforms.dpr, dpr);
@@ -847,7 +911,7 @@ export function ParticleGarden({
         if (!reducedMotion && trailFrame % 2 === 0) {
           trailContext.save();
           trailContext.globalCompositeOperation = "destination-out";
-          trailContext.globalAlpha = 0.105;
+          trailContext.globalAlpha = 0.22 - clamp(inputsRef.current.tuning.trailLength, 0, 1) * (0.115 / 0.62);
           trailContext.fillStyle = "#000";
           trailContext.fillRect(0, 0, trailCanvas.width, trailCanvas.height);
           trailContext.globalCompositeOperation = "lighter";
