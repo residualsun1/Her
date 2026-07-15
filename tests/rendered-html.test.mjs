@@ -65,9 +65,10 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(page, /<HerApp \/>/);
   assert.match(layout, /AI Memory Garden/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
-  assert.match(herApp, /Auto Subject Focus/);
-  assert.match(herApp, /Background Suppression/);
-  assert.match(herApp, /Subject Exposure/);
+  assert.match(herApp, /背景抑制/);
+  assert.match(herApp, /主体曝光/);
+  assert.match(herApp, /不会自动聚焦、裁切、放大/);
+  assert.doesNotMatch(herApp, /Auto Subject Focus|Subject Scale|Focus X|Focus Y/);
   assert.match(particle, /webgl2/);
   assert.match(particle, /imageClarity/);
   assert.match(particle, /imageBase/);
@@ -81,6 +82,8 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(particle, /function analyzeSubject/);
   assert.match(particle, /layout\(location = 3\) in float aSubject/);
   assert.match(particle, /backgroundSuppression/);
+  assert.match(particle, /context\.drawImage\(image, 0, 0, columns, rows\)/);
+  assert.doesNotMatch(particle, /automaticZoom|subjectTuning\.focusX|subjectTuning\.focusY/);
   assert.match(particle, /pointBudget \* 0\.2/);
   assert.match(particle, /precomposed/);
   assert.match(particle, /trailCanvasRef/);

@@ -24,12 +24,6 @@ export type ParticleTuning = {
 };
 
 export type SubjectTuning = {
-  autoFocus: boolean;
-  /** Multiplier applied to the automatically inferred subject crop. */
-  scale: number;
-  /** Manual correction measured in fractions of the cropped frame. */
-  focusX: number;
-  focusY: number;
   backgroundSuppression: number;
   exposure: number;
   shadowLift: number;
@@ -51,10 +45,6 @@ export const DEFAULT_PARTICLE_TUNING: ParticleTuning = {
 };
 
 export const DEFAULT_SUBJECT_TUNING: SubjectTuning = {
-  autoFocus: true,
-  scale: 1,
-  focusX: 0,
-  focusY: 0,
   backgroundSuppression: 0.74,
   exposure: 1.34,
   shadowLift: 0.12,
@@ -112,9 +102,6 @@ type SubjectAnalysis = {
   width: number;
   height: number;
   saliency: Float32Array;
-  focusX: number;
-  focusY: number;
-  zoom: number;
 };
 
 const FLOATS_PER_POINT = 11;
@@ -440,9 +427,9 @@ function percentile(values: Float32Array, ratio: number) {
 }
 
 /**
- * A lightweight, local saliency pass. It favors areas that differ from the
- * image border and contain coherent contrast, which gives us a useful subject
- * crop without uploading the image or requiring an ML runtime.
+ * A lightweight, local saliency pass. It distinguishes likely subjects from
+ * the border background without uploading, cropping, scaling, or repositioning
+ * the source image.
  */
 function analyzeSubject(image: HTMLImageElement): SubjectAnalysis {
   const maxDimension = 180;
@@ -461,9 +448,6 @@ function analyzeSubject(image: HTMLImageElement): SubjectAnalysis {
       width: 1,
       height: 1,
       saliency: new Float32Array([1]),
-      focusX: 0.5,
-      focusY: 0.5,
-      zoom: 1,
     };
   }
 
@@ -530,63 +514,19 @@ function analyzeSubject(image: HTMLImageElement): SubjectAnalysis {
 
   const radius = clamp(Math.round(Math.min(width, height) * 0.055), 2, 10);
   const coherentSaliency = boxBlur(rawSaliency, width, height, radius);
-  for (let row = 0; row < height; row += 1) {
-    for (let column = 0; column < width; column += 1) {
-      const normalizedX = (column + 0.5) / width;
-      const normalizedY = (row + 0.5) / height;
-      const centerPrior = Math.exp(-(
-        Math.pow(Math.abs(normalizedX - 0.5) / 0.58, 4) +
-        Math.pow(Math.abs(normalizedY - 0.5) / 0.66, 4)
-      ));
-      coherentSaliency[row * width + column] *= 0.66 + centerPrior * 0.34;
-    }
-  }
-
-  const focusThreshold = percentile(coherentSaliency, 0.75);
   const maskLow = percentile(coherentSaliency, 0.48);
   const maskHigh = percentile(coherentSaliency, 0.86);
   const saliency = new Float32Array(width * height);
-  let weightSum = 0;
-  let weightedX = 0;
-  let weightedY = 0;
 
   for (let row = 0; row < height; row += 1) {
     for (let column = 0; column < width; column += 1) {
       const index = row * width + column;
       const score = coherentSaliency[index];
       saliency[index] = smoothstep(maskLow, Math.max(maskLow + 0.0001, maskHigh), score);
-      const weight = Math.max(0, score - focusThreshold);
-      weightSum += weight;
-      weightedX += weight * ((column + 0.5) / width);
-      weightedY += weight * ((row + 0.5) / height);
     }
   }
 
-  if (weightSum <= 0.0001) {
-    return { width, height, saliency, focusX: 0.5, focusY: 0.5, zoom: 1 };
-  }
-
-  const focusX = clamp(weightedX / weightSum, 0.08, 0.92);
-  const focusY = clamp(weightedY / weightSum, 0.08, 0.92);
-  let spreadX = 0;
-  let spreadY = 0;
-  for (let row = 0; row < height; row += 1) {
-    for (let column = 0; column < width; column += 1) {
-      const score = coherentSaliency[row * width + column];
-      const weight = Math.max(0, score - focusThreshold);
-      spreadX += weight * Math.pow((column + 0.5) / width - focusX, 2);
-      spreadY += weight * Math.pow((row + 0.5) / height - focusY, 2);
-    }
-  }
-  spreadX = Math.sqrt(spreadX / weightSum);
-  spreadY = Math.sqrt(spreadY / weightSum);
-  const zoom = clamp(
-    Math.min(0.34 / Math.max(spreadX, 0.08), 0.34 / Math.max(spreadY, 0.08)),
-    1,
-    2.25,
-  );
-
-  return { width, height, saliency, focusX, focusY, zoom };
+  return { width, height, saliency };
 }
 
 function sampleSubjectMask(analysis: SubjectAnalysis, normalizedX: number, normalizedY: number) {
@@ -612,27 +552,7 @@ function sampleImage(
   subjectTuning: SubjectTuning,
   precomposed: boolean,
 ) {
-  const automaticZoom = subjectTuning.autoFocus ? analysis.zoom : 1;
-  const zoom = precomposed
-    ? 1
-    : clamp(automaticZoom * subjectTuning.scale, 1, 3.2);
-  const sourceWidth = image.naturalWidth / zoom;
-  const sourceHeight = image.naturalHeight / zoom;
-  const automaticFocusX = subjectTuning.autoFocus ? analysis.focusX : 0.5;
-  const automaticFocusY = subjectTuning.autoFocus ? analysis.focusY : 0.5;
-  const focusX = clamp(automaticFocusX + subjectTuning.focusX / zoom, 0, 1);
-  const focusY = clamp(automaticFocusY + subjectTuning.focusY / zoom, 0, 1);
-  const sourceX = clamp(
-    focusX * image.naturalWidth - sourceWidth / 2,
-    0,
-    image.naturalWidth - sourceWidth,
-  );
-  const sourceY = clamp(
-    focusY * image.naturalHeight - sourceHeight / 2,
-    0,
-    image.naturalHeight - sourceHeight,
-  );
-  const imageAspect = sourceWidth / Math.max(sourceHeight, 1);
+  const imageAspect = image.naturalWidth / Math.max(image.naturalHeight, 1);
   const columns = Math.max(2, Math.round(Math.sqrt(pointBudget * imageAspect)));
   const rows = Math.max(2, Math.round(columns / imageAspect));
   const samplingCanvas = document.createElement("canvas");
@@ -648,17 +568,7 @@ function sampleImage(
   }
 
   context.clearRect(0, 0, columns, rows);
-  context.drawImage(
-    image,
-    sourceX,
-    sourceY,
-    sourceWidth,
-    sourceHeight,
-    0,
-    0,
-    columns,
-    rows,
-  );
+  context.drawImage(image, 0, 0, columns, rows);
   const pixels = context.getImageData(0, 0, columns, rows).data;
   const points: number[] = [];
   const haloLimit = Math.floor(pointBudget * 0.2);
@@ -703,10 +613,8 @@ function sampleImage(
       let red = pixels[offset] / 255;
       let green = pixels[offset + 1] / 255;
       let blue = pixels[offset + 2] / 255;
-      const sourceNormalizedX = (sourceX + ((column + 0.5) / columns) * sourceWidth) /
-        Math.max(image.naturalWidth, 1);
-      const sourceNormalizedY = (sourceY + ((row + 0.5) / rows) * sourceHeight) /
-        Math.max(image.naturalHeight, 1);
+      const sourceNormalizedX = (column + 0.5) / columns;
+      const sourceNormalizedY = (row + 0.5) / rows;
       const subject = precomposed
         ? 1
         : sampleSubjectMask(analysis, sourceNormalizedX, sourceNormalizedY);
