@@ -74,6 +74,11 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(particle, /uniform float uMouseRadius/);
   assert.match(particle, /DEFAULT_PARTICLE_TUNING/);
   assert.match(particle, /pointBudget \* 0\.2/);
+  assert.match(particle, /surfacePointCount/);
+  assert.match(particle, /accentPointCount/);
+  assert.match(particle, /ONE_MINUS_SRC_ALPHA/);
+  assert.match(particle, /outlineLimit/);
+  assert.match(particle, /ribbonMix/);
   assert.match(particle, /precomposed/);
   assert.match(particle, /trailCanvasRef/);
   assert.match(particle, /destination-out/);

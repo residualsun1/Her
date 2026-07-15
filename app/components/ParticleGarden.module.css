@@ -24,8 +24,8 @@
   filter:
     saturate(1.18)
     contrast(1.08)
-    drop-shadow(0 0 5px rgb(84 171 255 / 0.22))
-    drop-shadow(0 0 13px rgb(66 119 255 / 0.12));
+    drop-shadow(0 0 5px rgb(255 235 202 / 0.2))
+    drop-shadow(0 0 13px rgb(255 221 170 / 0.1));
   cursor: grab;
   touch-action: none;
 }
@@ -41,7 +41,7 @@
   filter:
     saturate(1.28)
     blur(0.35px)
-    drop-shadow(0 0 8px rgb(74 158 255 / 0.3));
+    drop-shadow(0 0 8px rgb(255 229 190 / 0.24));
   mix-blend-mode: screen;
   pointer-events: none;
 }
@@ -110,6 +110,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .canvas {
-    filter: saturate(1.08) contrast(1.04) drop-shadow(0 0 5px rgb(84 171 255 / 0.14));
+    filter: saturate(1.08) contrast(1.04) drop-shadow(0 0 5px rgb(255 235 202 / 0.12));
   }
 }
