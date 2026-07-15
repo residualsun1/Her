@@ -26,6 +26,7 @@ export interface ParticleGardenProps {
 type MutableInput = {
   audio: number;
   interaction: number;
+  clarity: number;
 };
 
 type PointerState = {
@@ -93,7 +94,7 @@ void main() {
     0.82,
     length(vec2(aHome.x * 0.9, (aHome.y - 0.12) * 0.72))
   );
-  float deform = mix(0.46, 1.0, pow(1.0 - core, 1.05));
+  float deform = mix(0.36, 1.0, pow(1.0 - core, 1.05));
   deform = mix(deform, 1.0, aMeta.w);
 
   // The dense surface is always alive; the face moves less, but never becomes a static photo.
@@ -106,7 +107,7 @@ void main() {
 
   // Edge duplicates form the turbulent blue-white halo visible in the references.
   float haloBreath = 0.76 + 0.24 * sin(uTime * 0.52 + aMeta.y * TAU);
-  float haloDistance = (0.032 + aMeta.y * 0.12) * haloBreath;
+  float haloDistance = (0.028 + aMeta.y * 0.105) * haloBreath;
   float haloCurl = sin(uTime * 0.38 + aMeta.x * TAU + aHome.y * 3.0);
   base += aMeta.w * (
     radial * haloDistance +
@@ -199,7 +200,7 @@ void main() {
   float core = 1.0 - smoothstep(0.05, 0.29, distanceFromCenter);
   float glow = 1.0 - smoothstep(0.13, 0.5, distanceFromCenter);
   float intensity = core * (0.78 + vSpark * 0.38) + glow * (0.2 + vSpark * 0.2);
-  float haloOpacity = mix(1.0, 0.56, vHalo);
+  float haloOpacity = mix(1.0, 0.48, vHalo);
   float alpha = vColor.a * intensity * haloOpacity;
 
   if (alpha < 0.008) {
@@ -312,7 +313,7 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
   context.drawImage(image, 0, 0, columns, rows);
   const pixels = context.getImageData(0, 0, columns, rows).data;
   const points: number[] = [];
-  const haloLimit = Math.floor(pointBudget * 0.18);
+  const haloLimit = Math.floor(pointBudget * 0.15);
   let haloCount = 0;
 
   const luminanceAt = (column: number, row: number) => {
@@ -418,7 +419,7 @@ export function ParticleGarden({
   imageUrl,
   audioLevel = 0,
   interactionStrength = 1,
-  imageClarity = 0.06,
+  imageClarity = 0.26,
   className,
   onReady,
 }: ParticleGardenProps) {
@@ -427,6 +428,7 @@ export function ParticleGarden({
   const inputsRef = useRef<MutableInput>({
     audio: clamp(audioLevel, 0, 1),
     interaction: Math.max(0, interactionStrength),
+    clarity: clamp(imageClarity, 0, 1),
   });
   const onReadyRef = useRef(onReady);
 
@@ -437,6 +439,10 @@ export function ParticleGarden({
   useEffect(() => {
     inputsRef.current.interaction = Math.max(0, interactionStrength);
   }, [interactionStrength]);
+
+  useEffect(() => {
+    inputsRef.current.clarity = clamp(imageClarity, 0, 1);
+  }, [imageClarity]);
 
   useEffect(() => {
     onReadyRef.current = onReady;
@@ -455,6 +461,7 @@ export function ParticleGarden({
     let pointCount = 0;
     let imageAspect = 1;
     let currentAudio = 0;
+    let lastContinuity = -1;
     let lastFrameTime = performance.now();
     const startTime = lastFrameTime;
     const pointerTarget: PointerState = { x: 2, y: 2, active: 0 };
@@ -564,7 +571,7 @@ export function ParticleGarden({
       }
       pointerTarget.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
       pointerTarget.y = 1 - ((event.clientY - bounds.top) / bounds.height) * 2;
-      pointerTarget.active = event.buttons > 0 ? 1 : 0.42;
+      pointerTarget.active = event.buttons > 0 ? 1 : 0.3;
       if (dragging) {
         dragTarget.x = clamp(
           dragBase.x + ((event.clientX - dragOrigin.x) / bounds.width) * 2.8,
@@ -592,7 +599,7 @@ export function ParticleGarden({
     const handlePointerUp = (event: PointerEvent) => {
       updatePointer(event);
       dragging = false;
-      pointerTarget.active = 0.42;
+      pointerTarget.active = 0.3;
       if (canvas.hasPointerCapture?.(event.pointerId)) {
         canvas.releasePointerCapture(event.pointerId);
       }
@@ -696,6 +703,18 @@ export function ParticleGarden({
       dragCurrent.y += (dragTarget.y - dragCurrent.y) * dragBlend;
       currentAudio += (inputsRef.current.audio - currentAudio) * audioBlend;
 
+      const dragActivity = clamp(Math.hypot(dragCurrent.x, dragCurrent.y), 0, 1);
+      const continuityFactor = clamp(
+        1 - pointerCurrent.active * 0.45 - dragActivity * 0.7,
+        0.16,
+        1,
+      );
+      const liveContinuity = inputsRef.current.clarity * continuityFactor;
+      if (Math.abs(liveContinuity - lastContinuity) > 0.004) {
+        canvas.parentElement?.style.setProperty("--image-clarity-live", liveContinuity.toFixed(3));
+        lastContinuity = liveContinuity;
+      }
+
       gl.clear(gl.COLOR_BUFFER_BIT);
       if (pointCount > 0) {
         gl.useProgram(program);
@@ -737,6 +756,7 @@ export function ParticleGarden({
       canvas.removeEventListener("pointerup", handlePointerUp);
       canvas.removeEventListener("pointercancel", handlePointerCancel);
       canvas.removeEventListener("pointerleave", handlePointerLeave);
+      canvas.parentElement?.style.removeProperty("--image-clarity-live");
       if (image) {
         image.onload = null;
         image.onerror = null;

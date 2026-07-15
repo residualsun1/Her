@@ -227,9 +227,9 @@ export function HerApp() {
     possibleTopics: ["winter memories", "home", "quiet rituals"],
   });
   const [audioLevel, setAudioLevel] = useState(0.06);
-  const [interactionStrength, setInteractionStrength] = useState(1.25);
-  const [danceStrength, setDanceStrength] = useState(0.9);
-  const [imageClarity, setImageClarity] = useState(0.06);
+  const [interactionStrength, setInteractionStrength] = useState(1.15);
+  const [danceStrength, setDanceStrength] = useState(0.85);
+  const [imageClarity, setImageClarity] = useState(0.26);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -1334,7 +1334,7 @@ export function HerApp() {
               <img src={gardenItems[(gardenIndex - 1 + gardenItems.length) % gardenItems.length].imageUrl} alt="Previous memory" />
             </div>
             <div className={styles.centerMemory} onClick={openGardenConversation} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openGardenConversation(); } }} role="button" tabIndex={0}>
-              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.08} interactionStrength={0.9} imageClarity={0.04} />
+              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.08} interactionStrength={0.9} imageClarity={0.22} />
               <div className={styles.memoryCaption}><span>{pad(gardenIndex + 1)} / {pad(gardenItems.length)}</span><h2>{gardenItems[gardenIndex].title}</h2><small>open this memory ↗</small></div>
             </div>
             <div className={styles.sideMemory} onClick={() => chooseGardenItem(gardenIndex + 1)}>
@@ -1432,7 +1432,7 @@ export function HerApp() {
           <label className={styles.toggleRow}><span><b>Let AI understand the image</b><small>A compressed copy is sent only with consent.</small></span><input type="checkbox" checked={visionEnabled} onChange={(event) => setVisionEnabled(event.target.checked)} /></label>
           <label className={styles.toggleRow}><span><b>Save my voice on this device</b><small>Turn audio is never uploaded for cloud storage.</small></span><input type="checkbox" checked={saveVoice} onChange={(event) => setSaveVoice(event.target.checked)} /></label>
           <label>Dance strength <output>{danceStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={danceStrength} onChange={(event) => setDanceStrength(Number(event.target.value))} /></label>
-          <label>Image continuity <output>{imageClarity.toFixed(2)}</output><input type="range" min="0" max="0.22" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
+          <label>Image continuity <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.1" max="0.46" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
           <label>Mouse field <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /></label>
           <p className={styles.synthDisclosure}>{providerMode === "mock" ? "Offline preview mode is active: no external model is being called. " : "Live text mode is active. "}Voice playback in this runnable Demo uses an explicitly disclosed browser synthetic voice until a configured streaming TTS provider is added.</p>
         </aside>
