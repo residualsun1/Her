@@ -1,10 +1,11 @@
 :root {
-  --font-sans: "Avenir Next", "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-display: "Iowan Old Style", "Baskerville", "Songti SC", "STSong", Georgia, serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   color-scheme: dark;
   background: #020303;
   font-synthesis: none;
+  font-optical-sizing: auto;
 }
 
 * {
@@ -21,6 +22,11 @@ body {
 
 body {
   overflow-x: hidden;
+  color: #f5f5f7;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -29,12 +35,18 @@ select {
   font: inherit;
 }
 
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid rgba(137, 245, 207, 0.7);
-  outline-offset: 3px;
+  outline: 2px solid rgba(137, 245, 207, 0.86);
+  outline-offset: 4px;
 }
 
 ::selection {
