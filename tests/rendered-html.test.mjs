@@ -22,9 +22,10 @@ test("server-renders the Her memory garden shell", async () => {
   const html = await response.text();
 
   assert.match(html, /<title>Her — AI Memory Garden<\/title>/i);
-  assert.match(html, /THE GARDEN/);
+  assert.match(html, /The Garden/);
   assert.match(html, /Save Memory/);
   assert.match(html, /There’s something gentle in this portrait/);
+  assert.doesNotMatch(html, /Images keep breathing/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 

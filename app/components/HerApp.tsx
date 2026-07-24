@@ -99,7 +99,7 @@ const SAMPLE_CARDS: MemoryCard[] = [
     title: "The good kind of melancholy",
     summary:
       "A winter picture opened a small conversation about nostalgia, old films, and the tender sadness that returns every year.",
-    date: "DEC 04, 2025",
+    date: "Dec 04, 2025",
     time: "10:49 AM",
     duration: "01:21",
     pinnedDate: "2025-12-04",
@@ -137,7 +137,7 @@ const SAMPLE_CARDS: MemoryCard[] = [
     title: "The little traveler",
     summary:
       "A photograph became a map: not of where you went, but of the person who was brave enough to go.",
-    date: "NOV 30, 2025",
+    date: "Nov 30, 2025",
     time: "02:57 PM",
     duration: "03:09",
     pinnedDate: "2025-11-30",
@@ -167,7 +167,7 @@ const SAMPLE_CARDS: MemoryCard[] = [
     title: "Do humans have system prompts?",
     summary:
       "Four synthetic voices met briefly in the dark and wondered whether people also carry invisible instructions.",
-    date: "DEC 03, 2025",
+    date: "Dec 03, 2025",
     time: "11:41 PM",
     duration: "00:48",
     pinnedDate: "2025-12-03",
@@ -318,7 +318,13 @@ export function HerApp() {
   const musicAnalyserFrameRef = useRef<number | null>(null);
   const salonRunRef = useRef(0);
   const gardenStripRef = useRef<HTMLDivElement>(null);
-  const gardenDragRef = useRef({ pointerId: -1, startX: 0, scrollLeft: 0, moved: false });
+  const gardenDragRef = useRef({
+    pointerId: -1,
+    startX: 0,
+    scrollLeft: 0,
+    moved: false,
+    mode: null as "artwork" | "gallery" | null,
+  });
   const revealTimerRef = useRef<number | null>(null);
 
   const currentAssistant = [...turns].reverse().find((turn) => turn.role === "assistant");
@@ -883,7 +889,7 @@ export function HerApp() {
         title: result.title ?? fallbackTitle,
         summary: result.summary ?? fallbackSummary,
         diary: result.diary,
-        date: now.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase(),
+        date: now.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
         time: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
         duration: formatClock(elapsed),
         mode: "conversation",
@@ -912,7 +918,7 @@ export function HerApp() {
         diary: replyLanguage === "zh"
           ? `今天，我和一张图片待了一会儿。${turns.filter((turn) => turn.role === "user").map((turn) => turn.original).join(" ")}`
           : `Today I stayed with an image for a while. ${turns.filter((turn) => turn.role === "user").map((turn) => turn.original).join(" ")}`,
-        date: now.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase(),
+        date: now.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
         time: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
         duration: formatClock(elapsed),
         mode: "conversation",
@@ -1213,32 +1219,26 @@ export function HerApp() {
     else audio.pause();
   };
 
-  const chooseGardenItem = (index: number) => {
-    if (!gardenItems.length) return;
-    const normalized = (index + gardenItems.length) % gardenItems.length;
-    setGardenIndex(normalized);
-    const item = gardenStripRef.current?.querySelector<HTMLElement>(`[data-garden-index="${normalized}"]`);
-    item?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  };
-
   const handleGardenPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button")) return;
     const strip = event.currentTarget;
+    const interactingWithArtwork = Boolean((event.target as HTMLElement).closest("[data-garden-index]"));
     gardenDragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       scrollLeft: strip.scrollLeft,
       moved: false,
+      mode: interactingWithArtwork ? "artwork" : "gallery",
     };
-    strip.setPointerCapture(event.pointerId);
+    if (!interactingWithArtwork) strip.setPointerCapture(event.pointerId);
   };
 
   const handleGardenPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = gardenDragRef.current;
     if (drag.pointerId !== event.pointerId) return;
     const delta = event.clientX - drag.startX;
-    if (Math.abs(delta) > 5) drag.moved = true;
-    event.currentTarget.scrollLeft = drag.scrollLeft - delta;
+    if (Math.abs(delta) > 7) drag.moved = true;
+    if (drag.mode === "gallery") event.currentTarget.scrollLeft = drag.scrollLeft - delta;
   };
 
   const settleGardenSelection = (strip: HTMLDivElement) => {
@@ -1261,8 +1261,10 @@ export function HerApp() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    const mode = gardenDragRef.current.mode;
     gardenDragRef.current.pointerId = -1;
-    settleGardenSelection(event.currentTarget);
+    gardenDragRef.current.mode = null;
+    if (mode === "gallery") settleGardenSelection(event.currentTarget);
   };
 
   const handleGardenWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
@@ -1348,13 +1350,13 @@ export function HerApp() {
     <main className={styles.app}>
       <header className={styles.header}>
         <button className={styles.wordmark} onClick={() => navigateTo("conversation")} aria-label="Open conversation">
-          <span className={styles.wordmarkDot} /> HER
+          <span className={styles.wordmarkDot} /> Her
         </button>
         <nav className={styles.nav} aria-label="Primary navigation">
-          <button className={view === "garden" ? styles.navActive : ""} aria-current={view === "garden" ? "page" : undefined} onClick={() => navigateTo("garden")}>THE GARDEN</button>
-          <button className={view === "memory" ? styles.navActive : ""} aria-current={view === "memory" ? "page" : undefined} onClick={() => { navigateTo("memory"); setMemoryTab("cards"); }}>MEMORY</button>
-          <button className={view === "salon" ? styles.navActive : ""} aria-current={view === "salon" ? "page" : undefined} onClick={() => navigateTo("salon")}>AI SALON</button>
-          <button className={view === "music" ? styles.navActive : ""} aria-current={view === "music" ? "page" : undefined} onClick={() => navigateTo("music")}>MUSIC</button>
+          <button className={view === "garden" ? styles.navActive : ""} aria-current={view === "garden" ? "page" : undefined} onClick={() => navigateTo("garden")}>The Garden</button>
+          <button className={view === "memory" ? styles.navActive : ""} aria-current={view === "memory" ? "page" : undefined} onClick={() => { navigateTo("memory"); setMemoryTab("cards"); }}>Memory</button>
+          <button className={view === "salon" ? styles.navActive : ""} aria-current={view === "salon" ? "page" : undefined} onClick={() => navigateTo("salon")}>Ai Salon</button>
+          <button className={view === "music" ? styles.navActive : ""} aria-current={view === "music" ? "page" : undefined} onClick={() => navigateTo("music")}>Music</button>
         </nav>
         <button className={styles.iconButton} onClick={() => setSettingsOpen(true)} aria-label="Open settings">
           <span className={styles.tuneIcon}><i /><i /><i /></span>
@@ -1378,7 +1380,7 @@ export function HerApp() {
             <div className={`${styles.providerPill} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
               <span className={replyState === "speaking" ? styles.liveWave : styles.providerGlyph}>{replyState === "speaking" ? "≋" : "×"}</span>
               <span className={styles.statusDot} />
-              <span>{providerMode === "mock" ? "Preview AI" : providerLabel(provider)}</span>
+              <span>{providerMode === "mock" ? "Preview ai" : providerLabel(provider)}</span>
             </div>
           )}
 
@@ -1428,7 +1430,7 @@ export function HerApp() {
                 </div>
                 {replyState === "listening" && (
                   <div className={styles.recordingTools}>
-                    <span><b className={styles.recordingDot} /> REC {formatClock(Math.max(1, recordingElapsed))}</span>
+                    <span><b className={styles.recordingDot} /> Rec {formatClock(Math.max(1, recordingElapsed))}</span>
                     <button onClick={() => void stopListening(false)}>cancel</button>
                   </div>
                 )}
@@ -1456,7 +1458,7 @@ export function HerApp() {
                 </article>
               ) : (
                 <article className={styles.salonSetup}>
-                  <span>AI SALON · LATE NIGHT</span>
+                  <span>Ai salon · Late night</span>
                   <h1>Give the voices<br />something to wonder about.</h1>
                   <div className={styles.topicList}>
                     {SALON_TOPICS.map((topic) => <button key={topic} onClick={() => setSalonTopic(topic)} className={salonTopic === topic ? styles.topicActive : ""}>{topic}</button>)}
@@ -1480,7 +1482,6 @@ export function HerApp() {
 
       {view === "garden" && (
         <section className={styles.galleryPage}>
-          <div className={styles.sectionIntro}><span>THE GARDEN</span><h1>Images keep breathing<br />after the moment is gone.</h1></div>
           {gardenItems.length ? (
             <>
               <div
@@ -1491,14 +1492,28 @@ export function HerApp() {
                 onPointerUp={handleGardenPointerUp}
                 onPointerCancel={handleGardenPointerUp}
                 onWheel={handleGardenWheel}
+                onScroll={(event) => settleGardenSelection(event.currentTarget)}
                 aria-label="Memory particles. Drag left or right to explore."
               >
-                <div className={styles.gardenTrack}>
+                <div
+                  className={styles.gardenTrack}
+                  style={{
+                    "--garden-width": `${Math.max(100, 22 + gardenItems.length * 46)}vw`,
+                    "--garden-mobile-width": `${Math.max(100, 14 + gardenItems.length * 82)}vw`,
+                  } as CSSProperties}
+                >
                   {gardenItems.map((item, index) => (
                     <article
                       key={item.id}
                       data-garden-index={index}
                       className={`${styles.gardenParticleFrame} ${index === gardenIndex ? styles.gardenParticleActive : ""}`}
+                      style={{
+                        "--garden-left": `${8 + index * 46}vw`,
+                        "--garden-mobile-left": `${6 + index * 82}vw`,
+                        "--garden-top": `${index % 3 === 0 ? 1 : index % 3 === 1 ? 16 : 7}%`,
+                        "--float-delay": `${index * -1.7}s`,
+                        "--float-duration": `${9 + (index % 3) * 2}s`,
+                      } as CSSProperties}
                       onClick={() => openGardenConversation(item)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
@@ -1519,11 +1534,6 @@ export function HerApp() {
                         tuning={particleTuning}
                         className={styles.gardenParticle}
                       />
-                      <div className={styles.memoryCaption}>
-                        <span>{pad(index + 1)} / {pad(gardenItems.length)}</span>
-                        <h2>{item.title}</h2>
-                        <small>open this memory ↗</small>
-                      </div>
                       <button
                         className={styles.deleteMemoryButton}
                         onClick={(event) => {
@@ -1538,11 +1548,10 @@ export function HerApp() {
                   ))}
                 </div>
               </div>
-              <p className={styles.dragHint}>DRAG TO WANDER · SCROLL HORIZONTALLY</p>
-              <div className={styles.pagination}>{gardenItems.map((item, index) => <button key={item.id} className={index === gardenIndex ? styles.pageActive : ""} onClick={() => chooseGardenItem(index)} aria-label={`Show ${item.title}`} />)}</div>
+              <p className={styles.dragHint}>Drag the open space to wander · Drag an artwork to move its particles</p>
             </>
           ) : (
-            <div className={styles.emptyState}><span>THE GARDEN IS QUIET</span><p>Upload an image when you are ready to let a memory grow here.</p></div>
+            <div className={styles.emptyState}><span>The garden is quiet</span><p>Upload an image when you are ready to let a memory grow here.</p></div>
           )}
           <button className={styles.uploadMore} onClick={() => fileInputRef.current?.click()}>＋ Upload more</button>
         </section>
@@ -1551,7 +1560,7 @@ export function HerApp() {
       {view === "memory" && (
         <section className={styles.memoryPage}>
           <div className={styles.memoryHeader}>
-            <div><span>DAY / NIGHT CHRON</span><h1>You and I have memories,<br />longer than the road ahead.</h1></div>
+            <div><span>Day / night chron</span><h1>You and I have memories,<br />longer than the road ahead.</h1></div>
             <div className={styles.tabSwitch}><button className={memoryTab === "cards" ? styles.tabActive : ""} onClick={() => setMemoryTab("cards")}>Cards</button><button className={memoryTab === "calendar" ? styles.tabActive : ""} onClick={() => setMemoryTab("calendar")}>Calendar</button></div>
           </div>
           {memoryTab === "cards" ? (
@@ -1577,7 +1586,7 @@ export function HerApp() {
                       <img src={card.imageUrl} alt="Memory cover" />
                       <div className={styles.cardBody}>
                         <h2>{card.title}</h2>
-                        <div className={styles.cardMeta}><span>{card.mode === "salon" ? "@AI SALON" : "@YOU ∩ COMPANION"} · {card.duration}</span><span>{card.date}<br />{card.time}</span></div>
+                        <div className={styles.cardMeta}><span>{card.mode === "salon" ? "@Ai salon" : "@You ∩ companion"} · {card.duration}</span><span>{card.date}<br />{card.time}</span></div>
                         <p className={styles.cardSummary}>{card.summary}</p>
                         <div className={styles.turnList}>
                           {card.turns.map((turn) => (
@@ -1591,7 +1600,7 @@ export function HerApp() {
                     </article>
                   );
                 })}
-              </div> : <div className={styles.emptyState}><span>NO SAVED MEMORIES</span><p>Your next saved conversation will appear here.</p></div>}
+              </div> : <div className={styles.emptyState}><span>No saved memories</span><p>Your next saved conversation will appear here.</p></div>}
               {cards.length > 0 && <div className={styles.cardNav}><button onClick={() => setCardIndex((index) => Math.max(0, index - 1))}>‹</button><span>{pad(cardIndex + 1)} / {pad(cards.length)}</span><button onClick={() => setCardIndex((index) => Math.min(cards.length - 1, index + 1))}>›</button></div>}
             </>
           ) : (
@@ -1609,9 +1618,9 @@ export function HerApp() {
       {view === "music" && (
         <section className={styles.musicPage}>
           <div className={styles.musicOrb}><span>{musicPlaying ? "≋" : "○"}</span></div>
-          <div className={styles.musicCopy}><span>ATMOSPHERE</span><h1>Give the memory<br />a room to live in.</h1><p>Import a track from your device. It stays here, and the particles will listen with you.</p></div>
+          <div className={styles.musicCopy}><span>Atmosphere</span><h1>Give the memory<br />a room to live in.</h1><p>Import a track from your device. It stays here, and the particles will listen with you.</p></div>
           <div className={styles.musicPlayer}>
-            <div><small>NOW PLAYING</small><strong>{musicName}</strong></div>
+            <div><small>Now playing</small><strong>{musicName}</strong></div>
             <button onClick={() => void handleMusicPlay()} disabled={!musicUrl}>{musicPlaying ? "Ⅱ" : "▶"}</button>
             <button onClick={() => musicInputRef.current?.click()}>Choose music</button>
           </div>
@@ -1639,7 +1648,7 @@ export function HerApp() {
       {deleteTarget && (
         <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-labelledby="delete-memory-title">
           <article className={styles.deleteConfirm}>
-            <span>REMOVE MEMORY</span>
+            <span>Remove memory</span>
             <h2 id="delete-memory-title">Let this memory go?</h2>
             <p>
               {deleteTarget.kind === "garden"
@@ -1729,7 +1738,7 @@ function storedSessionToCard(session: SessionRecord, imageUrl: string): MemoryCa
     title,
     summary,
     diary: session.summary?.diary?.body.original,
-    date: date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase(),
+    date: date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
     time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
     duration: formatClock(Math.max(1, Math.round(session.durationMs / 1000))),
     pinnedDate: session.pinnedDate,
