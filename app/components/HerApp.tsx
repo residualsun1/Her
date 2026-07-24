@@ -318,6 +318,8 @@ export function HerApp() {
   const musicAnalyserFrameRef = useRef<number | null>(null);
   const salonRunRef = useRef(0);
   const gardenStripRef = useRef<HTMLDivElement>(null);
+  const gardenCursorRef = useRef<HTMLSpanElement>(null);
+  const gardenWheelTimerRef = useRef<number | null>(null);
   const gardenDragRef = useRef({
     pointerId: -1,
     startX: 0,
@@ -445,6 +447,7 @@ export function HerApp() {
       void audioContextRef.current?.close();
       void musicAudioContextRef.current?.close();
       if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
+      if (gardenWheelTimerRef.current) window.clearTimeout(gardenWheelTimerRef.current);
     };
   }, []);
 
@@ -1230,18 +1233,26 @@ export function HerApp() {
       moved: false,
       mode: interactingWithArtwork ? "artwork" : "gallery",
     };
+    if (gardenCursorRef.current) gardenCursorRef.current.dataset.active = "true";
     if (!interactingWithArtwork) strip.setPointerCapture(event.pointerId);
   };
 
   const handleGardenPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const cursor = gardenCursorRef.current;
+    if (cursor) {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      cursor.style.left = `${event.clientX - bounds.left}px`;
+      cursor.style.top = `${event.clientY - bounds.top}px`;
+      cursor.style.opacity = "1";
+    }
     const drag = gardenDragRef.current;
     if (drag.pointerId !== event.pointerId) return;
     const delta = event.clientX - drag.startX;
     if (Math.abs(delta) > 7) drag.moved = true;
-    if (drag.mode === "gallery") event.currentTarget.scrollLeft = drag.scrollLeft - delta;
+    if (drag.moved) event.currentTarget.scrollLeft = drag.scrollLeft - delta;
   };
 
-  const settleGardenSelection = (strip: HTMLDivElement) => {
+  const settleGardenSelection = (strip: HTMLDivElement, snap = false) => {
     const stripCenter = strip.getBoundingClientRect().left + strip.clientWidth / 2;
     let nearestIndex = gardenIndex;
     let nearestDistance = Number.POSITIVE_INFINITY;
@@ -1254,6 +1265,10 @@ export function HerApp() {
       }
     });
     setGardenIndex(nearestIndex);
+    if (snap) {
+      strip.querySelector<HTMLElement>(`[data-garden-index="${nearestIndex}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
   };
 
   const handleGardenPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1264,13 +1279,29 @@ export function HerApp() {
     const mode = gardenDragRef.current.mode;
     gardenDragRef.current.pointerId = -1;
     gardenDragRef.current.mode = null;
-    if (mode === "gallery") settleGardenSelection(event.currentTarget);
+    if (gardenCursorRef.current) gardenCursorRef.current.dataset.active = "false";
+    if (mode) settleGardenSelection(event.currentTarget, true);
   };
 
   const handleGardenWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
     if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
     event.preventDefault();
     event.currentTarget.scrollLeft += event.deltaY;
+    const strip = event.currentTarget;
+    if (gardenWheelTimerRef.current) window.clearTimeout(gardenWheelTimerRef.current);
+    gardenWheelTimerRef.current = window.setTimeout(() => {
+      settleGardenSelection(strip, true);
+      gardenWheelTimerRef.current = null;
+    }, 160);
+  };
+
+  const focusGardenItem = (index: number) => {
+    if (!gardenItems.length) return;
+    const normalized = Math.max(0, Math.min(index, gardenItems.length - 1));
+    setGardenIndex(normalized);
+    gardenStripRef.current
+      ?.querySelector<HTMLElement>(`[data-garden-index="${normalized}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   };
 
   const openGardenConversation = (item = gardenItems[gardenIndex]) => {
@@ -1347,7 +1378,7 @@ export function HerApp() {
   };
 
   return (
-    <main className={styles.app}>
+    <main className={`${styles.app} ${view === "garden" ? styles.gardenMode : ""}`}>
       <header className={styles.header}>
         <button className={styles.wordmark} onClick={() => navigateTo("conversation")} aria-label="Open conversation">
           <span className={styles.wordmarkDot} /> Her
@@ -1487,19 +1518,24 @@ export function HerApp() {
               <div
                 ref={gardenStripRef}
                 className={styles.gardenStrip}
-                onPointerDown={handleGardenPointerDown}
-                onPointerMove={handleGardenPointerMove}
-                onPointerUp={handleGardenPointerUp}
-                onPointerCancel={handleGardenPointerUp}
+                onPointerDownCapture={handleGardenPointerDown}
+                onPointerMoveCapture={handleGardenPointerMove}
+                onPointerUpCapture={handleGardenPointerUp}
+                onPointerCancelCapture={handleGardenPointerUp}
                 onWheel={handleGardenWheel}
                 onScroll={(event) => settleGardenSelection(event.currentTarget)}
+                onPointerLeave={() => {
+                  if (gardenDragRef.current.pointerId === -1 && gardenCursorRef.current) {
+                    gardenCursorRef.current.style.opacity = "0";
+                  }
+                }}
                 aria-label="Memory particles. Drag left or right to explore."
               >
                 <div
                   className={styles.gardenTrack}
                   style={{
-                    "--garden-width": `${Math.max(100, 22 + gardenItems.length * 46)}vw`,
-                    "--garden-mobile-width": `${Math.max(100, 14 + gardenItems.length * 82)}vw`,
+                    "--garden-width": `${Math.max(100, 42 + gardenItems.length * 58)}vw`,
+                    "--garden-mobile-width": `${Math.max(100, 28 + gardenItems.length * 72)}vw`,
                   } as CSSProperties}
                 >
                   {gardenItems.map((item, index) => (
@@ -1508,11 +1544,9 @@ export function HerApp() {
                       data-garden-index={index}
                       className={`${styles.gardenParticleFrame} ${index === gardenIndex ? styles.gardenParticleActive : ""}`}
                       style={{
-                        "--garden-left": `${8 + index * 46}vw`,
-                        "--garden-mobile-left": `${6 + index * 82}vw`,
-                        "--garden-top": `${index % 3 === 0 ? 1 : index % 3 === 1 ? 16 : 7}%`,
-                        "--float-delay": `${index * -1.7}s`,
-                        "--float-duration": `${9 + (index % 3) * 2}s`,
+                        "--garden-left": `${12 + index * 58}vw`,
+                        "--garden-mobile-left": `${2 + index * 72}vw`,
+                        "--garden-top": `${index % 4 === 0 ? 1 : index % 4 === 1 ? 7 : index % 4 === 2 ? 3 : 10}%`,
                       } as CSSProperties}
                       onClick={() => openGardenConversation(item)}
                       onKeyDown={(event) => {
@@ -1547,8 +1581,35 @@ export function HerApp() {
                     </article>
                   ))}
                 </div>
+                <span ref={gardenCursorRef} className={styles.galleryCursor} aria-hidden="true" />
               </div>
-              <p className={styles.dragHint}>Drag the open space to wander · Drag an artwork to move its particles</p>
+              <button
+                className={`${styles.gardenArrow} ${styles.gardenArrowLeft}`}
+                onClick={() => focusGardenItem(gardenIndex - 1)}
+                disabled={gardenIndex === 0}
+                aria-label="Previous memory"
+              >
+                ‹
+              </button>
+              <button
+                className={`${styles.gardenArrow} ${styles.gardenArrowRight}`}
+                onClick={() => focusGardenItem(gardenIndex + 1)}
+                disabled={gardenIndex === gardenItems.length - 1}
+                aria-label="Next memory"
+              >
+                ›
+              </button>
+              <div className={styles.gardenDots} aria-label={`${gardenIndex + 1} of ${gardenItems.length}`}>
+                {gardenItems.map((item, index) => (
+                  <button
+                    key={item.id}
+                    className={index === gardenIndex ? styles.gardenDotActive : ""}
+                    onClick={() => focusGardenItem(index)}
+                    aria-label={`Show ${item.title}`}
+                    aria-current={index === gardenIndex ? "true" : undefined}
+                  />
+                ))}
+              </div>
             </>
           ) : (
             <div className={styles.emptyState}><span>The garden is quiet</span><p>Upload an image when you are ready to let a memory grow here.</p></div>
