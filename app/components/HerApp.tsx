@@ -2,7 +2,11 @@
 /* eslint-disable @next/next/no-img-element -- object URLs and canvas fallbacks cannot use Next image optimization */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type {
+  CSSProperties,
+  PointerEvent as ReactPointerEvent,
+  WheelEvent as ReactWheelEvent,
+} from "react";
 import {
   DEFAULT_PARTICLE_TUNING,
   ParticleGarden,
@@ -73,6 +77,13 @@ type GardenVisualItem = {
   imageUrl: string;
   precomposed?: boolean;
 };
+
+type DeleteTarget =
+  | { kind: "garden"; item: GardenVisualItem }
+  | { kind: "memory"; card: MemoryCard };
+
+const HIDDEN_SAMPLE_GARDEN_KEY = "her-hidden-sample-garden";
+const HIDDEN_SAMPLE_CARDS_KEY = "her-hidden-sample-cards";
 
 const SAMPLE_GARDEN: GardenVisualItem[] = [
   { id: "winter-tree", title: "Winter light", imageUrl: "/demo/memory-tree.png", precomposed: true },
@@ -211,6 +222,21 @@ const formatClock = (seconds: number) => `${pad(Math.floor(seconds / 60))}:${pad
 const localDateKey = (date = new Date()) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` as CalendarDate;
 
+const readHiddenSampleIds = (key: string) => {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+    return new Set(Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []);
+  } catch {
+    return new Set<string>();
+  }
+};
+
+const hideSampleId = (key: string, id: string) => {
+  const hidden = readHiddenSampleIds(key);
+  hidden.add(id);
+  window.localStorage.setItem(key, JSON.stringify([...hidden]));
+};
+
 export function HerApp() {
   const [view, setView] = useState<View>("conversation");
   const [memoryTab, setMemoryTab] = useState<MemoryTab>("cards");
@@ -248,6 +274,10 @@ export function HerApp() {
   const [preview, setPreview] = useState<MemoryCard | null>(null);
   const [cards, setCards] = useState<MemoryCard[]>(SAMPLE_CARDS);
   const [cardIndex, setCardIndex] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [conversationFromGarden, setConversationFromGarden] = useState(false);
+  const [conversationChromeVisible, setConversationChromeVisible] = useState(true);
   const [calendarMonth, setCalendarMonth] = useState(new Date(2025, 11, 1));
   const [selectedDate, setSelectedDate] = useState("2025-12-04");
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
@@ -287,6 +317,9 @@ export function HerApp() {
   const musicAnalyserRef = useRef<AnalyserNode | null>(null);
   const musicAnalyserFrameRef = useRef<number | null>(null);
   const salonRunRef = useRef(0);
+  const gardenStripRef = useRef<HTMLDivElement>(null);
+  const gardenDragRef = useRef({ pointerId: -1, startX: 0, scrollLeft: 0, moved: false });
+  const revealTimerRef = useRef<number | null>(null);
 
   const currentAssistant = [...turns].reverse().find((turn) => turn.role === "assistant");
   const currentSalonLine = salonLineIndex >= 0 ? salonLines[salonLineIndex] : null;
@@ -355,14 +388,17 @@ export function HerApp() {
       persistedUrlsRef.current.push(url);
       gardenUrls.set(garden.id, url);
     }
-    setGardenItems([
+    const hiddenGardenIds = readHiddenSampleIds(HIDDEN_SAMPLE_GARDEN_KEY);
+    const nextGardenItems = [
       ...gardens.map((garden) => ({
         id: garden.id,
         title: garden.title?.original ?? garden.image.filename.replace(/\.[^.]+$/, ""),
         imageUrl: gardenUrls.get(garden.id)!,
       })),
-      ...SAMPLE_GARDEN,
-    ]);
+      ...SAMPLE_GARDEN.filter((item) => !hiddenGardenIds.has(item.id)),
+    ];
+    setGardenItems(nextGardenItems);
+    setGardenIndex((index) => Math.min(index, Math.max(0, nextGardenItems.length - 1)));
     const loaded = await Promise.all(sessions.map(async (session): Promise<MemoryCard | null> => {
       const url = gardenUrls.get(session.gardenItemId);
       if (!url) return null;
@@ -375,7 +411,10 @@ export function HerApp() {
       return card;
     }));
     const valid = loaded.filter((card): card is MemoryCard => Boolean(card));
-    setCards([...valid, ...SAMPLE_CARDS]);
+    const hiddenCardIds = readHiddenSampleIds(HIDDEN_SAMPLE_CARDS_KEY);
+    const nextCards = [...valid, ...SAMPLE_CARDS.filter((card) => !hiddenCardIds.has(card.id))];
+    setCards(nextCards);
+    setCardIndex((index) => Math.min(index, Math.max(0, nextCards.length - 1)));
   }, []);
 
   useEffect(() => {
@@ -399,6 +438,7 @@ export function HerApp() {
       window.speechSynthesis?.cancel();
       void audioContextRef.current?.close();
       void musicAudioContextRef.current?.close();
+      if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
     };
   }, []);
 
@@ -1174,12 +1214,68 @@ export function HerApp() {
   };
 
   const chooseGardenItem = (index: number) => {
+    if (!gardenItems.length) return;
     const normalized = (index + gardenItems.length) % gardenItems.length;
     setGardenIndex(normalized);
+    const item = gardenStripRef.current?.querySelector<HTMLElement>(`[data-garden-index="${normalized}"]`);
+    item?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   };
 
-  const openGardenConversation = () => {
-    const item = gardenItems[gardenIndex];
+  const handleGardenPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("button")) return;
+    const strip = event.currentTarget;
+    gardenDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      scrollLeft: strip.scrollLeft,
+      moved: false,
+    };
+    strip.setPointerCapture(event.pointerId);
+  };
+
+  const handleGardenPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = gardenDragRef.current;
+    if (drag.pointerId !== event.pointerId) return;
+    const delta = event.clientX - drag.startX;
+    if (Math.abs(delta) > 5) drag.moved = true;
+    event.currentTarget.scrollLeft = drag.scrollLeft - delta;
+  };
+
+  const settleGardenSelection = (strip: HTMLDivElement) => {
+    const stripCenter = strip.getBoundingClientRect().left + strip.clientWidth / 2;
+    let nearestIndex = gardenIndex;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    strip.querySelectorAll<HTMLElement>("[data-garden-index]").forEach((item) => {
+      const bounds = item.getBoundingClientRect();
+      const distance = Math.abs(bounds.left + bounds.width / 2 - stripCenter);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = Number(item.dataset.gardenIndex);
+      }
+    });
+    setGardenIndex(nearestIndex);
+  };
+
+  const handleGardenPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (gardenDragRef.current.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    gardenDragRef.current.pointerId = -1;
+    settleGardenSelection(event.currentTarget);
+  };
+
+  const handleGardenWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    event.preventDefault();
+    event.currentTarget.scrollLeft += event.deltaY;
+  };
+
+  const openGardenConversation = (item = gardenItems[gardenIndex]) => {
+    if (!item || gardenDragRef.current.moved) {
+      gardenDragRef.current.moved = false;
+      return;
+    }
     setImageUrl(item.imageUrl);
     setImagePrecomposed(Boolean(item.precomposed));
     setImageTitle(item.title);
@@ -1196,8 +1292,38 @@ export function HerApp() {
     }]);
     setElapsed(0);
     setReplyState("ready");
+    setConversationFromGarden(true);
+    setConversationChromeVisible(false);
+    if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = window.setTimeout(() => {
+      setConversationChromeVisible(true);
+      revealTimerRef.current = null;
+    }, 1700);
     setView("conversation");
   };
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === "garden") {
+        const isSample = SAMPLE_GARDEN.some((item) => item.id === deleteTarget.item.id);
+        if (isSample) hideSampleId(HIDDEN_SAMPLE_GARDEN_KEY, deleteTarget.item.id);
+        else await memoryStore.deleteGardenItem(deleteTarget.item.id, { cascadeSessions: true });
+      } else {
+        const isSample = SAMPLE_CARDS.some((card) => card.id === deleteTarget.card.id);
+        if (isSample) hideSampleId(HIDDEN_SAMPLE_CARDS_KEY, deleteTarget.card.id);
+        else await memoryStore.deleteSessionRecord(deleteTarget.card.id);
+      }
+      setDeleteTarget(null);
+      await refreshSavedCards();
+      flashNotice(deleteTarget.kind === "garden" ? "Memory removed from The Garden." : "Memory deleted.");
+    } catch {
+      flashNotice("This memory could not be deleted yet.");
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteTarget, deleting, flashNotice, refreshSavedCards]);
 
   const navigateTo = (nextView: View) => {
     if (nextView !== "conversation" && (replyState === "listening" || captureStartingRef.current)) {
@@ -1208,6 +1334,12 @@ export function HerApp() {
       window.speechSynthesis?.resume();
       setSalonPaused(false);
       stopSpeechPlayback();
+    }
+    if (nextView === "conversation") {
+      if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+      setConversationFromGarden(false);
+      setConversationChromeVisible(true);
     }
     setView(nextView);
   };
@@ -1242,17 +1374,19 @@ export function HerApp() {
             onReady={(info) => setParticleInfo(`${info.pointCount.toLocaleString()} particles`)}
           />
           <div className={styles.vignette} />
-          <div className={styles.providerPill}>
-            <span className={replyState === "speaking" ? styles.liveWave : styles.providerGlyph}>{replyState === "speaking" ? "≋" : "×"}</span>
-            <span className={styles.statusDot} />
-            <span>{providerMode === "mock" ? "Preview AI" : providerLabel(provider)}</span>
-          </div>
+          {(view === "salon" || !conversationFromGarden || conversationChromeVisible) && (
+            <div className={`${styles.providerPill} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
+              <span className={replyState === "speaking" ? styles.liveWave : styles.providerGlyph}>{replyState === "speaking" ? "≋" : "×"}</span>
+              <span className={styles.statusDot} />
+              <span>{providerMode === "mock" ? "Preview AI" : providerLabel(provider)}</span>
+            </div>
+          )}
 
           {view === "conversation" ? (
-            <>
+            (!conversationFromGarden || conversationChromeVisible) && <div className={`${styles.conversationUi} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
               {replyState === "thinking" && <div className={styles.thinking}>the other side is thinking <span>·</span><span>·</span><span>·</span></div>}
               {currentAssistant && (
-                <article className={`${styles.replyCard} ${replyState === "speaking" ? styles.replySpeaking : ""}`}>
+                <article className={`${styles.replyCard} ${conversationFromGarden ? styles.gardenQuestion : ""} ${replyState === "speaking" ? styles.replySpeaking : ""}`}>
                   <div className={styles.miniWave} aria-hidden="true">{Array.from({ length: 11 }, (_, index) => <i key={index} />)}</div>
                   <p>{currentAssistant.original}</p>
                   {currentAssistant.translation && <><span className={styles.divider} /><p className={styles.translation}>{currentAssistant.translation}</p></>}
@@ -1305,7 +1439,7 @@ export function HerApp() {
                 </div>
                 <button className={styles.uploadAnother} onClick={() => fileInputRef.current?.click()}>← Upload Another</button>
               </div>
-            </>
+            </div>
           ) : (
             <div className={styles.salonLayer}>
               <div className={styles.roleRail}>
@@ -1340,28 +1474,76 @@ export function HerApp() {
               )}
             </div>
           )}
-          <span className={styles.particleMeta}>{particleInfo}</span>
+          {(view === "salon" || !conversationFromGarden || conversationChromeVisible) && <span className={`${styles.particleMeta} ${conversationFromGarden ? styles.delayedChrome : ""}`}>{particleInfo}</span>}
         </section>
       )}
 
       {view === "garden" && (
         <section className={styles.galleryPage}>
           <div className={styles.sectionIntro}><span>THE GARDEN</span><h1>Images keep breathing<br />after the moment is gone.</h1></div>
-          <div className={styles.gardenCarousel}>
-            <button onClick={() => chooseGardenItem(gardenIndex - 1)} aria-label="Previous image">‹</button>
-            <div className={styles.sideMemory} onClick={() => chooseGardenItem(gardenIndex - 1)}>
-              <img src={gardenItems[(gardenIndex - 1 + gardenItems.length) % gardenItems.length].imageUrl} alt="Previous memory" />
-            </div>
-            <div className={styles.centerMemory} onClick={openGardenConversation} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openGardenConversation(); } }} role="button" tabIndex={0}>
-              <ParticleGarden imageUrl={gardenItems[gardenIndex].imageUrl} audioLevel={0.1} interactionStrength={1.1} imageClarity={0.72} precomposed={gardenItems[gardenIndex].precomposed} tuning={particleTuning} />
-              <div className={styles.memoryCaption}><span>{pad(gardenIndex + 1)} / {pad(gardenItems.length)}</span><h2>{gardenItems[gardenIndex].title}</h2><small>open this memory ↗</small></div>
-            </div>
-            <div className={styles.sideMemory} onClick={() => chooseGardenItem(gardenIndex + 1)}>
-              <img src={gardenItems[(gardenIndex + 1) % gardenItems.length].imageUrl} alt="Next memory" />
-            </div>
-            <button onClick={() => chooseGardenItem(gardenIndex + 1)} aria-label="Next image">›</button>
-          </div>
-          <div className={styles.pagination}>{gardenItems.map((item, index) => <button key={item.id} className={index === gardenIndex ? styles.pageActive : ""} onClick={() => chooseGardenItem(index)} aria-label={`Open ${item.title}`} />)}</div>
+          {gardenItems.length ? (
+            <>
+              <div
+                ref={gardenStripRef}
+                className={styles.gardenStrip}
+                onPointerDown={handleGardenPointerDown}
+                onPointerMove={handleGardenPointerMove}
+                onPointerUp={handleGardenPointerUp}
+                onPointerCancel={handleGardenPointerUp}
+                onWheel={handleGardenWheel}
+                aria-label="Memory particles. Drag left or right to explore."
+              >
+                <div className={styles.gardenTrack}>
+                  {gardenItems.map((item, index) => (
+                    <article
+                      key={item.id}
+                      data-garden-index={index}
+                      className={`${styles.gardenParticleFrame} ${index === gardenIndex ? styles.gardenParticleActive : ""}`}
+                      onClick={() => openGardenConversation(item)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openGardenConversation(item);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open ${item.title}`}
+                    >
+                      <ParticleGarden
+                        imageUrl={item.imageUrl}
+                        audioLevel={index === gardenIndex ? 0.1 : 0.045}
+                        interactionStrength={1.1}
+                        imageClarity={0.72}
+                        precomposed={item.precomposed}
+                        tuning={particleTuning}
+                        className={styles.gardenParticle}
+                      />
+                      <div className={styles.memoryCaption}>
+                        <span>{pad(index + 1)} / {pad(gardenItems.length)}</span>
+                        <h2>{item.title}</h2>
+                        <small>open this memory ↗</small>
+                      </div>
+                      <button
+                        className={styles.deleteMemoryButton}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDeleteTarget({ kind: "garden", item });
+                        }}
+                        aria-label={`Delete ${item.title}`}
+                      >
+                        Delete
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </div>
+              <p className={styles.dragHint}>DRAG TO WANDER · SCROLL HORIZONTALLY</p>
+              <div className={styles.pagination}>{gardenItems.map((item, index) => <button key={item.id} className={index === gardenIndex ? styles.pageActive : ""} onClick={() => chooseGardenItem(index)} aria-label={`Show ${item.title}`} />)}</div>
+            </>
+          ) : (
+            <div className={styles.emptyState}><span>THE GARDEN IS QUIET</span><p>Upload an image when you are ready to let a memory grow here.</p></div>
+          )}
           <button className={styles.uploadMore} onClick={() => fileInputRef.current?.click()}>＋ Upload more</button>
         </section>
       )}
@@ -1374,12 +1556,24 @@ export function HerApp() {
           </div>
           {memoryTab === "cards" ? (
             <>
-              <div className={styles.cardCarousel}>
+              {cards.length ? <div className={styles.cardCarousel}>
                 {cards.map((card, index) => {
                   const offset = index - cardIndex;
                   if (Math.abs(offset) > 2) return null;
                   return (
                     <article key={card.id} className={`${styles.memoryCard} ${offset === 0 ? styles.memoryCardActive : ""}`} style={{ "--card-offset": offset } as CSSProperties} onClick={() => offset !== 0 && setCardIndex(index)}>
+                      {offset === 0 && (
+                        <button
+                          className={styles.cardDeleteButton}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleteTarget({ kind: "memory", card });
+                          }}
+                          aria-label={`Delete ${card.title}`}
+                        >
+                          Delete
+                        </button>
+                      )}
                       <img src={card.imageUrl} alt="Memory cover" />
                       <div className={styles.cardBody}>
                         <h2>{card.title}</h2>
@@ -1397,8 +1591,8 @@ export function HerApp() {
                     </article>
                   );
                 })}
-              </div>
-              <div className={styles.cardNav}><button onClick={() => setCardIndex((index) => Math.max(0, index - 1))}>‹</button><span>{pad(cardIndex + 1)} / {pad(cards.length)}</span><button onClick={() => setCardIndex((index) => Math.min(cards.length - 1, index + 1))}>›</button></div>
+              </div> : <div className={styles.emptyState}><span>NO SAVED MEMORIES</span><p>Your next saved conversation will appear here.</p></div>}
+              {cards.length > 0 && <div className={styles.cardNav}><button onClick={() => setCardIndex((index) => Math.max(0, index - 1))}>‹</button><span>{pad(cardIndex + 1)} / {pad(cards.length)}</span><button onClick={() => setCardIndex((index) => Math.min(cards.length - 1, index + 1))}>›</button></div>}
             </>
           ) : (
             <CalendarPanel
@@ -1438,6 +1632,25 @@ export function HerApp() {
                 <div className={styles.previewActions}><button onClick={() => void confirmPreview()} disabled={confirming} aria-label="Save to memory">{confirming ? "…" : "✓"}</button><button onClick={() => void navigator.clipboard.writeText(`${preview.title}\n\n${preview.summary}`)} aria-label="Copy summary">▣</button><button onClick={() => setPreview(null)} disabled={confirming} aria-label="Close preview">×</button></div>
               </>
             ) : null}
+          </article>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-labelledby="delete-memory-title">
+          <article className={styles.deleteConfirm}>
+            <span>REMOVE MEMORY</span>
+            <h2 id="delete-memory-title">Let this memory go?</h2>
+            <p>
+              {deleteTarget.kind === "garden"
+                ? "This particle image and its linked conversations will be removed."
+                : "This saved conversation will be removed from Memory."}
+            </p>
+            <strong>{deleteTarget.kind === "garden" ? deleteTarget.item.title : deleteTarget.card.title}</strong>
+            <div>
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting}>Keep it</button>
+              <button onClick={() => void confirmDelete()} disabled={deleting}>{deleting ? "Removing…" : "Delete"}</button>
+            </div>
           </article>
         </div>
       )}

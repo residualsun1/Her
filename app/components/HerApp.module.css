@@ -1523,3 +1523,351 @@
     transition-delay: 0ms !important;
   }
 }
+
+/* Memory garden iteration: unframed particle promenade and soft detail reveal. */
+.conversationUi {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+}
+
+.conversationUi > * {
+  pointer-events: auto;
+}
+
+.delayedChrome {
+  animation: chromeMistIn 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.gardenQuestion {
+  top: 48%;
+  right: 5vw;
+  left: auto;
+  width: min(450px, 39vw);
+  padding: 30px 34px 24px;
+  border-color: rgba(255, 255, 255, 0.075);
+  background:
+    radial-gradient(circle at 78% 22%, rgba(116, 85, 105, 0.08), transparent 52%),
+    rgba(8, 10, 12, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 24px 80px rgba(0, 0, 0, 0.16);
+  text-align: left;
+  transform: translateY(-50%);
+  -webkit-backdrop-filter: blur(15px) saturate(82%);
+  backdrop-filter: blur(15px) saturate(82%);
+  animation: questionMistIn 1.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.gardenQuestion > p {
+  color: rgba(245, 245, 247, 0.56);
+  font-size: clamp(21px, 2.25vw, 31px);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.18);
+  filter: blur(0.2px);
+}
+
+.gardenQuestion .miniWave,
+.gardenQuestion .replyActions {
+  justify-content: flex-start;
+}
+
+.gardenQuestion .miniWave {
+  opacity: 0.48;
+}
+
+.gardenQuestion .replyActions {
+  opacity: 0.58;
+}
+
+.galleryPage {
+  padding-right: 0;
+  padding-left: 0;
+  overflow: hidden;
+}
+
+.galleryPage .sectionIntro {
+  padding: 0 4vw;
+}
+
+.gardenStrip {
+  width: 100%;
+  height: min(58vh, 610px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  cursor: grab;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.gardenStrip::-webkit-scrollbar {
+  display: none;
+}
+
+.gardenStrip:active {
+  cursor: grabbing;
+}
+
+.gardenTrack {
+  display: flex;
+  align-items: center;
+  gap: clamp(32px, 6vw, 96px);
+  width: max-content;
+  height: 100%;
+  padding: 0 max(7vw, calc((100vw - min(68vw, 780px)) / 2));
+}
+
+.gardenParticleFrame {
+  position: relative;
+  flex: 0 0 min(68vw, 780px);
+  height: 100%;
+  outline: none;
+  scroll-snap-align: center;
+  cursor: pointer;
+  opacity: 0.54;
+  transform: scale(0.91);
+  transition:
+    opacity 520ms ease,
+    transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gardenParticleFrame:focus-visible {
+  outline: 1px solid rgba(137, 245, 207, 0.45);
+  outline-offset: -14px;
+}
+
+.gardenParticleActive {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.gardenParticle {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+
+.gardenParticleFrame .memoryCaption {
+  right: auto;
+  bottom: 18px;
+  left: 24px;
+  width: auto;
+  padding: 0;
+  background: none;
+  opacity: 0.58;
+  text-shadow: 0 2px 18px #000;
+  transition: opacity 300ms ease;
+}
+
+.gardenParticleActive .memoryCaption {
+  opacity: 0.82;
+}
+
+.gardenParticleFrame .memoryCaption h2 {
+  margin: 6px 0 3px;
+  font-size: clamp(20px, 2.25vw, 29px);
+}
+
+.deleteMemoryButton,
+.cardDeleteButton {
+  position: absolute;
+  z-index: 8;
+  top: 18px;
+  right: 20px;
+  padding: 8px 11px;
+  border: 1px solid rgba(244, 140, 155, 0.18) !important;
+  border-radius: 999px;
+  background: rgba(8, 9, 10, 0.2);
+  color: rgba(255, 191, 199, 0.55);
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  opacity: 0.46;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.deleteMemoryButton:hover,
+.deleteMemoryButton:focus-visible,
+.cardDeleteButton:hover,
+.cardDeleteButton:focus-visible {
+  border-color: rgba(244, 140, 155, 0.42) !important;
+  background: rgba(92, 28, 39, 0.22);
+  color: rgba(255, 216, 221, 0.9);
+  opacity: 1;
+}
+
+.dragHint {
+  margin: 9px 0 0;
+  color: rgba(255, 255, 255, 0.24);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.galleryPage .pagination {
+  margin-top: 12px;
+}
+
+.galleryPage .uploadMore {
+  margin-top: 14px;
+}
+
+.cardDeleteButton {
+  top: 16px;
+  right: 16px;
+  background: rgba(8, 9, 10, 0.55);
+  opacity: 0.66;
+}
+
+.emptyState {
+  display: grid;
+  place-items: center;
+  min-height: min(54vh, 560px);
+  color: rgba(255, 255, 255, 0.34);
+  text-align: center;
+}
+
+.emptyState span {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+}
+
+.emptyState p {
+  max-width: 420px;
+  margin: 12px 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.deleteConfirm {
+  width: min(430px, 100%);
+  padding: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 28px;
+  background: rgba(14, 15, 17, 0.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 36px 110px rgba(0, 0, 0, 0.72);
+  text-align: center;
+  -webkit-backdrop-filter: blur(30px) saturate(125%);
+  backdrop-filter: blur(30px) saturate(125%);
+  animation: deleteDialogIn 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.deleteConfirm > span {
+  color: rgba(244, 140, 155, 0.64);
+  font-size: 8px;
+  letter-spacing: 0.2em;
+}
+
+.deleteConfirm h2 {
+  margin: 14px 0 10px;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 32px;
+  font-weight: 400;
+}
+
+.deleteConfirm p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.deleteConfirm strong {
+  display: block;
+  margin: 22px 0;
+  color: rgba(255, 255, 255, 0.76);
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.deleteConfirm > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.deleteConfirm button {
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 10px;
+}
+
+.deleteConfirm button:last-child {
+  border-color: rgba(244, 140, 155, 0.25) !important;
+  background: rgba(244, 140, 155, 0.09);
+  color: #ffb9c3;
+}
+
+@keyframes chromeMistIn {
+  from { opacity: 0; filter: blur(8px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+@keyframes questionMistIn {
+  from { opacity: 0; filter: blur(10px); transform: translateY(calc(-50% + 20px)) scale(0.97); }
+  to { opacity: 1; filter: blur(0); transform: translateY(-50%) scale(1); }
+}
+
+@keyframes deleteDialogIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 820px) {
+  .galleryPage .sectionIntro {
+    padding: 0 18px;
+  }
+
+  .gardenStrip {
+    height: min(54vh, 520px);
+  }
+
+  .gardenTrack {
+    gap: 20px;
+    padding: 0 8vw;
+  }
+
+  .gardenParticleFrame {
+    flex-basis: 84vw;
+  }
+
+  .gardenQuestion {
+    top: 43%;
+    right: 18px;
+    width: calc(100vw - 36px);
+    padding: 24px 23px 20px;
+    background: rgba(8, 10, 12, 0.12);
+  }
+
+  .gardenQuestion > p {
+    font-size: 22px;
+  }
+
+  .deleteMemoryButton {
+    top: 12px;
+    right: 12px;
+  }
+
+  .dragHint {
+    margin-top: 7px;
+  }
+}
