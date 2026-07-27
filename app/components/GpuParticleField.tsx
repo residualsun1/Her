@@ -44,6 +44,7 @@ uniform float uDiffusion;
 uniform float uHaloLifespan;
 uniform vec2 uWind;
 uniform vec2 uPointer;
+uniform vec2 uRotation;
 uniform float uPointerForce;
 uniform float uPointerActive;
 uniform float uMouseRadius;
@@ -169,7 +170,14 @@ void main() {
   velocity.xy += edgeDirection * detached * edgeWeight * uEdgeScatter * 0.00042 * frameScale;
   velocity.xy += vec2(seed - 0.5, stagger - 0.5) * detached * uEdgePerturbation * 0.0012 * frameScale;
 
-  vec2 pointerInField = uPointer / max(uFit, vec2(0.001));
+  vec2 pointerOnPlane = uPointer / max(uFit, vec2(0.001));
+  float cosYaw = max(cos(uRotation.y), 0.14);
+  float cosPitch = max(cos(uRotation.x), 0.14);
+  float pointerX = pointerOnPlane.x / cosYaw;
+  float pointerY = (
+    pointerOnPlane.y - pointerX * sin(uRotation.y) * sin(uRotation.x)
+  ) / cosPitch;
+  vec2 pointerInField = vec2(pointerX, pointerY);
   vec2 pointerDelta = position.xy - pointerInField;
   float pointerDistance = max(length(pointerDelta), 0.0001);
   float radius = max((uMouseRadius * 2.0) / max(uViewport.y, 1.0), 0.025);
@@ -225,6 +233,10 @@ uniform float uSparkleAmount;
 uniform float uBloomRadius;
 uniform float uBloomThreshold;
 uniform float uHaloLayer;
+uniform float uSurfaceLayer;
+uniform float uImageClarity;
+uniform float uDepthStrength;
+uniform vec2 uRotation;
 uniform float uTime;
 uniform float uDpr;
 uniform float uAudio;
@@ -241,6 +253,7 @@ out vec3 vColor;
 out float vAlpha;
 out float vGlow;
 out float vSparkle;
+out float vSurface;
 
 float hash21(vec2 value) {
   vec3 p3 = fract(vec3(value.xyx) * 0.1031);
@@ -255,6 +268,23 @@ vec3 hueRotate(vec3 color, float angle) {
     cross(axis, color) * sin(angle) +
     axis * dot(axis, color) * (1.0 - cos(angle)),
     vec3(0.0)
+  );
+}
+
+vec3 rotateField(vec3 point, vec2 rotation) {
+  float cosYaw = cos(rotation.y);
+  float sinYaw = sin(rotation.y);
+  vec3 yawed = vec3(
+    point.x * cosYaw + point.z * sinYaw,
+    point.y,
+    -point.x * sinYaw + point.z * cosYaw
+  );
+  float cosPitch = cos(rotation.x);
+  float sinPitch = sin(rotation.x);
+  return vec3(
+    yawed.x,
+    yawed.y * cosPitch - yawed.z * sinPitch,
+    yawed.y * sinPitch + yawed.z * cosPitch
   );
 }
 
@@ -273,8 +303,15 @@ void main() {
   vec2 home = aParticleUv * 2.0 - 1.0;
   float seed = particle.w;
   float radius = length(home / vec2(1.0, 1.06));
-  float irregular = (hash21(aParticleUv * 91.73) - 0.5) * uClusterIrregularity;
-  float boundary = 0.84 + irregular * 0.34;
+  float angle = atan(home.y, home.x);
+  float contourNoise =
+    sin(angle * 3.0 + 1.7) * 0.55 +
+    sin(angle * 7.0 - 0.8) * 0.28 +
+    sin(angle * 13.0 + 2.4) * 0.17;
+  float granularNoise = hash21(aParticleUv * 91.73) - 0.5;
+  float irregular = contourNoise * uClusterIrregularity;
+  float boundary = 0.82 + irregular * 0.18 +
+    granularNoise * uClusterIrregularity * 0.12;
   float shapeMask = 1.0 - smoothstep(
     boundary,
     boundary + max(uEdgeFeather * 0.46, 0.025),
@@ -288,8 +325,8 @@ void main() {
   float up = dot(texture(uImage, aParticleUv + vec2(0.0, uImageTexel.y)).rgb, vec3(0.2126, 0.7152, 0.0722));
   float imageEdge = clamp(length(vec2(right - left, up - down)) * 2.2, 0.0, 1.0);
   float contentBounds = 1.0 - smoothstep(
-    0.76 + irregular * 0.12,
-    1.02 + irregular * 0.08,
+    0.76 + contourNoise * uClusterIrregularity * 0.035,
+    1.02 + contourNoise * uClusterIrregularity * 0.025,
     radius
   );
   float contentOverride = smoothstep(0.045, 0.42, luminance) *
@@ -299,15 +336,34 @@ void main() {
   float haloGate = step(1.0 - uHaloDensity, hash21(aParticleUv * 1723.91 + seed));
   float haloBand = smoothstep(0.42, 1.02, radius);
   vec2 haloDirection = normalize(home + vec2(0.0001));
+  float trailSelector = pow(hash21(aParticleUv * 2309.73 + seed), 2.4);
+  vec2 plumeDirection = normalize(vec2(
+    sin(seed * 31.0 + angle * 1.7) * 0.42,
+    0.72 + cos(seed * 19.0 - angle) * 0.28
+  ));
   float haloFlutter = sin(uTime * 0.31 + seed * 21.0) * 0.5 + 0.5;
-  vec2 haloOffset = haloDirection * uHaloWidth * haloBand * (0.28 + seed * 0.72);
+  float trailLength = uHaloWidth * haloBand *
+    (0.18 + seed * 0.46 + trailSelector * 1.55);
+  vec2 haloOffset = mix(
+    haloDirection,
+    plumeDirection,
+    0.38 + trailSelector * 0.5
+  ) * trailLength;
   haloOffset += vec2(
     sin(seed * 41.0 + uTime * 0.19),
     cos(seed * 37.0 - uTime * 0.17)
-  ) * uHaloWidth * 0.18 * haloFlutter;
+  ) * uHaloWidth * (0.08 + trailSelector * 0.18) * haloFlutter;
 
-  float perspective = clamp(1.0 / (1.0 - particle.z * 0.34), 0.68, 1.55);
-  vec2 clipPosition = (particle.xy + haloOffset * uHaloLayer) * fit * perspective;
+  float relief = (luminance - 0.38) * clamp(uDepthStrength / 100.0, 0.0, 2.0) * 0.18;
+  relief += imageEdge * clamp(uDepthStrength / 100.0, 0.0, 2.0) * 0.075;
+  relief += granularNoise * 0.018;
+  vec3 fieldPosition = vec3(
+    particle.xy + haloOffset * uHaloLayer,
+    particle.z + relief * mix(1.0, 0.3, uHaloLayer)
+  );
+  vec3 rotatedPosition = rotateField(fieldPosition, uRotation);
+  float perspective = clamp(1.0 / (1.0 - rotatedPosition.z * 0.42), 0.58, 1.7);
+  vec2 clipPosition = rotatedPosition.xy * fit * perspective;
   gl_Position = vec4(clipPosition, 0.0, 1.0);
 
   float detached = step(0.0, motion.w);
@@ -316,13 +372,20 @@ void main() {
   float softPulse = 0.94 + sin(uTime * 0.56 + particle.z * 19.0) * 0.06;
   float audioSize = step(-0.5, uReactTarget) * step(uReactTarget, 0.5) * uAudio * 0.08;
   float bloomSize = smoothstep(uBloomThreshold, 1.0, luminance) * uBloomRadius;
-  gl_PointSize = clamp(
+  float luminousPointSize = clamp(
     uParticleSize * uDpr * perspective *
       (0.58 + sqrt(max(luminance, 0.0)) * 0.66 + audioSize + bloomSize * 0.34) *
       mix(1.0, 0.76, uHaloLayer),
     0.65 * uDpr,
     7.5 * uDpr
   );
+  float surfacePointSize = clamp(
+    uParticleSize * uDpr * perspective *
+      (0.42 + sqrt(max(luminance, 0.0)) * 0.24),
+    0.62 * uDpr,
+    3.1 * uDpr
+  );
+  gl_PointSize = mix(luminousPointSize, surfacePointSize, uSurfaceLayer);
 
   float hueTarget = step(2.5, uReactTarget) * uAudio * 0.08;
   float hueAngle = radians(uHueDrift) * (0.3 + seed * 0.7) *
@@ -333,18 +396,31 @@ void main() {
   color *= mix(0.9, uLuminanceMultiplier, smoothstep(0.42, 0.92, luminance));
   color *= 1.0 + uAudio * uAudioBrightnessStrength;
   color += vec3(0.08, 0.16, 0.24) * detached * 0.22;
+  vec3 surfaceColor = contrasted * (0.86 + luminance * 0.2);
+  surfaceColor *= 1.0 + uAudio * uAudioBrightnessStrength * 0.72;
+  color = mix(color, surfaceColor, uSurfaceLayer);
 
   vColor = color * softPulse;
   float density = pow(max(luminance, 0.012), max(uDensityGamma, 0.1));
   float coreAlpha = source.a * clusterMask * (0.24 + density * 0.92);
+  float surfaceAlpha = source.a * clusterMask * uImageClarity *
+    (0.38 + density * 0.5) * (0.88 + hash21(aParticleUv * 613.1) * 0.12);
   float haloAlpha = source.a * haloGate * uHaloDensity *
     (0.16 + density * 0.48 + imageEdge * 0.34) * mix(1.0, decay, detached);
-  vAlpha = mix(coreAlpha, haloAlpha, uHaloLayer) * (1.0 + uAudio * 0.12);
-  vGlow = smoothstep(uBloomThreshold, 1.0, luminance) + imageEdge * 0.28 +
-    detached * 0.12 + uAudio * uAudioBloomStrength;
+  vAlpha = mix(
+    mix(coreAlpha, haloAlpha, uHaloLayer),
+    surfaceAlpha,
+    uSurfaceLayer
+  ) * (1.0 + uAudio * 0.12);
+  vGlow = (
+    smoothstep(uBloomThreshold, 1.0, luminance) + imageEdge * 0.28 +
+    detached * 0.12 + uAudio * uAudioBloomStrength
+  ) * mix(1.0, 0.22, uSurfaceLayer);
   vSparkle = hash21(aParticleUv * 787.13) * uSparkleAmount *
     (0.35 + 0.65 * sin(uTime * (0.8 + seed) + seed * 31.0) * 0.5 + 0.5);
   vSparkle += hash21(aParticleUv * 1291.37 + seed) * uTreble * uSparkleReactStrength;
+  vSparkle *= 1.0 - uSurfaceLayer;
+  vSurface = uSurfaceLayer;
 }
 `;
 
@@ -354,6 +430,7 @@ in vec3 vColor;
 in float vAlpha;
 in float vGlow;
 in float vSparkle;
+in float vSurface;
 
 uniform float uHighlightGain;
 uniform float uBloomStrength;
@@ -366,143 +443,19 @@ void main() {
   if (radius > 0.5) discard;
   float core = 1.0 - smoothstep(0.04, 0.23, radius);
   float halo = 1.0 - smoothstep(0.12, 0.5, radius);
-  float alpha = vAlpha * (core * 0.84 + halo * (0.14 + vGlow * uBloomStrength * 0.14));
-  alpha += vSparkle * core * 0.22;
+  float luminousAlpha = vAlpha *
+    (core * 0.84 + halo * (0.14 + vGlow * uBloomStrength * 0.14));
+  luminousAlpha += vSparkle * core * 0.22;
+  float grainDisc = 1.0 - smoothstep(0.34, 0.5, radius);
+  float surfaceAlpha = vAlpha * grainDisc * (0.9 + vGlow * 0.08);
+  float alpha = mix(luminousAlpha, surfaceAlpha, vSurface);
   if (alpha < 0.006) discard;
-  vec3 litColor = vColor * (0.88 + vGlow * uHighlightGain * 0.24 + vSparkle);
+  vec3 luminousColor = vColor * (0.88 + vGlow * uHighlightGain * 0.24 + vSparkle);
+  vec3 surfaceColor = vColor * (0.94 + vGlow * 0.08);
+  vec3 litColor = mix(luminousColor, surfaceColor, vSurface);
   vec3 overflow = max(litColor - vec3(1.0), vec3(0.0));
   litColor /= 1.0 + overflow * 0.22;
   outColor = vec4(litColor, alpha);
-}
-`;
-
-const TEXTURE_CORE_VERTEX = `precision highp float;
-
-in vec3 position;
-out vec2 vClipPosition;
-
-void main() {
-  vClipPosition = position.xy;
-  gl_Position = vec4(position.xy, 0.0, 1.0);
-}
-`;
-
-const TEXTURE_CORE_FRAGMENT = `precision highp float;
-
-uniform sampler2D uImage;
-uniform vec2 uImageTexel;
-uniform vec2 uViewport;
-uniform vec2 uFit;
-uniform vec2 uPointer;
-uniform float uPointerActive;
-uniform float uMouseRadius;
-uniform float uTime;
-uniform float uImageClarity;
-uniform float uContrast;
-uniform float uCoreRetention;
-uniform float uEdgeFeather;
-uniform float uClusterIrregularity;
-uniform float uAudio;
-uniform float uAudioBrightnessStrength;
-
-in vec2 vClipPosition;
-out vec4 outColor;
-
-float hash21(vec2 value) {
-  vec3 p3 = fract(vec3(value.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
-}
-
-float valueNoise(vec2 point) {
-  vec2 cell = floor(point);
-  vec2 local = fract(point);
-  local = local * local * (3.0 - 2.0 * local);
-  float a = hash21(cell);
-  float b = hash21(cell + vec2(1.0, 0.0));
-  float c = hash21(cell + vec2(0.0, 1.0));
-  float d = hash21(cell + vec2(1.0, 1.0));
-  return mix(mix(a, b, local.x), mix(c, d, local.x), local.y);
-}
-
-float fbm(vec2 point) {
-  float value = 0.0;
-  float amplitude = 0.56;
-  mat2 rotation = mat2(0.82, -0.57, 0.57, 0.82);
-  for (int octave = 0; octave < 4; octave += 1) {
-    value += valueNoise(point) * amplitude;
-    point = rotation * point * 2.03 + vec2(7.1, 3.7);
-    amplitude *= 0.5;
-  }
-  return value;
-}
-
-float luminanceAt(vec2 uv) {
-  vec3 color = texture(uImage, clamp(uv, vec2(0.001), vec2(0.999))).rgb;
-  return dot(color, vec3(0.2126, 0.7152, 0.0722));
-}
-
-float imageEdge(vec2 uv) {
-  float left = luminanceAt(uv - vec2(uImageTexel.x, 0.0));
-  float right = luminanceAt(uv + vec2(uImageTexel.x, 0.0));
-  float down = luminanceAt(uv - vec2(0.0, uImageTexel.y));
-  float up = luminanceAt(uv + vec2(0.0, uImageTexel.y));
-  return clamp(length(vec2(right - left, up - down)) * 2.5, 0.0, 1.0);
-}
-
-void main() {
-  vec2 fit = max(uFit, vec2(0.001));
-  vec2 local = vClipPosition / fit;
-  if (max(abs(local.x), abs(local.y)) > 1.0) discard;
-
-  vec2 uv = local * 0.5 + 0.5;
-  vec4 source = texture(uImage, uv);
-  float luminance = dot(source.rgb, vec3(0.2126, 0.7152, 0.0722));
-  float edge = imageEdge(uv);
-
-  float radius = length(local / vec2(1.0, 1.06));
-  vec2 breathingOffset = vec2(uTime * 0.012, -uTime * 0.008);
-  float broadNoise = fbm(local * 2.15 + breathingOffset);
-  float fineNoise = fbm(local * 5.4 - breathingOffset * 1.7);
-  float irregularity = max(uClusterIrregularity, 0.02);
-  float boundary = 0.82 + (broadNoise - 0.5) * irregularity * 0.62;
-  boundary += (fineNoise - 0.5) * irregularity * 0.15;
-
-  float feather = max(uEdgeFeather * 0.58, 0.035);
-  float organicMask = 1.0 - smoothstep(boundary - feather, boundary + feather, radius);
-  float protectedCore = 1.0 - smoothstep(0.46, 0.76, radius);
-  float contentSupport = smoothstep(0.025, 0.34, luminance + edge * 0.72);
-  float contentBounds = 1.0 - smoothstep(0.72, 0.98, radius);
-  float textureMask = max(
-    organicMask,
-    max(protectedCore * 0.94, contentSupport * contentBounds * uCoreRetention)
-  );
-
-  float transitionBand = smoothstep(0.06, 0.58, textureMask) *
-    (1.0 - smoothstep(0.62, 0.98, textureMask));
-  float grain = hash21(floor(gl_FragCoord.xy * 0.78));
-  float dissolvedEdge = smoothstep(0.1 + grain * 0.52, 0.82, textureMask);
-  textureMask = mix(textureMask, dissolvedEdge, transitionBand * 0.72);
-
-  vec2 pointerPixels = (vClipPosition - uPointer) * uViewport * 0.5;
-  float pointerDistance = length(pointerPixels);
-  float pointerVoid = smoothstep(
-    max(uMouseRadius * 0.16, 4.0),
-    max(uMouseRadius * 0.78, 12.0),
-    pointerDistance
-  );
-  textureMask *= mix(1.0, pointerVoid, uPointerActive * 0.94);
-
-  vec3 color = clamp((source.rgb - 0.5) * uContrast + 0.5, 0.0, 1.0);
-  float tactileGrain = hash21(gl_FragCoord.xy);
-  color *= 0.94 + tactileGrain * 0.08;
-  color += vec3(0.055, 0.11, 0.16) * edge * transitionBand;
-  color *= 1.0 + uAudio * uAudioBrightnessStrength * 0.72;
-
-  float alpha = source.a * textureMask * uImageClarity *
-    mix(0.56, 0.88, uCoreRetention);
-  if (alpha < 0.008) discard;
-  outColor = vec4(color, alpha);
 }
 `;
 
@@ -668,6 +621,15 @@ function GpuParticleScene({
   const pointerActiveRef = useRef(0);
   const smoothedPointerRef = useRef(new THREE.Vector2(0, 0));
   const smoothedPointerActiveRef = useRef(0);
+  const rotationRef = useRef(new THREE.Vector2(0, 0));
+  const rotationTargetRef = useRef(new THREE.Vector2(0, 0));
+  const rotationVelocityRef = useRef(new THREE.Vector2(0, 0));
+  const dragRef = useRef({
+    active: false,
+    pointerId: -1,
+    x: 0,
+    y: 0,
+  });
   const smoothedAudioRef = useRef({ level: 0, bass: 0, mid: 0, treble: 0 });
   const onReadyRef = useRef(onReady);
 
@@ -698,21 +660,63 @@ function GpuParticleScene({
       pointerActiveRef.current = 1;
     };
     const deactivatePointer = () => {
-      pointerActiveRef.current = 0;
+      if (!dragRef.current.active) pointerActiveRef.current = 0;
+    };
+    const beginDrag = (event: PointerEvent) => {
+      activatePointer();
+      if (preview) return;
+      dragRef.current = {
+        active: true,
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+      };
+      canvas.setPointerCapture?.(event.pointerId);
+    };
+    const rotateCloud = (event: PointerEvent) => {
+      activatePointer();
+      const drag = dragRef.current;
+      if (preview || !drag.active || drag.pointerId !== event.pointerId) return;
+      const deltaX = event.clientX - drag.x;
+      const deltaY = event.clientY - drag.y;
+      drag.x = event.clientX;
+      drag.y = event.clientY;
+      const target = rotationTargetRef.current;
+      target.x = clamp(target.x - deltaY * 0.0062, -1.43, 1.43);
+      target.y = clamp(target.y + deltaX * 0.0062, -1.43, 1.43);
+      rotationVelocityRef.current.set(-deltaY * 0.00145, deltaX * 0.00145);
+    };
+    const endDrag = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag.active || drag.pointerId !== event.pointerId) return;
+      drag.active = false;
+      if (canvas.hasPointerCapture?.(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
     };
     canvas.addEventListener("pointerenter", activatePointer, { passive: true });
-    canvas.addEventListener("pointermove", activatePointer, { passive: true });
-    canvas.addEventListener("pointerdown", activatePointer, { passive: true });
+    canvas.addEventListener("pointermove", rotateCloud, { passive: true });
+    canvas.addEventListener("pointerdown", beginDrag, { passive: true });
+    canvas.addEventListener("pointerup", endDrag, { passive: true });
     canvas.addEventListener("pointerleave", deactivatePointer, { passive: true });
-    canvas.addEventListener("pointercancel", deactivatePointer, { passive: true });
+    canvas.addEventListener("pointercancel", endDrag, { passive: true });
+    window.addEventListener("pointerup", endDrag, { passive: true });
     return () => {
       canvas.removeEventListener("pointerenter", activatePointer);
-      canvas.removeEventListener("pointermove", activatePointer);
-      canvas.removeEventListener("pointerdown", activatePointer);
+      canvas.removeEventListener("pointermove", rotateCloud);
+      canvas.removeEventListener("pointerdown", beginDrag);
+      canvas.removeEventListener("pointerup", endDrag);
       canvas.removeEventListener("pointerleave", deactivatePointer);
-      canvas.removeEventListener("pointercancel", deactivatePointer);
+      canvas.removeEventListener("pointercancel", endDrag);
+      window.removeEventListener("pointerup", endDrag);
     };
-  }, [gl]);
+  }, [gl, preview]);
+
+  useEffect(() => {
+    rotationRef.current.set(0, 0);
+    rotationTargetRef.current.set(0, 0);
+    rotationVelocityRef.current.set(0, 0);
+  }, [imageUrl]);
 
   const simulationMaterial = useMemo(() => new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3,
@@ -744,6 +748,7 @@ function GpuParticleScene({
       uHaloLifespan: { value: tuning.emberLifespan },
       uWind: { value: new THREE.Vector2(tuning.windX, tuning.windY) },
       uPointer: { value: new THREE.Vector2(2, 2) },
+      uRotation: { value: new THREE.Vector2(0, 0) },
       uPointerForce: { value: interactionStrength * tuning.mouseForce },
       uPointerActive: { value: 0 },
       uMouseRadius: { value: tuning.mouseRadius },
@@ -810,6 +815,10 @@ function GpuParticleScene({
       uBloomRadius: { value: tuning.bloomRadius },
       uBloomThreshold: { value: tuning.bloomThreshold },
       uHaloLayer: { value: 0 },
+      uSurfaceLayer: { value: 0 },
+      uImageClarity: { value: imageClarity },
+      uDepthStrength: { value: tuning.depthStrength },
+      uRotation: { value: new THREE.Vector2(0, 0) },
       uTime: { value: 0 },
       uDpr: { value: gl.getPixelRatio() },
       uAudio: { value: 0 },
@@ -840,38 +849,13 @@ function GpuParticleScene({
     return material;
   }, [particleMaterial]);
 
-  const textureCoreMaterial = useMemo(() => new THREE.RawShaderMaterial({
-    glslVersion: THREE.GLSL3,
-    vertexShader: TEXTURE_CORE_VERTEX,
-    fragmentShader: TEXTURE_CORE_FRAGMENT,
-    uniforms: {
-      uImage: { value: sourceTexture },
-      uImageTexel: { value: new THREE.Vector2(1 / imageSize.width, 1 / imageSize.height) },
-      uViewport: { value: new THREE.Vector2(size.width, size.height) },
-      uFit: { value: new THREE.Vector2(0.91, 0.91) },
-      uPointer: { value: new THREE.Vector2(2, 2) },
-      uPointerActive: { value: 0 },
-      uMouseRadius: { value: tuning.mouseRadius },
-      uTime: { value: 0 },
-      uImageClarity: { value: imageClarity },
-      uContrast: { value: tuning.contrast },
-      uCoreRetention: { value: tuning.coreRetention },
-      uEdgeFeather: { value: tuning.edgeFeather },
-      uClusterIrregularity: { value: tuning.clusterIrregularity },
-      uAudio: { value: 0 },
-      uAudioBrightnessStrength: { value: tuning.audioBrightnessStrength },
-    },
-    transparent: true,
-    depthTest: false,
-    depthWrite: false,
-    blending: THREE.NormalBlending,
-  }), [
-    imageSize.height,
-    imageSize.width,
-    size.height,
-    size.width,
-    sourceTexture,
-  ]);
+  const surfaceMaterial = useMemo(() => {
+    const material = particleMaterial.clone();
+    material.uniforms.uSurfaceLayer.value = 1;
+    material.blending = THREE.NormalBlending;
+    material.needsUpdate = true;
+    return material;
+  }, [particleMaterial]);
 
   const fadeMaterial = useMemo(() => new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3,
@@ -897,7 +881,7 @@ function GpuParticleScene({
       simulationMaterial.dispose();
       particleMaterial.dispose();
       haloMaterial.dispose();
-      textureCoreMaterial.dispose();
+      surfaceMaterial.dispose();
       fadeMaterial.dispose();
       geometry.dispose();
       initialPositionTexture.dispose();
@@ -916,7 +900,7 @@ function GpuParticleScene({
     simulationMaterial,
     simulationQuad,
     simulationScene,
-    textureCoreMaterial,
+    surfaceMaterial,
   ]);
 
   useFrame((state, delta) => {
@@ -957,6 +941,16 @@ function GpuParticleScene({
     smoothedPointerActiveRef.current +=
       (pointerActiveRef.current - smoothedPointerActiveRef.current) * pointerBlend;
 
+    if (!preview && !dragRef.current.active) {
+      const velocity = rotationVelocityRef.current;
+      const target = rotationTargetRef.current;
+      target.x = clamp(target.x + velocity.x * delta * 60, -1.43, 1.43);
+      target.y = clamp(target.y + velocity.y * delta * 60, -1.43, 1.43);
+      velocity.multiplyScalar(Math.exp(-delta * 5.4));
+    }
+    const rotationBlend = 1 - Math.exp(-delta * 12);
+    rotationRef.current.lerp(rotationTargetRef.current, rotationBlend);
+
     const simUniforms = simulationMaterial.uniforms;
     simUniforms.uPositionState.value = positionTextureRef.current;
     simUniforms.uVelocityState.value = velocityTextureRef.current;
@@ -981,6 +975,7 @@ function GpuParticleScene({
     simUniforms.uHaloLifespan.value = tuning.emberLifespan;
     simUniforms.uWind.value.set(tuning.windX, tuning.windY);
     simUniforms.uPointer.value.copy(smoothedPointerRef.current);
+    simUniforms.uRotation.value.copy(rotationRef.current);
     simUniforms.uPointerForce.value = interactionStrength * tuning.mouseForce;
     simUniforms.uPointerActive.value = smoothedPointerActiveRef.current;
     simUniforms.uMouseRadius.value = tuning.mouseRadius;
@@ -1009,7 +1004,7 @@ function GpuParticleScene({
     velocityTextureRef.current = target.textures[1];
     writeIndexRef.current = writeIndexRef.current === 0 ? 1 : 0;
 
-    [particleMaterial, haloMaterial].forEach((material) => {
+    [particleMaterial, haloMaterial, surfaceMaterial].forEach((material) => {
       const pointUniforms = material.uniforms;
       pointUniforms.uPositionState.value = positionTextureRef.current;
       pointUniforms.uVelocityState.value = velocityTextureRef.current;
@@ -1031,6 +1026,9 @@ function GpuParticleScene({
       pointUniforms.uBloomStrength.value = tuning.bloomStrength;
       pointUniforms.uBloomRadius.value = tuning.bloomRadius;
       pointUniforms.uBloomThreshold.value = tuning.bloomThreshold;
+      pointUniforms.uImageClarity.value = imageClarity;
+      pointUniforms.uDepthStrength.value = tuning.depthStrength;
+      pointUniforms.uRotation.value.copy(rotationRef.current);
       pointUniforms.uTime.value = state.clock.elapsedTime;
       pointUniforms.uDpr.value = gl.getPixelRatio();
       pointUniforms.uAudio.value = smoothed.level;
@@ -1040,20 +1038,6 @@ function GpuParticleScene({
       pointUniforms.uSparkleReactStrength.value = tuning.sparkleReactStrength;
       pointUniforms.uReactTarget.value = reactTargetCode(tuning.reactTarget);
     });
-    const coreUniforms = textureCoreMaterial.uniforms;
-    coreUniforms.uViewport.value.set(size.width, size.height);
-    coreUniforms.uFit.value.set(fitX, fitY);
-    coreUniforms.uPointer.value.copy(smoothedPointerRef.current);
-    coreUniforms.uPointerActive.value = smoothedPointerActiveRef.current;
-    coreUniforms.uMouseRadius.value = tuning.mouseRadius;
-    coreUniforms.uTime.value = state.clock.elapsedTime;
-    coreUniforms.uImageClarity.value = imageClarity;
-    coreUniforms.uContrast.value = tuning.contrast;
-    coreUniforms.uCoreRetention.value = tuning.coreRetention;
-    coreUniforms.uEdgeFeather.value = tuning.edgeFeather;
-    coreUniforms.uClusterIrregularity.value = tuning.clusterIrregularity;
-    coreUniforms.uAudio.value = smoothed.level;
-    coreUniforms.uAudioBrightnessStrength.value = tuning.audioBrightnessStrength;
     fadeMaterial.uniforms.uOpacity.value = preview
       ? 1
       : clamp(1 - tuning.trailLength, 0.015, 1);
@@ -1067,10 +1051,12 @@ function GpuParticleScene({
           <primitive object={fadeMaterial} attach="material" />
         </mesh>
       )}
-      <mesh renderOrder={-2} frustumCulled={false}>
-        <planeGeometry args={[2, 2]} />
-        <primitive object={textureCoreMaterial} attach="material" />
-      </mesh>
+      <points
+        geometry={geometry}
+        material={surfaceMaterial}
+        frustumCulled={false}
+        renderOrder={-2}
+      />
       <points
         geometry={geometry}
         material={haloMaterial}

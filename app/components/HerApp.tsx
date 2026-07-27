@@ -98,7 +98,7 @@ const PARAMETER_NOTES = {
   particleCount: "调高会让图像更细腻，也更消耗 GPU；出现卡顿时优先降低。",
   particleSize: "调高后颗粒更醒目，调低后画面更细密、主体更清晰。",
   trailLength: "调高会留下更长的运动轨迹；过高时画面可能糊成光带。",
-  imageClarity: "调高会保留更多原图，调低会让粒子成为画面主角。",
+  imageClarity: "控制主体微粒的密实度；调高更像清晰磨砂纹理，但不会显示固定原图底板。",
   coreRetention: "调高可稳定主体轮廓，调低会让更多粒子离开原位。",
   haloWidth: "调高会让外围星云扩展得更远，星团看起来更蓬松。",
   haloDensity: "调高会让外缘更饱满，同时增加粒子叠加亮度。",
