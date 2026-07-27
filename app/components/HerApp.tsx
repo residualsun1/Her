@@ -86,19 +86,19 @@ const HIDDEN_SAMPLE_GARDEN_KEY = "her-hidden-sample-garden";
 const HIDDEN_SAMPLE_CARDS_KEY = "her-hidden-sample-cards";
 
 const SAMPLE_GARDEN: GardenVisualItem[] = [
-  { id: "winter-tree", title: "Winter light", imageUrl: "/demo/memory-tree.png", precomposed: true },
-  { id: "golden-passage", title: "A golden passage", imageUrl: "/demo/memory-corridor.png", precomposed: true },
-  { id: "quiet-pavilion", title: "Quiet pavilion", imageUrl: "/demo/memory-pavilion.png", precomposed: true },
-  { id: "spoken-memory", title: "A voice in the dark", imageUrl: "/demo/memory-voice.png", precomposed: true },
+  { id: "winter-light", title: "Light in winter", imageUrl: "/demo/light-in-winter.jpg", precomposed: true },
+  { id: "blue-rain", title: "Blue rain", imageUrl: "/demo/dark-blue.jpg", precomposed: true },
+  { id: "deep-blue", title: "Deep blue", imageUrl: "/demo/deep-blue.jpg", precomposed: true },
+  { id: "miss-you", title: "I miss you", imageUrl: "/demo/miss-you.jpg", precomposed: true },
 ];
 
 const SAMPLE_CARDS: MemoryCard[] = [
   {
     id: "sample-melancholy",
-    imageUrl: "/demo/memory-tree.png",
-    title: "The good kind of melancholy",
+    imageUrl: "/demo/light-in-winter.jpg",
+    title: "Light in winter",
     summary:
-      "A winter picture opened a small conversation about nostalgia, old films, and the tender sadness that returns every year.",
+      "A warm lamp in fresh snow opened a small conversation about winter, returning home, and the comfort of being remembered.",
     date: "Dec 04, 2025",
     time: "10:49 AM",
     duration: "01:21",
@@ -133,10 +133,10 @@ const SAMPLE_CARDS: MemoryCard[] = [
   },
   {
     id: "sample-traveler",
-    imageUrl: "/demo/memory-pavilion.png",
-    title: "The little traveler",
+    imageUrl: "/demo/deep-blue.jpg",
+    title: "Deep blue",
     summary:
-      "A photograph became a map: not of where you went, but of the person who was brave enough to go.",
+      "A field under a star-filled sky became a map: not of where you went, but of the quiet distance you were willing to cross.",
     date: "Nov 30, 2025",
     time: "02:57 PM",
     duration: "03:09",
@@ -163,10 +163,10 @@ const SAMPLE_CARDS: MemoryCard[] = [
   },
   {
     id: "sample-salon",
-    imageUrl: "/demo/memory-corridor.png",
-    title: "Do humans have system prompts?",
+    imageUrl: "/demo/dark-blue.jpg",
+    title: "Blue rain",
     summary:
-      "Four synthetic voices met briefly in the dark and wondered whether people also carry invisible instructions.",
+      "Four synthetic voices met briefly in the rain and wondered whether a familiar road can remember who once walked it.",
     date: "Dec 03, 2025",
     time: "11:41 PM",
     duration: "00:48",
@@ -240,9 +240,9 @@ const hideSampleId = (key: string, id: string) => {
 export function HerApp() {
   const [view, setView] = useState<View>("conversation");
   const [memoryTab, setMemoryTab] = useState<MemoryTab>("cards");
-  const [imageUrl, setImageUrl] = useState("/demo/memory-portrait-raw.png");
+  const [imageUrl, setImageUrl] = useState("/demo/light-in-winter.jpg");
   const [imagePrecomposed, setImagePrecomposed] = useState(false);
-  const [imageTitle, setImageTitle] = useState("A quiet evening");
+  const [imageTitle, setImageTitle] = useState("Light in winter");
   const [gardenItems, setGardenItems] = useState<GardenVisualItem[]>(SAMPLE_GARDEN);
   const [gardenIndex, setGardenIndex] = useState(0);
   const [turns, setTurns] = useState<ChatTurn[]>(DEFAULT_TURNS);
@@ -261,8 +261,8 @@ export function HerApp() {
   const [visionEnabled, setVisionEnabled] = useState(true);
   const [saveVoice, setSaveVoice] = useState(true);
   const [imageContext, setImageContext] = useState<{ description: string; possibleTopics: string[] } | null>({
-    description: "A person sits indoors in a quiet evening scene.",
-    possibleTopics: ["quiet evenings", "home", "the feeling behind a portrait"],
+    description: "A warm street lamp glows in a quiet winter snowfall.",
+    possibleTopics: ["winter nights", "home", "a light left on for someone"],
   });
   const [audioLevel, setAudioLevel] = useState(0.06);
   const [interactionStrength, setInteractionStrength] = useState(1.25);
@@ -1312,7 +1312,7 @@ export function HerApp() {
     setImageUrl(item.imageUrl);
     setImagePrecomposed(Boolean(item.precomposed));
     setImageTitle(item.title);
-    currentGardenIdRef.current = item.id.startsWith("winter-") || item.id.startsWith("golden-") || item.id.startsWith("quiet-") || item.id.startsWith("spoken-") ? undefined : item.id;
+    currentGardenIdRef.current = SAMPLE_GARDEN.some((sample) => sample.id === item.id) ? undefined : item.id;
     draftSessionIdRef.current = undefined;
     setTurns([{
       id: crypto.randomUUID(),
