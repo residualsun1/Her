@@ -121,10 +121,15 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(gpu, /uDepthReactStrength/);
   assert.match(gpu, /uBass/);
   assert.match(gpu, /uTreble/);
+  assert.match(gpu, /TEXTURE_CORE_FRAGMENT/);
+  assert.match(gpu, /uImageClarity/);
+  assert.match(gpu, /textureCoreMaterial/);
+  assert.match(gpu, /contentBounds/);
   assert.match(gpu, /smoothstep\(0\.38, 1\.0, age\)/);
   assert.match(particleConfig, /particleCount: 262_144/);
   assert.match(particleConfig, /particleSize: 2\.8/);
   assert.match(particleConfig, /depthStrength: 50/);
+  assert.match(particleConfig, /danceStrength: 7\.5/);
   assert.match(particleConfig, /audioBrightnessStrength: 0\.55/);
   assert.match(particleConfig, /audioAttack: 0\.045/);
   assert.match(particleConfig, /audioRelease: 0\.28/);

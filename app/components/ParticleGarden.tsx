@@ -127,6 +127,7 @@ export function ParticleGarden({
             audioLevel={audioLevel}
             audioBands={audioBands}
             interactionStrength={interactionStrength}
+            imageClarity={imageClarity}
             preview={preview}
             onReady={(pointCount) => {
               setReadyKey(renderKey);

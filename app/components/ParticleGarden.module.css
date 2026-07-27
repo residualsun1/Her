@@ -64,7 +64,7 @@
 }
 
 .ready .imageBase {
-  opacity: calc(var(--image-clarity, 0.72) * 0.12);
+  opacity: 0;
   filter: saturate(0.72) contrast(1.12) brightness(0.64) blur(0.25px);
 }
 

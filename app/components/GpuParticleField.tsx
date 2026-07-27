@@ -287,7 +287,13 @@ void main() {
   float down = dot(texture(uImage, aParticleUv - vec2(0.0, uImageTexel.y)).rgb, vec3(0.2126, 0.7152, 0.0722));
   float up = dot(texture(uImage, aParticleUv + vec2(0.0, uImageTexel.y)).rgb, vec3(0.2126, 0.7152, 0.0722));
   float imageEdge = clamp(length(vec2(right - left, up - down)) * 2.2, 0.0, 1.0);
-  float contentOverride = smoothstep(0.045, 0.42, luminance) * uCoreRetention;
+  float contentBounds = 1.0 - smoothstep(
+    0.76 + irregular * 0.12,
+    1.02 + irregular * 0.08,
+    radius
+  );
+  float contentOverride = smoothstep(0.045, 0.42, luminance) *
+    uCoreRetention * contentBounds;
   float clusterMask = max(shapeMask, contentOverride);
 
   float haloGate = step(1.0 - uHaloDensity, hash21(aParticleUv * 1723.91 + seed));
@@ -370,6 +376,136 @@ void main() {
 }
 `;
 
+const TEXTURE_CORE_VERTEX = `precision highp float;
+
+in vec3 position;
+out vec2 vClipPosition;
+
+void main() {
+  vClipPosition = position.xy;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}
+`;
+
+const TEXTURE_CORE_FRAGMENT = `precision highp float;
+
+uniform sampler2D uImage;
+uniform vec2 uImageTexel;
+uniform vec2 uViewport;
+uniform vec2 uFit;
+uniform vec2 uPointer;
+uniform float uPointerActive;
+uniform float uMouseRadius;
+uniform float uTime;
+uniform float uImageClarity;
+uniform float uContrast;
+uniform float uCoreRetention;
+uniform float uEdgeFeather;
+uniform float uClusterIrregularity;
+uniform float uAudio;
+uniform float uAudioBrightnessStrength;
+
+in vec2 vClipPosition;
+out vec4 outColor;
+
+float hash21(vec2 value) {
+  vec3 p3 = fract(vec3(value.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float valueNoise(vec2 point) {
+  vec2 cell = floor(point);
+  vec2 local = fract(point);
+  local = local * local * (3.0 - 2.0 * local);
+  float a = hash21(cell);
+  float b = hash21(cell + vec2(1.0, 0.0));
+  float c = hash21(cell + vec2(0.0, 1.0));
+  float d = hash21(cell + vec2(1.0, 1.0));
+  return mix(mix(a, b, local.x), mix(c, d, local.x), local.y);
+}
+
+float fbm(vec2 point) {
+  float value = 0.0;
+  float amplitude = 0.56;
+  mat2 rotation = mat2(0.82, -0.57, 0.57, 0.82);
+  for (int octave = 0; octave < 4; octave += 1) {
+    value += valueNoise(point) * amplitude;
+    point = rotation * point * 2.03 + vec2(7.1, 3.7);
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
+float luminanceAt(vec2 uv) {
+  vec3 color = texture(uImage, clamp(uv, vec2(0.001), vec2(0.999))).rgb;
+  return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+float imageEdge(vec2 uv) {
+  float left = luminanceAt(uv - vec2(uImageTexel.x, 0.0));
+  float right = luminanceAt(uv + vec2(uImageTexel.x, 0.0));
+  float down = luminanceAt(uv - vec2(0.0, uImageTexel.y));
+  float up = luminanceAt(uv + vec2(0.0, uImageTexel.y));
+  return clamp(length(vec2(right - left, up - down)) * 2.5, 0.0, 1.0);
+}
+
+void main() {
+  vec2 fit = max(uFit, vec2(0.001));
+  vec2 local = vClipPosition / fit;
+  if (max(abs(local.x), abs(local.y)) > 1.0) discard;
+
+  vec2 uv = local * 0.5 + 0.5;
+  vec4 source = texture(uImage, uv);
+  float luminance = dot(source.rgb, vec3(0.2126, 0.7152, 0.0722));
+  float edge = imageEdge(uv);
+
+  float radius = length(local / vec2(1.0, 1.06));
+  vec2 breathingOffset = vec2(uTime * 0.012, -uTime * 0.008);
+  float broadNoise = fbm(local * 2.15 + breathingOffset);
+  float fineNoise = fbm(local * 5.4 - breathingOffset * 1.7);
+  float irregularity = max(uClusterIrregularity, 0.02);
+  float boundary = 0.82 + (broadNoise - 0.5) * irregularity * 0.62;
+  boundary += (fineNoise - 0.5) * irregularity * 0.15;
+
+  float feather = max(uEdgeFeather * 0.58, 0.035);
+  float organicMask = 1.0 - smoothstep(boundary - feather, boundary + feather, radius);
+  float protectedCore = 1.0 - smoothstep(0.46, 0.76, radius);
+  float contentSupport = smoothstep(0.025, 0.34, luminance + edge * 0.72);
+  float contentBounds = 1.0 - smoothstep(0.72, 0.98, radius);
+  float textureMask = max(
+    organicMask,
+    max(protectedCore * 0.94, contentSupport * contentBounds * uCoreRetention)
+  );
+
+  float transitionBand = smoothstep(0.06, 0.58, textureMask) *
+    (1.0 - smoothstep(0.62, 0.98, textureMask));
+  float grain = hash21(floor(gl_FragCoord.xy * 0.78));
+  float dissolvedEdge = smoothstep(0.1 + grain * 0.52, 0.82, textureMask);
+  textureMask = mix(textureMask, dissolvedEdge, transitionBand * 0.72);
+
+  vec2 pointerPixels = (vClipPosition - uPointer) * uViewport * 0.5;
+  float pointerDistance = length(pointerPixels);
+  float pointerVoid = smoothstep(
+    max(uMouseRadius * 0.16, 4.0),
+    max(uMouseRadius * 0.78, 12.0),
+    pointerDistance
+  );
+  textureMask *= mix(1.0, pointerVoid, uPointerActive * 0.94);
+
+  vec3 color = clamp((source.rgb - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  float tactileGrain = hash21(gl_FragCoord.xy);
+  color *= 0.94 + tactileGrain * 0.08;
+  color += vec3(0.055, 0.11, 0.16) * edge * transitionBand;
+  color *= 1.0 + uAudio * uAudioBrightnessStrength * 0.72;
+
+  float alpha = source.a * textureMask * uImageClarity *
+    mix(0.56, 0.88, uCoreRetention);
+  if (alpha < 0.008) discard;
+  outColor = vec4(color, alpha);
+}
+`;
+
 const FADE_VERTEX = `precision highp float;
 in vec3 position;
 void main() {
@@ -398,6 +534,7 @@ type GpuParticleFieldProps = {
   audioLevel: number;
   audioBands: AudioBands;
   interactionStrength: number;
+  imageClarity: number;
   preview?: boolean;
   onReady?: (pointCount: number) => void;
 };
@@ -487,6 +624,7 @@ function GpuParticleScene({
   audioLevel,
   audioBands,
   interactionStrength,
+  imageClarity,
   preview = false,
   onReady,
 }: GpuParticleFieldProps) {
@@ -702,6 +840,39 @@ function GpuParticleScene({
     return material;
   }, [particleMaterial]);
 
+  const textureCoreMaterial = useMemo(() => new THREE.RawShaderMaterial({
+    glslVersion: THREE.GLSL3,
+    vertexShader: TEXTURE_CORE_VERTEX,
+    fragmentShader: TEXTURE_CORE_FRAGMENT,
+    uniforms: {
+      uImage: { value: sourceTexture },
+      uImageTexel: { value: new THREE.Vector2(1 / imageSize.width, 1 / imageSize.height) },
+      uViewport: { value: new THREE.Vector2(size.width, size.height) },
+      uFit: { value: new THREE.Vector2(0.91, 0.91) },
+      uPointer: { value: new THREE.Vector2(2, 2) },
+      uPointerActive: { value: 0 },
+      uMouseRadius: { value: tuning.mouseRadius },
+      uTime: { value: 0 },
+      uImageClarity: { value: imageClarity },
+      uContrast: { value: tuning.contrast },
+      uCoreRetention: { value: tuning.coreRetention },
+      uEdgeFeather: { value: tuning.edgeFeather },
+      uClusterIrregularity: { value: tuning.clusterIrregularity },
+      uAudio: { value: 0 },
+      uAudioBrightnessStrength: { value: tuning.audioBrightnessStrength },
+    },
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+  }), [
+    imageSize.height,
+    imageSize.width,
+    size.height,
+    size.width,
+    sourceTexture,
+  ]);
+
   const fadeMaterial = useMemo(() => new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3,
     vertexShader: FADE_VERTEX,
@@ -726,6 +897,7 @@ function GpuParticleScene({
       simulationMaterial.dispose();
       particleMaterial.dispose();
       haloMaterial.dispose();
+      textureCoreMaterial.dispose();
       fadeMaterial.dispose();
       geometry.dispose();
       initialPositionTexture.dispose();
@@ -744,6 +916,7 @@ function GpuParticleScene({
     simulationMaterial,
     simulationQuad,
     simulationScene,
+    textureCoreMaterial,
   ]);
 
   useFrame((state, delta) => {
@@ -867,6 +1040,20 @@ function GpuParticleScene({
       pointUniforms.uSparkleReactStrength.value = tuning.sparkleReactStrength;
       pointUniforms.uReactTarget.value = reactTargetCode(tuning.reactTarget);
     });
+    const coreUniforms = textureCoreMaterial.uniforms;
+    coreUniforms.uViewport.value.set(size.width, size.height);
+    coreUniforms.uFit.value.set(fitX, fitY);
+    coreUniforms.uPointer.value.copy(smoothedPointerRef.current);
+    coreUniforms.uPointerActive.value = smoothedPointerActiveRef.current;
+    coreUniforms.uMouseRadius.value = tuning.mouseRadius;
+    coreUniforms.uTime.value = state.clock.elapsedTime;
+    coreUniforms.uImageClarity.value = imageClarity;
+    coreUniforms.uContrast.value = tuning.contrast;
+    coreUniforms.uCoreRetention.value = tuning.coreRetention;
+    coreUniforms.uEdgeFeather.value = tuning.edgeFeather;
+    coreUniforms.uClusterIrregularity.value = tuning.clusterIrregularity;
+    coreUniforms.uAudio.value = smoothed.level;
+    coreUniforms.uAudioBrightnessStrength.value = tuning.audioBrightnessStrength;
     fadeMaterial.uniforms.uOpacity.value = preview
       ? 1
       : clamp(1 - tuning.trailLength, 0.015, 1);
@@ -880,6 +1067,10 @@ function GpuParticleScene({
           <primitive object={fadeMaterial} attach="material" />
         </mesh>
       )}
+      <mesh renderOrder={-2} frustumCulled={false}>
+        <planeGeometry args={[2, 2]} />
+        <primitive object={textureCoreMaterial} attach="material" />
+      </mesh>
       <points
         geometry={geometry}
         material={haloMaterial}
