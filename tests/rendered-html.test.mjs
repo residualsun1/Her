@@ -126,6 +126,13 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(gpu, /WebGLRenderTarget/);
   assert.match(gpu, /sobelEdge/);
   assert.match(gpu, /curlNoise/);
+  assert.match(gpu, /upperDreamZone/);
+  assert.match(gpu, /sideDreamZone/);
+  assert.match(gpu, /lowerDetailAnchor/);
+  assert.match(gpu, /dreamReleaseZone/);
+  assert.match(gpu, /filamentSelector/);
+  assert.match(gpu, /plumeSelector/);
+  assert.match(gpu, /detailGain/);
   assert.match(gpu, /uPeelThreshold/);
   assert.match(gpu, /uErosionRate/);
   assert.match(gpu, /uHaloLifespan/);
@@ -146,7 +153,9 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(gpu, /rotationTargetRef/);
   assert.match(gpu, /centerTrough/);
   assert.match(gpu, /raisedRim/);
-  assert.match(gpu, /flowWeight = 0\.018/);
+  assert.match(gpu, /flowWeight = \(0\.004 \+ release \* 0\.996\)/);
+  assert.match(gpu, /mix\(0\.22, 1\.0, dreamReleaseZone\)/);
+  assert.doesNotMatch(gpu, /flowWeight = 0\.018/);
   assert.doesNotMatch(gpu, /TEXTURE_CORE_FRAGMENT|textureCoreMaterial/);
   assert.match(gpu, /contentBounds/);
   assert.match(gpu, /smoothstep\(0\.38, 1\.0, age\)/);
