@@ -99,6 +99,8 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /律动映射目标/);
   assert.match(herApp, /音频平滑度/);
   assert.match(herApp, /handleParticleWheel/);
+  assert.match(herApp, /smoothingTimeConstant = 0\.58/);
+  assert.match(herApp, /average \* 1\.42 \+ bass \* 0\.88/);
   assert.match(herApp, /immersiveMode/);
   assert.match(herApp, /Hide interface/);
   assert.match(herApp, /Show interface \(Esc\)/);
@@ -130,8 +132,14 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(gpu, /sideDreamZone/);
   assert.match(gpu, /lowerDetailAnchor/);
   assert.match(gpu, /dreamReleaseZone/);
+  assert.match(gpu, /contourEdge/);
+  assert.match(gpu, /releaseEdge \* uEdgeScatter/);
+  assert.match(gpu, /coherentPlume/);
   assert.match(gpu, /filamentSelector/);
   assert.match(gpu, /plumeSelector/);
+  assert.match(gpu, /audioDreamDrive/);
+  assert.match(gpu, /rhythmVibration/);
+  assert.match(gpu, /audioDanceOffset/);
   assert.match(gpu, /detailGain/);
   assert.match(gpu, /uPeelThreshold/);
   assert.match(gpu, /uErosionRate/);
@@ -162,10 +170,10 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(particleConfig, /particleCount: 262_144/);
   assert.match(particleConfig, /particleSize: 2\.8/);
   assert.match(particleConfig, /depthStrength: 50/);
-  assert.match(particleConfig, /danceStrength: 7\.5/);
-  assert.match(particleConfig, /audioBrightnessStrength: 0\.55/);
-  assert.match(particleConfig, /audioAttack: 0\.045/);
-  assert.match(particleConfig, /audioRelease: 0\.28/);
+  assert.match(particleConfig, /danceStrength: 8\.4/);
+  assert.match(particleConfig, /audioBrightnessStrength: 0\.7/);
+  assert.match(particleConfig, /audioAttack: 0\.025/);
+  assert.match(particleConfig, /audioRelease: 0\.2/);
   assert.match(particleConfig, /reactTarget: "peel"/);
   assert.match(particleStyles, /\.ready \.imageBase/);
   assert.match(appStyles, /\.parameterNote/);

@@ -121,8 +121,15 @@ void main() {
 
   float edge = sobelEdge(vUv);
   float reactiveBass = clamp(uBass * uBassGain, 0.0, 1.5);
-  float reactiveFlow = 1.0 + (uAudioEnergy + uMid * 0.65) * uFlowReactStrength;
-  float bassPeel = reactiveBass * uRhythmIntensity * 0.055;
+  float audioDreamDrive = clamp(
+    pow(max(uAudioEnergy, 0.0), 0.72) * 1.18 +
+      reactiveBass * 0.48 + uMid * 0.28,
+    0.0,
+    2.0
+  );
+  float reactiveFlow = 1.0 + (uAudioEnergy + uMid * 0.75) *
+    uFlowReactStrength * (1.0 + uDanceStrength * 0.14);
+  float bassPeel = reactiveBass * uRhythmIntensity * 0.09;
   float threshold = clamp(uPeelThreshold - bassPeel, 0.02, 0.98);
   float edgeWeight = smoothstep(threshold - 0.12, threshold + 0.12, edge);
   float stagger = hash21(vUv * 1931.17 + seed);
@@ -139,8 +146,26 @@ void main() {
     0.0,
     1.0
   );
-  float release = edgeWeight * mix(0.035, 1.0, haloParticle) *
-    mix(0.045, 1.0, dreamReleaseZone);
+  float lobeSignal = clamp(
+    0.5 + 0.5 * (
+      sin(home.x * 8.3 + home.y * 3.1 + 1.4) * 0.58 +
+      sin(home.x * 15.7 - home.y * 2.4 - 0.8) * 0.42
+    ),
+    0.0,
+    1.0
+  );
+  float coherentPlume = smoothstep(0.5, 0.82, lobeSignal);
+  float contourEdge = smoothstep(0.58, 0.94, fieldRadius) *
+    dreamReleaseZone * (0.42 + coherentPlume * 0.78);
+  float releaseEdge = max(edgeWeight, contourEdge);
+  float release = releaseEdge * mix(0.055, 1.0, haloParticle) *
+    mix(0.07, 1.0, dreamReleaseZone);
+  release = clamp(
+    release * (1.0 + audioDreamDrive * dreamReleaseZone *
+      (0.48 + coherentPlume * 0.58)),
+    0.0,
+    1.0
+  );
 
   float pace = max(uErosionRate, 0.001);
   if (life < 0.0) {
@@ -168,10 +193,12 @@ void main() {
   noisePoint += vec2(noiseTime, -noiseTime * 0.71);
   vec2 curl = curlNoise(noisePoint);
   float diffusion = clamp(uDiffusion / 1.5, 0.0, 3.0);
+  float audioDiffusion = 1.0 + audioDreamDrive *
+    (0.58 + uDanceStrength * 0.075);
   float flowWeight = (0.004 + release * 0.996) *
     mix(0.22, 1.0, dreamReleaseZone);
   velocity.xy += curl * uNoiseStrength * uFlowAmplitude * reactiveFlow *
-    flowWeight * 0.0028 * frameScale * diffusion;
+    flowWeight * 0.0028 * frameScale * diffusion * audioDiffusion;
   velocity.xy += uWind * detached * mix(0.32, 1.0, dreamReleaseZone) *
     0.0018 * frameScale;
   velocity.z += fieldNoise(noisePoint * 0.72) * uFlowAmplitude * reactiveFlow *
@@ -196,11 +223,25 @@ void main() {
     0.24 + dreamReleaseZone * 0.58 + filamentSelector * 0.16
   ));
   float plumeForce = mix(0.16, 1.0 + filamentSelector * 1.35, dreamReleaseZone);
-  velocity.xy += scatterDirection * detached * edgeWeight * uEdgeScatter *
+  velocity.xy += scatterDirection * detached * releaseEdge * uEdgeScatter *
     plumeForce * 0.00042 * frameScale;
   velocity.xy += vec2(seed - 0.5, stagger - 0.5) * detached *
     uEdgePerturbation * mix(0.2, 1.0, dreamReleaseZone) *
     0.0012 * frameScale;
+  float beatImpulse = clamp(
+    reactiveBass * 0.82 + audioDreamDrive * 0.34,
+    0.0,
+    1.8
+  );
+  vec2 rhythmVibration = vec2(
+    sin(uTime * (2.6 + uMid * 3.2) + seed * 23.0),
+    cos(uTime * (2.1 + uTreble * 4.1) + seed * 19.0)
+  );
+  velocity.xy += rhythmVibration * dreamReleaseZone * audioDreamDrive *
+    (0.0005 + uDanceStrength * 0.0002) * frameScale;
+  velocity.xy += plumeDirection * detached * dreamReleaseZone * beatImpulse *
+    (0.00042 + uDanceStrength * 0.00016) *
+    (0.52 + coherentPlume * 0.88) * frameScale;
 
   vec2 pointerOnPlane = uPointer / max(uFit, vec2(0.001));
   float cosYaw = max(cos(uRotation.y), 0.14);
@@ -354,6 +395,16 @@ void main() {
     0.0,
     1.0
   );
+  float lobeSignal = clamp(
+    0.5 + 0.5 * (
+      sin(home.x * 8.3 + home.y * 3.1 + 1.4) * 0.58 +
+      sin(home.x * 15.7 - home.y * 2.4 - 0.8) * 0.42
+    ),
+    0.0,
+    1.0
+  );
+  float coherentPlume = smoothstep(0.5, 0.82, lobeSignal);
+  float audioDreamPulse = pow(clamp(uAudio, 0.0, 1.0), 0.68);
   float contourNoise =
     sin(angle * 3.0 + 1.7) * 0.55 +
     sin(angle * 7.0 - 0.8) * 0.28 +
@@ -385,7 +436,7 @@ void main() {
 
   float haloGate = step(1.0 - uHaloDensity, hash21(aParticleUv * 1723.91 + seed));
   float haloBand = smoothstep(0.42, 1.02, radius) *
-    mix(0.08, 1.0, dreamReleaseZone);
+    mix(0.1, 1.0 + coherentPlume * 0.28, dreamReleaseZone);
   vec2 haloDirection = normalize(home + vec2(0.0001));
   float trailSelector = pow(hash21(aParticleUv * 2309.73 + seed), 2.4);
   float plumeSelector = pow(hash21(aParticleUv * 3181.27 + seed * 17.0), 4.2);
@@ -396,11 +447,14 @@ void main() {
   ));
   float haloFlutter = sin(uTime * 0.31 + seed * 21.0) * 0.5 + 0.5;
   float trailLength = uHaloWidth * haloBand *
-    (0.12 + seed * 0.38 + trailSelector * 1.28 +
-      plumeSelector * dreamReleaseZone * 2.75);
-  trailLength *= mix(0.1, 1.0, dreamReleaseZone);
-  trailLength *= 1.0 + uAudio *
-    (0.18 + trailSelector * 0.72 + plumeSelector * dreamReleaseZone * 1.15);
+    (0.16 + seed * 0.42 + trailSelector * 1.12 +
+      coherentPlume * dreamReleaseZone * 1.95 +
+      plumeSelector * dreamReleaseZone * 2.35);
+  trailLength *= mix(0.12, 1.08, dreamReleaseZone);
+  trailLength *= 1.0 + audioDreamPulse *
+    (0.52 + coherentPlume * 0.92 +
+      plumeSelector * dreamReleaseZone * 1.55);
+  trailLength = min(trailLength, uHaloWidth * 4.35);
   vec2 haloOffset = mix(
     haloDirection,
     plumeDirection,
@@ -412,6 +466,15 @@ void main() {
     cos(seed * 37.0 - uTime * 0.17)
   ) * uHaloWidth * (0.05 + trailSelector * 0.16 + plumeSelector * 0.2) *
     haloFlutter * mix(0.12, 1.0, dreamReleaseZone);
+  float audioDancePhase = uTime * (2.2 + audioDreamPulse * 3.8);
+  vec2 audioDanceOffset = vec2(
+    sin(audioDancePhase + seed * 29.0 + angle * 2.0),
+    cos(audioDancePhase * 0.83 + seed * 17.0 - angle)
+  );
+  haloOffset += audioDanceOffset * uHaloWidth * dreamReleaseZone *
+    audioDreamPulse * (0.16 + coherentPlume * 0.5 + plumeSelector * 0.72);
+  haloOffset += plumeDirection * uHaloWidth * dreamReleaseZone *
+    audioDreamPulse * (0.14 + coherentPlume * 0.62);
 
   float relief = (luminance - 0.38) * clamp(uDepthStrength / 100.0, 0.0, 2.0) * 0.18;
   relief += imageEdge * clamp(uDepthStrength / 100.0, 0.0, 2.0) * 0.075;
@@ -435,7 +498,8 @@ void main() {
   float luminousPointSize = clamp(
     uParticleSize * uDpr * perspective * zoomPointScale *
       (0.58 + sqrt(max(luminance, 0.0)) * 0.66 + audioSize + bloomSize * 0.34) *
-      mix(1.0, 0.76, uHaloLayer),
+      mix(1.0, 0.76 + audioDreamPulse * dreamReleaseZone *
+        (0.16 + coherentPlume * 0.22), uHaloLayer),
     0.65 * uDpr,
     7.5 * uDpr
   );
@@ -471,8 +535,13 @@ void main() {
     detailGain;
   float haloAlpha = source.a * haloGate * uHaloDensity *
     (0.16 + density * 0.48 + imageEdge * 0.34) * mix(1.0, decay, detached);
-  haloAlpha *= mix(0.12, 1.24 + plumeSelector * 0.38, dreamReleaseZone);
-  haloAlpha *= 1.0 + uAudio * (0.72 + trailSelector * 0.88);
+  haloAlpha *= mix(
+    0.12,
+    1.18 + coherentPlume * 0.62 + plumeSelector * 0.46,
+    dreamReleaseZone
+  );
+  haloAlpha *= 1.0 + audioDreamPulse *
+    (1.08 + coherentPlume * 1.12 + trailSelector * 0.92);
   float luminousAlpha = mix(
     mix(coreAlpha, haloAlpha, uHaloLayer),
     surfaceAlpha,
@@ -487,7 +556,9 @@ void main() {
   vGlow = (
     smoothstep(uBloomThreshold, 1.0, luminance) + imageEdge * 0.28 +
     detached * 0.12 +
-    uAudio * uAudioBloomStrength * mix(0.22, 1.0, uHaloLayer)
+    audioDreamPulse * uAudioBloomStrength *
+      mix(0.22, 1.0 + dreamReleaseZone *
+        (0.42 + coherentPlume * 0.58), uHaloLayer)
   ) * mix(1.0, 0.22, uSurfaceLayer);
   vSparkle = hash21(aParticleUv * 787.13) * uSparkleAmount *
     (0.35 + 0.65 * sin(uTime * (0.8 + seed) + seed * 31.0) * 0.5 + 0.5);

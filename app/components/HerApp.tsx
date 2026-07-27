@@ -1285,7 +1285,7 @@ export function HerApp() {
     if (!analyser) {
       analyser = context.createAnalyser();
       analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.76;
+      analyser.smoothingTimeConstant = 0.58;
       source.connect(analyser);
       analyser.connect(context.destination);
       musicAnalyserRef.current = analyser;
@@ -1302,9 +1302,9 @@ export function HerApp() {
       const treble = averageFrequencyBand(spectrum, trebleStart, spectrum.length);
       const average = averageFrequencyBand(spectrum, 0, spectrum.length);
       const now = performance.now();
-      if (now - lastAudioUiUpdateRef.current > 50) {
+      if (now - lastAudioUiUpdateRef.current > 32) {
         lastAudioUiUpdateRef.current = now;
-        setAudioLevel(Math.min(1, 0.035 + average * 1.15 + bass * 0.62));
+        setAudioLevel(Math.min(1, 0.025 + average * 1.42 + bass * 0.88));
         setAudioBands({ bass, mid, treble });
       }
       musicAnalyserFrameRef.current = requestAnimationFrame(tick);
