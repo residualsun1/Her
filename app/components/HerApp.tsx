@@ -86,6 +86,14 @@ type DeleteTarget =
 const HIDDEN_SAMPLE_GARDEN_KEY = "her-hidden-sample-garden";
 const HIDDEN_SAMPLE_CARDS_KEY = "her-hidden-sample-cards";
 
+const averageFrequencyBand = (data: Uint8Array, start: number, end: number) => {
+  const from = Math.max(0, Math.min(start, data.length));
+  const to = Math.max(from + 1, Math.min(end, data.length));
+  let total = 0;
+  for (let index = from; index < to; index += 1) total += data[index];
+  return total / (to - from) / 255;
+};
+
 const SAMPLE_GARDEN: GardenVisualItem[] = [
   { id: "winter-light", title: "Light in winter", imageUrl: "/demo/light-in-winter.jpg", precomposed: true },
   { id: "blue-rain", title: "Blue rain", imageUrl: "/demo/dark-blue.jpg", precomposed: true },
@@ -266,7 +274,7 @@ export function HerApp() {
     possibleTopics: ["winter nights", "home", "a light left on for someone"],
   });
   const [audioLevel, setAudioLevel] = useState(0.06);
-  const [audioBands, setAudioBands] = useState({ bass: 0.02, treble: 0.01 });
+  const [audioBands, setAudioBands] = useState({ bass: 0.02, mid: 0.015, treble: 0.01 });
   const [interactionStrength, setInteractionStrength] = useState(1.25);
   const [imageClarity, setImageClarity] = useState(0.72);
   const [particleTuning, setParticleTuning] = useState<ParticleTuning>({ ...DEFAULT_PARTICLE_TUNING });
@@ -663,14 +671,15 @@ export function HerApp() {
         analyser.getByteFrequencyData(data);
         const bassBins = Math.max(4, Math.floor(data.length * 0.16));
         const trebleStart = Math.floor(data.length * 0.58);
-        const bass = data.slice(0, bassBins).reduce((sum, value) => sum + value, 0) / bassBins / 255;
-        const treble = data.slice(trebleStart).reduce((sum, value) => sum + value, 0) / Math.max(data.length - trebleStart, 1) / 255;
-        const average = data.reduce((sum, value) => sum + value, 0) / data.length / 255;
+        const bass = averageFrequencyBand(data, 0, bassBins);
+        const mid = averageFrequencyBand(data, bassBins, trebleStart);
+        const treble = averageFrequencyBand(data, trebleStart, data.length);
+        const average = averageFrequencyBand(data, 0, data.length);
         const now = performance.now();
         if (now - lastAudioUiUpdateRef.current > 50) {
           lastAudioUiUpdateRef.current = now;
           setAudioLevel(Math.min(1, average * 2.2 + bass * 0.58 + 0.04));
-          setAudioBands({ bass, treble });
+          setAudioBands({ bass, mid, treble });
         }
         analyserFrameRef.current = requestAnimationFrame(tick);
       };
@@ -1217,14 +1226,15 @@ export function HerApp() {
       analyser!.getByteFrequencyData(spectrum);
       const bassBins = Math.max(4, Math.floor(spectrum.length * 0.18));
       const trebleStart = Math.floor(spectrum.length * 0.58);
-      const bass = spectrum.slice(0, bassBins).reduce((sum, value) => sum + value, 0) / bassBins / 255;
-      const treble = spectrum.slice(trebleStart).reduce((sum, value) => sum + value, 0) / Math.max(spectrum.length - trebleStart, 1) / 255;
-      const average = spectrum.reduce((sum, value) => sum + value, 0) / spectrum.length / 255;
+      const bass = averageFrequencyBand(spectrum, 0, bassBins);
+      const mid = averageFrequencyBand(spectrum, bassBins, trebleStart);
+      const treble = averageFrequencyBand(spectrum, trebleStart, spectrum.length);
+      const average = averageFrequencyBand(spectrum, 0, spectrum.length);
       const now = performance.now();
       if (now - lastAudioUiUpdateRef.current > 50) {
         lastAudioUiUpdateRef.current = now;
         setAudioLevel(Math.min(1, 0.035 + average * 1.15 + bass * 0.62));
-        setAudioBands({ bass, treble });
+        setAudioBands({ bass, mid, treble });
       }
       musicAnalyserFrameRef.current = requestAnimationFrame(tick);
     };
@@ -1235,7 +1245,7 @@ export function HerApp() {
     if (musicAnalyserFrameRef.current) cancelAnimationFrame(musicAnalyserFrameRef.current);
     musicAnalyserFrameRef.current = null;
     setAudioLevel(0.05);
-    setAudioBands({ bass: 0.02, treble: 0.01 });
+    setAudioBands({ bass: 0.02, mid: 0.015, treble: 0.01 });
   };
 
   const handleMusicPlay = async () => {
@@ -1819,13 +1829,23 @@ export function HerApp() {
           </div>
           <label>律动总强度 <output>{particleTuning.rhythmIntensity.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.rhythmIntensity} onChange={(event) => updateParticleTuning("rhythmIntensity", Number(event.target.value))} /></label>
           <label>舞动幅度 <output>{particleTuning.danceStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.danceStrength} onChange={(event) => updateParticleTuning("danceStrength", Number(event.target.value))} /></label>
+          <label>音频亮度 <output>{particleTuning.audioBrightnessStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.audioBrightnessStrength} onChange={(event) => updateParticleTuning("audioBrightnessStrength", Number(event.target.value))} /></label>
+          <label>音频光晕 <output>{particleTuning.audioBloomStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={particleTuning.audioBloomStrength} onChange={(event) => updateParticleTuning("audioBloomStrength", Number(event.target.value))} /></label>
+          <label>低音增益 <output>{particleTuning.bassGain.toFixed(2)}</output><input type="range" min="0" max="3" step="0.05" value={particleTuning.bassGain} onChange={(event) => updateParticleTuning("bassGain", Number(event.target.value))} /></label>
+          <label>流动律动 <output>{particleTuning.flowReactStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={particleTuning.flowReactStrength} onChange={(event) => updateParticleTuning("flowReactStrength", Number(event.target.value))} /></label>
+          <label>深度律动 <output>{particleTuning.depthReactStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={particleTuning.depthReactStrength} onChange={(event) => updateParticleTuning("depthReactStrength", Number(event.target.value))} /></label>
+          <label>闪烁律动 <output>{particleTuning.sparkleReactStrength.toFixed(2)}</output><input type="range" min="0" max="1" step="0.02" value={particleTuning.sparkleReactStrength} onChange={(event) => updateParticleTuning("sparkleReactStrength", Number(event.target.value))} /></label>
+          <label>音频噪声门 <output>{particleTuning.audioNoiseGate.toFixed(2)}</output><input type="range" min="0" max="0.3" step="0.01" value={particleTuning.audioNoiseGate} onChange={(event) => updateParticleTuning("audioNoiseGate", Number(event.target.value))} /></label>
+          <label>动态曲线 <output>{particleTuning.audioDynamicCurve.toFixed(2)}</output><input type="range" min="0.3" max="1.5" step="0.02" value={particleTuning.audioDynamicCurve} onChange={(event) => updateParticleTuning("audioDynamicCurve", Number(event.target.value))} /></label>
+          <label>亮起速度 <output>{particleTuning.audioAttack.toFixed(3)}s</output><input type="range" min="0.01" max="0.3" step="0.005" value={particleTuning.audioAttack} onChange={(event) => updateParticleTuning("audioAttack", Number(event.target.value))} /></label>
+          <label>回落速度 <output>{particleTuning.audioRelease.toFixed(2)}s</output><input type="range" min="0.05" max="1" step="0.01" value={particleTuning.audioRelease} onChange={(event) => updateParticleTuning("audioRelease", Number(event.target.value))} /></label>
           <label>律动映射目标
             <select value={particleTuning.reactTarget} onChange={(event) => updateParticleTuning("reactTarget", event.target.value as ParticleTuning["reactTarget"])}>
               <option value="peel">边缘剥离</option><option value="size">粒子大小</option><option value="diffusion">扩散范围</option><option value="noise">噪声速度</option><option value="hue">色相</option>
             </select>
           </label>
           <label>音频平滑度 <output>{particleTuning.audioSmoothing.toFixed(2)}</output><input type="range" min="0.1" max="0.99" step="0.01" value={particleTuning.audioSmoothing} onChange={(event) => updateParticleTuning("audioSmoothing", Number(event.target.value))} /></label>
-          <p className={styles.settingsHint}>低音轻轻降低剥离阈值；高音只扰动风向。所有变化都经过平滑，不会让画面突然跳动。</p>
+          <p className={styles.settingsHint}>总音量控制亮度呼吸；低音推动深度与流动；高音只增加少量星光。亮起和回落分别平滑，强拍也不会突然过曝。</p>
 
           <div className={styles.settingsSectionLabel}><span>会话</span></div>
           <label>AI 模型<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providerOptions.map((option) => <option key={option.provider} value={option.provider} disabled={providerMode === "live" && !option.configured}>{providerLabel(option.provider)}{providerMode === "live" && !option.configured ? " · 未配置密钥" : ""}</option>)}</select></label>

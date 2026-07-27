@@ -37,7 +37,7 @@ export interface ParticleGardenProps {
 export function ParticleGarden({
   imageUrl,
   audioLevel = 0,
-  audioBands = { bass: 0, treble: 0 },
+  audioBands = { bass: 0, mid: 0, treble: 0 },
   interactionStrength = 1,
   imageClarity = 0.72,
   precomposed = false,

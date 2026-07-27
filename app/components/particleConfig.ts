@@ -27,6 +27,16 @@ export type ParticleTuning = {
   pointerSmoothing: number;
   colorShiftSpeed: number;
   danceStrength: number;
+  audioBrightnessStrength: number;
+  audioBloomStrength: number;
+  bassGain: number;
+  flowReactStrength: number;
+  depthReactStrength: number;
+  sparkleReactStrength: number;
+  audioNoiseGate: number;
+  audioDynamicCurve: number;
+  audioAttack: number;
+  audioRelease: number;
   highlightGain: number;
   bloomStrength: number;
   bloomRadius: number;
@@ -75,6 +85,16 @@ export const DEFAULT_PARTICLE_TUNING: ParticleTuning = {
   pointerSmoothing: 0.16,
   colorShiftSpeed: 2,
   danceStrength: 7,
+  audioBrightnessStrength: 0.55,
+  audioBloomStrength: 0.35,
+  bassGain: 1.35,
+  flowReactStrength: 0.42,
+  depthReactStrength: 0.65,
+  sparkleReactStrength: 0.18,
+  audioNoiseGate: 0.06,
+  audioDynamicCurve: 0.72,
+  audioAttack: 0.045,
+  audioRelease: 0.28,
   highlightGain: 1.8,
   bloomStrength: 1.15,
   bloomRadius: 0.55,

@@ -51,8 +51,13 @@ uniform float uMouseRepulsion;
 uniform float uMouseSwirl;
 uniform float uMouseRingWidth;
 uniform float uMouseDepthPull;
+uniform float uAudioEnergy;
 uniform float uBass;
+uniform float uMid;
 uniform float uTreble;
+uniform float uBassGain;
+uniform float uFlowReactStrength;
+uniform float uDepthReactStrength;
 uniform float uRhythmIntensity;
 uniform float uDanceStrength;
 uniform float uReactTarget;
@@ -114,7 +119,9 @@ void main() {
   float frameScale = min(uDelta * 60.0, 2.5);
 
   float edge = sobelEdge(vUv);
-  float bassPeel = uBass * uRhythmIntensity * 0.055;
+  float reactiveBass = clamp(uBass * uBassGain, 0.0, 1.5);
+  float reactiveFlow = 1.0 + (uAudioEnergy + uMid * 0.65) * uFlowReactStrength;
+  float bassPeel = reactiveBass * uRhythmIntensity * 0.055;
   float threshold = clamp(uPeelThreshold - bassPeel, 0.02, 0.98);
   float edgeWeight = smoothstep(threshold - 0.12, threshold + 0.12, edge);
   float stagger = hash21(vUv * 1931.17 + seed);
@@ -127,7 +134,7 @@ void main() {
   }
 
   float detached = step(0.0, life) * release;
-  float audioDepth = uBass * uDanceStrength * 0.22;
+  float audioDepth = reactiveBass * uDanceStrength * uDepthReactStrength;
   float waveAmount = (uDepthWave + audioDepth) * 0.1;
   float depthPhase = uTime * uFlowSpeed * 0.36;
   float depthWave = sin(home.x * 3.7 + depthPhase + seed * 1.8);
@@ -138,16 +145,19 @@ void main() {
   vec3 targetHome = vec3(home.xy, depthTarget);
   velocity += (targetHome - position) * uHomeSpring * frameScale;
 
-  float noiseTime = uTime * uFlowSpeed * (0.16 + pace * 0.18);
+  float noiseTime = uTime * uFlowSpeed * (0.16 + pace * 0.18) *
+    (1.0 + uAudioEnergy * uFlowReactStrength * 0.18);
   noiseTime *= 1.0 + step(1.5, uReactTarget) * step(uReactTarget, 2.5) * uTreble * 0.22;
   vec2 noisePoint = position.xy * max(uNoiseFrequency, 0.05) * 2.35;
   noisePoint += vec2(noiseTime, -noiseTime * 0.71);
   vec2 curl = curlNoise(noisePoint);
   float diffusion = clamp(uDiffusion / 1.5, 0.0, 3.0);
   float flowWeight = 0.08 + release * 0.92;
-  velocity.xy += curl * uNoiseStrength * uFlowAmplitude * flowWeight * 0.0028 * frameScale * diffusion;
+  velocity.xy += curl * uNoiseStrength * uFlowAmplitude * reactiveFlow *
+    flowWeight * 0.0028 * frameScale * diffusion;
   velocity.xy += uWind * detached * 0.0018 * frameScale;
-  velocity.z += fieldNoise(noisePoint * 0.72) * uFlowAmplitude * flowWeight * 0.0013 * frameScale;
+  velocity.z += fieldNoise(noisePoint * 0.72) * uFlowAmplitude * reactiveFlow *
+    flowWeight * 0.0013 * frameScale;
 
   vec2 trebleRipple = vec2(
     sin(uTime * 0.73 + seed * 17.0),
@@ -218,6 +228,10 @@ uniform float uHaloLayer;
 uniform float uTime;
 uniform float uDpr;
 uniform float uAudio;
+uniform float uTreble;
+uniform float uAudioBrightnessStrength;
+uniform float uAudioBloomStrength;
+uniform float uSparkleReactStrength;
 uniform float uReactTarget;
 
 in vec3 position;
@@ -311,6 +325,7 @@ void main() {
   vec3 contrasted = clamp((source.rgb - 0.5) * uContrast + 0.5, 0.0, 1.0);
   vec3 color = hueRotate(contrasted, hueAngle);
   color *= mix(0.9, uLuminanceMultiplier, smoothstep(0.42, 0.92, luminance));
+  color *= 1.0 + uAudio * uAudioBrightnessStrength;
   color += vec3(0.08, 0.16, 0.24) * detached * 0.22;
 
   vColor = color * softPulse;
@@ -318,10 +333,12 @@ void main() {
   float coreAlpha = source.a * clusterMask * (0.24 + density * 0.92);
   float haloAlpha = source.a * haloGate * uHaloDensity *
     (0.16 + density * 0.48 + imageEdge * 0.34) * mix(1.0, decay, detached);
-  vAlpha = mix(coreAlpha, haloAlpha, uHaloLayer);
-  vGlow = smoothstep(uBloomThreshold, 1.0, luminance) + imageEdge * 0.28 + detached * 0.12;
+  vAlpha = mix(coreAlpha, haloAlpha, uHaloLayer) * (1.0 + uAudio * 0.12);
+  vGlow = smoothstep(uBloomThreshold, 1.0, luminance) + imageEdge * 0.28 +
+    detached * 0.12 + uAudio * uAudioBloomStrength;
   vSparkle = hash21(aParticleUv * 787.13) * uSparkleAmount *
     (0.35 + 0.65 * sin(uTime * (0.8 + seed) + seed * 31.0) * 0.5 + 0.5);
+  vSparkle += hash21(aParticleUv * 1291.37 + seed) * uTreble * uSparkleReactStrength;
 }
 `;
 
@@ -346,7 +363,10 @@ void main() {
   float alpha = vAlpha * (core * 0.84 + halo * (0.14 + vGlow * uBloomStrength * 0.14));
   alpha += vSparkle * core * 0.22;
   if (alpha < 0.006) discard;
-  outColor = vec4(vColor * (0.88 + vGlow * uHighlightGain * 0.24 + vSparkle), alpha);
+  vec3 litColor = vColor * (0.88 + vGlow * uHighlightGain * 0.24 + vSparkle);
+  vec3 overflow = max(litColor - vec3(1.0), vec3(0.0));
+  litColor /= 1.0 + overflow * 0.22;
+  outColor = vec4(litColor, alpha);
 }
 `;
 
@@ -367,6 +387,7 @@ void main() {
 
 export type AudioBands = {
   bass: number;
+  mid: number;
   treble: number;
 };
 
@@ -509,7 +530,7 @@ function GpuParticleScene({
   const pointerActiveRef = useRef(0);
   const smoothedPointerRef = useRef(new THREE.Vector2(0, 0));
   const smoothedPointerActiveRef = useRef(0);
-  const smoothedAudioRef = useRef({ level: 0, bass: 0, treble: 0 });
+  const smoothedAudioRef = useRef({ level: 0, bass: 0, mid: 0, treble: 0 });
   const onReadyRef = useRef(onReady);
 
   useEffect(() => {
@@ -592,8 +613,13 @@ function GpuParticleScene({
       uMouseSwirl: { value: tuning.mouseSwirl },
       uMouseRingWidth: { value: tuning.mouseRingWidth },
       uMouseDepthPull: { value: tuning.mouseDepthPull },
+      uAudioEnergy: { value: 0 },
       uBass: { value: 0 },
+      uMid: { value: 0 },
       uTreble: { value: 0 },
+      uBassGain: { value: tuning.bassGain },
+      uFlowReactStrength: { value: tuning.flowReactStrength },
+      uDepthReactStrength: { value: tuning.depthReactStrength },
       uRhythmIntensity: { value: tuning.rhythmIntensity },
       uDanceStrength: { value: tuning.danceStrength },
       uReactTarget: { value: reactTargetCode(tuning.reactTarget) },
@@ -649,6 +675,10 @@ function GpuParticleScene({
       uTime: { value: 0 },
       uDpr: { value: gl.getPixelRatio() },
       uAudio: { value: 0 },
+      uTreble: { value: 0 },
+      uAudioBrightnessStrength: { value: tuning.audioBrightnessStrength },
+      uAudioBloomStrength: { value: tuning.audioBloomStrength },
+      uSparkleReactStrength: { value: tuning.sparkleReactStrength },
       uReactTarget: { value: reactTargetCode(tuning.reactTarget) },
     },
     transparent: true,
@@ -720,12 +750,24 @@ function GpuParticleScene({
     frameRef.current += 1;
     if (preview && frameRef.current % 2 === 1) return;
 
-    const smoothing = clamp(tuning.audioSmoothing, 0.1, 0.99);
-    const response = 1 - Math.pow(smoothing, delta * 60);
     const smoothed = smoothedAudioRef.current;
-    smoothed.level += (audioLevel - smoothed.level) * response;
-    smoothed.bass += (audioBands.bass - smoothed.bass) * response;
-    smoothed.treble += (audioBands.treble - smoothed.treble) * response;
+    const gatedLevel = clamp(
+      (audioLevel - tuning.audioNoiseGate) / Math.max(1 - tuning.audioNoiseGate, 0.001),
+      0,
+      1,
+    );
+    const curvedLevel = Math.pow(gatedLevel, clamp(tuning.audioDynamicCurve, 0.3, 1.5));
+    const envelopeTime = curvedLevel > smoothed.level
+      ? Math.max(tuning.audioAttack, 0.01)
+      : Math.max(tuning.audioRelease, 0.05);
+    const envelopeResponse = 1 - Math.exp(-delta / envelopeTime);
+    smoothed.level += (curvedLevel - smoothed.level) * envelopeResponse;
+
+    const smoothing = clamp(tuning.audioSmoothing, 0.1, 0.99);
+    const bandResponse = 1 - Math.pow(smoothing, delta * 60);
+    smoothed.bass += (audioBands.bass - smoothed.bass) * bandResponse;
+    smoothed.mid += (audioBands.mid - smoothed.mid) * bandResponse;
+    smoothed.treble += (audioBands.treble - smoothed.treble) * bandResponse;
 
     const viewportAspect = Math.max(size.width / Math.max(size.height, 1), 0.001);
     const imageAspect = imageSize.width / imageSize.height;
@@ -773,8 +815,13 @@ function GpuParticleScene({
     simUniforms.uMouseSwirl.value = tuning.mouseSwirl;
     simUniforms.uMouseRingWidth.value = tuning.mouseRingWidth;
     simUniforms.uMouseDepthPull.value = tuning.mouseDepthPull;
+    simUniforms.uAudioEnergy.value = smoothed.level;
     simUniforms.uBass.value = smoothed.bass;
+    simUniforms.uMid.value = smoothed.mid;
     simUniforms.uTreble.value = smoothed.treble;
+    simUniforms.uBassGain.value = tuning.bassGain;
+    simUniforms.uFlowReactStrength.value = tuning.flowReactStrength;
+    simUniforms.uDepthReactStrength.value = tuning.depthReactStrength;
     simUniforms.uRhythmIntensity.value = tuning.rhythmIntensity;
     simUniforms.uDanceStrength.value = tuning.danceStrength;
     simUniforms.uReactTarget.value = reactTargetCode(tuning.reactTarget);
@@ -814,6 +861,10 @@ function GpuParticleScene({
       pointUniforms.uTime.value = state.clock.elapsedTime;
       pointUniforms.uDpr.value = gl.getPixelRatio();
       pointUniforms.uAudio.value = smoothed.level;
+      pointUniforms.uTreble.value = smoothed.treble;
+      pointUniforms.uAudioBrightnessStrength.value = tuning.audioBrightnessStrength;
+      pointUniforms.uAudioBloomStrength.value = tuning.audioBloomStrength;
+      pointUniforms.uSparkleReactStrength.value = tuning.sparkleReactStrength;
       pointUniforms.uReactTarget.value = reactTargetCode(tuning.reactTarget);
     });
     fadeMaterial.uniforms.uOpacity.value = preview
