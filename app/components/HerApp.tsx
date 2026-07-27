@@ -1338,7 +1338,6 @@ export function HerApp() {
       mode: interactingWithArtwork ? "artwork" : "gallery",
     };
     if (gardenCursorRef.current) gardenCursorRef.current.dataset.active = "true";
-    strip.setPointerCapture(event.pointerId);
   };
 
   const handleGardenPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1352,7 +1351,12 @@ export function HerApp() {
     const drag = gardenDragRef.current;
     if (drag.pointerId !== event.pointerId) return;
     const delta = event.clientX - drag.startX;
-    if (Math.abs(delta) > 5) drag.moved = true;
+    if (!drag.moved && Math.abs(delta) > 5) {
+      drag.moved = true;
+      if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+    }
     if (drag.moved) {
       event.preventDefault();
       event.currentTarget.scrollLeft = drag.scrollLeft - delta * 1.08;
@@ -1395,6 +1399,7 @@ export function HerApp() {
       focusGardenItem(gardenIndex + (totalDelta < 0 ? 1 : -1));
       return;
     }
+    if (!moved && mode === "artwork") return;
     settleGardenSelection(event.currentTarget, true);
   };
 
