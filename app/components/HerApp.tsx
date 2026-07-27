@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- object URLs and canvas fallbacks cannot use Next image optimization */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type {
   CSSProperties,
   PointerEvent as ReactPointerEvent,
@@ -9,9 +9,8 @@ import type {
 } from "react";
 import {
   DEFAULT_PARTICLE_TUNING,
-  ParticleGarden,
   type ParticleTuning,
-} from "./ParticleGarden";
+} from "./particleConfig";
 import { memoryStore } from "@/app/lib/memory/store";
 import type {
   CalendarDate,
@@ -19,6 +18,8 @@ import type {
   Turn as StoredTurn,
 } from "@/app/lib/memory/types";
 import styles from "./HerApp.module.css";
+
+const ParticleGarden = lazy(() => import("./ParticleGarden"));
 
 type View = "conversation" | "garden" | "memory" | "salon" | "music";
 type MemoryTab = "cards" | "calendar";
@@ -265,6 +266,7 @@ export function HerApp() {
     possibleTopics: ["winter nights", "home", "a light left on for someone"],
   });
   const [audioLevel, setAudioLevel] = useState(0.06);
+  const [audioBands, setAudioBands] = useState({ bass: 0.02, treble: 0.01 });
   const [interactionStrength, setInteractionStrength] = useState(1.25);
   const [imageClarity, setImageClarity] = useState(0.72);
   const [particleTuning, setParticleTuning] = useState<ParticleTuning>({ ...DEFAULT_PARTICLE_TUNING });
@@ -316,6 +318,7 @@ export function HerApp() {
   const musicSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const musicAnalyserRef = useRef<AnalyserNode | null>(null);
   const musicAnalyserFrameRef = useRef<number | null>(null);
+  const lastAudioUiUpdateRef = useRef(0);
   const salonRunRef = useRef(0);
   const gardenStripRef = useRef<HTMLDivElement>(null);
   const gardenCursorRef = useRef<HTMLSpanElement>(null);
@@ -333,7 +336,10 @@ export function HerApp() {
   const currentSalonLine = salonLineIndex >= 0 ? salonLines[salonLineIndex] : null;
   const currentSalonRole = SALON_ROLES.find((role) => role.id === currentSalonLine?.speakerId);
   const visualAudioLevel = Math.min(1, audioLevel);
-  const updateParticleTuning = useCallback((key: keyof ParticleTuning, value: number) => {
+  const updateParticleTuning = useCallback(<Key extends keyof ParticleTuning,>(
+    key: Key,
+    value: ParticleTuning[Key],
+  ) => {
     setParticleTuning((current) => ({ ...current, [key]: value }));
   }, []);
 
@@ -655,8 +661,17 @@ export function HerApp() {
       const data = new Uint8Array(analyser.frequencyBinCount);
       const tick = () => {
         analyser.getByteFrequencyData(data);
+        const bassBins = Math.max(4, Math.floor(data.length * 0.16));
+        const trebleStart = Math.floor(data.length * 0.58);
+        const bass = data.slice(0, bassBins).reduce((sum, value) => sum + value, 0) / bassBins / 255;
+        const treble = data.slice(trebleStart).reduce((sum, value) => sum + value, 0) / Math.max(data.length - trebleStart, 1) / 255;
         const average = data.reduce((sum, value) => sum + value, 0) / data.length / 255;
-        setAudioLevel(Math.min(1, average * 2.8 + 0.05));
+        const now = performance.now();
+        if (now - lastAudioUiUpdateRef.current > 50) {
+          lastAudioUiUpdateRef.current = now;
+          setAudioLevel(Math.min(1, average * 2.2 + bass * 0.58 + 0.04));
+          setAudioBands({ bass, treble });
+        }
         analyserFrameRef.current = requestAnimationFrame(tick);
       };
       tick();
@@ -1201,9 +1216,16 @@ export function HerApp() {
       if (!musicAudioRef.current || musicAudioRef.current.paused) return;
       analyser!.getByteFrequencyData(spectrum);
       const bassBins = Math.max(4, Math.floor(spectrum.length * 0.18));
+      const trebleStart = Math.floor(spectrum.length * 0.58);
       const bass = spectrum.slice(0, bassBins).reduce((sum, value) => sum + value, 0) / bassBins / 255;
+      const treble = spectrum.slice(trebleStart).reduce((sum, value) => sum + value, 0) / Math.max(spectrum.length - trebleStart, 1) / 255;
       const average = spectrum.reduce((sum, value) => sum + value, 0) / spectrum.length / 255;
-      setAudioLevel(Math.min(1, 0.04 + average * 1.45 + bass * 0.72));
+      const now = performance.now();
+      if (now - lastAudioUiUpdateRef.current > 50) {
+        lastAudioUiUpdateRef.current = now;
+        setAudioLevel(Math.min(1, 0.035 + average * 1.15 + bass * 0.62));
+        setAudioBands({ bass, treble });
+      }
       musicAnalyserFrameRef.current = requestAnimationFrame(tick);
     };
     tick();
@@ -1213,6 +1235,7 @@ export function HerApp() {
     if (musicAnalyserFrameRef.current) cancelAnimationFrame(musicAnalyserFrameRef.current);
     musicAnalyserFrameRef.current = null;
     setAudioLevel(0.05);
+    setAudioBands({ bass: 0.02, treble: 0.01 });
   };
 
   const handleMusicPlay = async () => {
@@ -1396,16 +1419,19 @@ export function HerApp() {
 
       {(view === "conversation" || view === "salon") && (
         <section className={styles.stage} aria-label={view === "salon" ? "AI Salon stage" : "Conversation stage"}>
-          <ParticleGarden
-            imageUrl={imageUrl}
-            audioLevel={visualAudioLevel}
-            interactionStrength={interactionStrength}
-            imageClarity={imageClarity}
-            precomposed={imagePrecomposed}
-            tuning={particleTuning}
-            className={styles.particleCanvas}
-            onReady={(info) => setParticleInfo(`${info.pointCount.toLocaleString()} particles`)}
-          />
+          <Suspense fallback={<img className={styles.particleLoading} src={imageUrl} alt="" aria-hidden="true" />}>
+            <ParticleGarden
+              imageUrl={imageUrl}
+              audioLevel={visualAudioLevel}
+              audioBands={audioBands}
+              interactionStrength={interactionStrength}
+              imageClarity={imageClarity}
+              precomposed={imagePrecomposed}
+              tuning={particleTuning}
+              className={styles.particleCanvas}
+              onReady={(info) => setParticleInfo(`${info.pointCount.toLocaleString()} particles`)}
+            />
+          </Suspense>
           <div className={styles.vignette} />
           {(view === "salon" || !conversationFromGarden || conversationChromeVisible) && (
             <div className={`${styles.providerPill} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
@@ -1559,15 +1585,19 @@ export function HerApp() {
                       tabIndex={0}
                       aria-label={`Open ${item.title}`}
                     >
-                      <ParticleGarden
-                        imageUrl={item.imageUrl}
-                        audioLevel={index === gardenIndex ? 0.1 : 0.045}
-                        interactionStrength={1.1}
-                        imageClarity={0.72}
-                        precomposed={item.precomposed}
-                        tuning={particleTuning}
-                        className={styles.gardenParticle}
-                      />
+                      <Suspense fallback={<img className={styles.particleLoading} src={item.imageUrl} alt="" aria-hidden="true" />}>
+                        <ParticleGarden
+                          imageUrl={item.imageUrl}
+                          audioLevel={index === gardenIndex ? 0.1 : 0.045}
+                          audioBands={audioBands}
+                          interactionStrength={1.1}
+                          imageClarity={0.72}
+                          precomposed={item.precomposed}
+                          preview
+                          tuning={particleTuning}
+                          className={styles.gardenParticle}
+                        />
+                      </Suspense>
                       <button
                         className={styles.deleteMemoryButton}
                         onClick={(event) => {
@@ -1727,41 +1757,59 @@ export function HerApp() {
 
       {settingsOpen && (
         <aside className={styles.settingsPanel} aria-label="设置">
-          <div className={styles.settingsTitle}><div><span>会话设置</span><h2>这段记忆应该如何呈现？</h2></div><button onClick={() => setSettingsOpen(false)}>×</button></div>
+          <div className={styles.settingsTitle}>
+            <div><span>Particle field</span><h2>让记忆缓慢风化。</h2></div>
+            <button onClick={() => setSettingsOpen(false)} aria-label="关闭设置">×</button>
+          </div>
+
+          <div className={styles.settingsSectionLabel}>
+            <span>基础物理</span>
+            <button onClick={() => { setParticleTuning({ ...DEFAULT_PARTICLE_TUNING }); setImageClarity(0.72); setInteractionStrength(1.25); }}>重置</button>
+          </div>
+          <label>粒子数量 <output>{Math.round(particleTuning.particleCount / 1000)}k</output><input type="range" min="10000" max="1000000" step="10000" value={particleTuning.particleCount} onChange={(event) => updateParticleTuning("particleCount", Number(event.target.value))} /></label>
+          <label>粒子基础大小 <output>{particleTuning.particleSize.toFixed(1)}</output><input type="range" min="0.1" max="5" step="0.1" value={particleTuning.particleSize} onChange={(event) => updateParticleTuning("particleSize", Number(event.target.value))} /></label>
+          <label>拖尾长度 <output>{particleTuning.trailLength.toFixed(2)}</output><input type="range" min="0" max="0.99" step="0.01" value={particleTuning.trailLength} onChange={(event) => updateParticleTuning("trailLength", Number(event.target.value))} /></label>
+          <label>画面保真 <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.38" max="0.96" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
+
+          <div className={styles.settingsSectionLabel}><span>诗意消散</span></div>
+          <label>边缘剥离阈值 <output>{particleTuning.peelThreshold.toFixed(2)}</output><input type="range" min="0.02" max="0.98" step="0.01" value={particleTuning.peelThreshold} onChange={(event) => updateParticleTuning("peelThreshold", Number(event.target.value))} /></label>
+          <label>时间侵蚀率 <output>{particleTuning.erosionRate.toFixed(2)}</output><input type="range" min="0.02" max="1.5" step="0.01" value={particleTuning.erosionRate} onChange={(event) => updateParticleTuning("erosionRate", Number(event.target.value))} /></label>
+          <label>余烬寿命 <output>{particleTuning.emberLifespan.toFixed(1)}s</output><input type="range" min="0.5" max="15" step="0.1" value={particleTuning.emberLifespan} onChange={(event) => updateParticleTuning("emberLifespan", Number(event.target.value))} /></label>
+          <label>粒子扩散 <output>{particleTuning.diffusion.toFixed(0)}</output><input type="range" min="0" max="100" step="1" value={particleTuning.diffusion} onChange={(event) => updateParticleTuning("diffusion", Number(event.target.value))} /></label>
+          <label>边缘扰动 <output>{particleTuning.edgePerturbation.toFixed(1)}</output><input type="range" min="0" max="5" step="0.1" value={particleTuning.edgePerturbation} onChange={(event) => updateParticleTuning("edgePerturbation", Number(event.target.value))} /></label>
+          <label>边缘扩散 <output>{particleTuning.edgeScatter.toFixed(1)}</output><input type="range" min="0" max="20" step="0.2" value={particleTuning.edgeScatter} onChange={(event) => updateParticleTuning("edgeScatter", Number(event.target.value))} /></label>
+
+          <div className={styles.settingsSectionLabel}><span>风场与噪声</span></div>
+          <label>噪声强度 <output>{particleTuning.noiseStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.noiseStrength} onChange={(event) => updateParticleTuning("noiseStrength", Number(event.target.value))} /></label>
+          <label>噪声频率 <output>{particleTuning.noiseFrequency.toFixed(2)}</output><input type="range" min="0.1" max="5" step="0.05" value={particleTuning.noiseFrequency} onChange={(event) => updateParticleTuning("noiseFrequency", Number(event.target.value))} /></label>
+          <label>风向 X <output>{particleTuning.windX.toFixed(2)}</output><input type="range" min="-1" max="1" step="0.01" value={particleTuning.windX} onChange={(event) => updateParticleTuning("windX", Number(event.target.value))} /></label>
+          <label>风向 Y <output>{particleTuning.windY.toFixed(2)}</output><input type="range" min="-1" max="1" step="0.01" value={particleTuning.windY} onChange={(event) => updateParticleTuning("windY", Number(event.target.value))} /></label>
+          <label>鼠标力场 <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /></label>
+
+          <div className={styles.settingsSectionLabel}><span>色彩与材质</span></div>
+          <label>色相漂移 <output>{particleTuning.hueDrift.toFixed(0)}°</output><input type="range" min="0" max="360" step="1" value={particleTuning.hueDrift} onChange={(event) => updateParticleTuning("hueDrift", Number(event.target.value))} /></label>
+          <label>亮度乘数 <output>{particleTuning.luminanceMultiplier.toFixed(1)}</output><input type="range" min="1" max="5" step="0.1" value={particleTuning.luminanceMultiplier} onChange={(event) => updateParticleTuning("luminanceMultiplier", Number(event.target.value))} /></label>
+
+          <div className={styles.settingsSectionLabel}><span>音频律动</span></div>
+          <div className={styles.settingsAudioActions}>
+            <button onClick={() => musicInputRef.current?.click()}>上传音乐</button>
+            <button onClick={() => replyState === "listening" ? void stopListening(false) : void beginListening()}>{replyState === "listening" ? "关闭麦克风" : "麦克风输入"}</button>
+          </div>
+          <label>律动总强度 <output>{particleTuning.rhythmIntensity.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.rhythmIntensity} onChange={(event) => updateParticleTuning("rhythmIntensity", Number(event.target.value))} /></label>
+          <label>律动映射目标
+            <select value={particleTuning.reactTarget} onChange={(event) => updateParticleTuning("reactTarget", event.target.value as ParticleTuning["reactTarget"])}>
+              <option value="peel">边缘剥离</option><option value="size">粒子大小</option><option value="diffusion">扩散范围</option><option value="noise">噪声速度</option><option value="hue">色相</option>
+            </select>
+          </label>
+          <label>音频平滑度 <output>{particleTuning.audioSmoothing.toFixed(2)}</output><input type="range" min="0.1" max="0.99" step="0.01" value={particleTuning.audioSmoothing} onChange={(event) => updateParticleTuning("audioSmoothing", Number(event.target.value))} /></label>
+          <p className={styles.settingsHint}>低音轻轻降低剥离阈值；高音只扰动风向。所有变化都经过平滑，不会让画面突然跳动。</p>
+
+          <div className={styles.settingsSectionLabel}><span>会话</span></div>
           <label>AI 模型<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providerOptions.map((option) => <option key={option.provider} value={option.provider} disabled={providerMode === "live" && !option.configured}>{providerLabel(option.provider)}{providerMode === "live" && !option.configured ? " · 未配置密钥" : ""}</option>)}</select></label>
           <label>语音音色<select value={voiceStyle} onChange={(event) => setVoiceStyle(event.target.value)}><option value="intimate">亲密英文</option><option value="reflective">沉思英文</option><option value="bright">明亮英文</option></select></label>
           <label>回复语言<select value={replyLanguage} onChange={(event) => setReplyLanguage(event.target.value as "en" | "zh")}><option value="en">英文优先</option><option value="zh">中文优先</option></select></label>
           <label className={styles.toggleRow}><span><b>允许 AI 理解图片</b><small>仅在你同意后发送压缩副本。</small></span><input type="checkbox" checked={visionEnabled} onChange={(event) => setVisionEnabled(event.target.checked)} /></label>
           <label className={styles.toggleRow}><span><b>在本设备保存我的语音</b><small>每轮语音不会上传到云端存储。</small></span><input type="checkbox" checked={saveVoice} onChange={(event) => setSaveVoice(event.target.checked)} /></label>
-          <div className={styles.settingsSectionLabel}><span>粒子场</span><button onClick={() => { setParticleTuning({ ...DEFAULT_PARTICLE_TUNING }); setImageClarity(0.72); setInteractionStrength(1.25); }}>全部重置</button></div>
-          <label>粒子扩散 <output>{particleTuning.dispersion.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.dispersion} onChange={(event) => updateParticleTuning("dispersion", Number(event.target.value))} /></label>
-          <label>粒子大小 <output>{particleTuning.particleSize.toFixed(1)}</output><input type="range" min="1" max="5" step="0.1" value={particleTuning.particleSize} onChange={(event) => updateParticleTuning("particleSize", Number(event.target.value))} /></label>
-          <label>对比度 <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.6" max="2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /></label>
-          <div className={styles.settingsSectionLabel}><span>光效与边缘</span></div>
-          <label>辉光强度 <output>{particleTuning.glowIntensity.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.glowIntensity} onChange={(event) => updateParticleTuning("glowIntensity", Number(event.target.value))} /></label>
-          <label>拖尾长度 <output>{particleTuning.trailLength.toFixed(2)}</output><input type="range" min="0" max="1" step="0.02" value={particleTuning.trailLength} onChange={(event) => updateParticleTuning("trailLength", Number(event.target.value))} /></label>
-          <label>色相漂移幅度 <output>{particleTuning.hueDrift.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.hueDrift} onChange={(event) => updateParticleTuning("hueDrift", Number(event.target.value))} /></label>
-          <label>色相漂移速度 <output>{particleTuning.colorShiftSpeed.toFixed(1)}</output><input type="range" min="0" max="4" step="0.1" value={particleTuning.colorShiftSpeed} onChange={(event) => updateParticleTuning("colorShiftSpeed", Number(event.target.value))} /></label>
-          <label>泛光阈值 <output>{particleTuning.bloomThreshold.toFixed(2)}</output><input type="range" min="0" max="0.98" step="0.02" value={particleTuning.bloomThreshold} onChange={(event) => updateParticleTuning("bloomThreshold", Number(event.target.value))} /></label>
-          <label>边缘扩散 <output>{particleTuning.edgeDispersion.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.edgeDispersion} onChange={(event) => updateParticleTuning("edgeDispersion", Number(event.target.value))} /></label>
-          <label>边缘扰动 <output>{particleTuning.edgeDisturbance.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.edgeDisturbance} onChange={(event) => updateParticleTuning("edgeDisturbance", Number(event.target.value))} /></label>
-          <div className={styles.settingsSectionLabel}><span>流场与交互</span></div>
-          <label>流动速度 <output>{particleTuning.flowSpeed.toFixed(1)}</output><input type="range" min="0" max="2" step="0.1" value={particleTuning.flowSpeed} onChange={(event) => updateParticleTuning("flowSpeed", Number(event.target.value))} /></label>
-          <label>流动幅度 <output>{particleTuning.flowAmplitude.toFixed(1)}</output><input type="range" min="0" max="2.5" step="0.1" value={particleTuning.flowAmplitude} onChange={(event) => updateParticleTuning("flowAmplitude", Number(event.target.value))} /></label>
-          <label>湍流强度 <output>{particleTuning.turbulence.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.turbulence} onChange={(event) => updateParticleTuning("turbulence", Number(event.target.value))} /></label>
-          <label>噪声尺度 <output>{particleTuning.noiseScale.toFixed(2)}</output><input type="range" min="0.5" max="3" step="0.05" value={particleTuning.noiseScale} onChange={(event) => updateParticleTuning("noiseScale", Number(event.target.value))} /></label>
-          <label>景深强度 <output>{particleTuning.depthStrength.toFixed(1)}</output><input type="range" min="0" max="100" step="1" value={particleTuning.depthStrength} onChange={(event) => updateParticleTuning("depthStrength", Number(event.target.value))} /></label>
-          <label>鼠标影响半径 <output>{particleTuning.mouseRadius.toFixed(1)}</output><input type="range" min="40" max="220" step="5" value={particleTuning.mouseRadius} onChange={(event) => updateParticleTuning("mouseRadius", Number(event.target.value))} /></label>
-          <label>鼠标扰动 <output>{particleTuning.mouseDisturbance.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.mouseDisturbance} onChange={(event) => updateParticleTuning("mouseDisturbance", Number(event.target.value))} /></label>
-          <label>漩涡强度 <output>{particleTuning.swirlStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.swirlStrength} onChange={(event) => updateParticleTuning("swirlStrength", Number(event.target.value))} /></label>
-          <label>引力井强度 <output>{particleTuning.gravityStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.gravityStrength} onChange={(event) => updateParticleTuning("gravityStrength", Number(event.target.value))} /></label>
-          <label>吸引／排斥 <output>{particleTuning.attractionRepulsion === 0 ? "中性" : `${particleTuning.attractionRepulsion < 0 ? "吸引" : "排斥"} ${Math.abs(particleTuning.attractionRepulsion).toFixed(2)}`}</output><input type="range" min="-1" max="1" step="0.05" value={particleTuning.attractionRepulsion} onChange={(event) => updateParticleTuning("attractionRepulsion", Number(event.target.value))} /></label>
-          <label>鼠标力场强度 <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /></label>
-          <div className={styles.settingsSectionLabel}><span>声音律动</span></div>
-          <label>律动强度 <output>{particleTuning.danceStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.danceStrength} onChange={(event) => updateParticleTuning("danceStrength", Number(event.target.value))} /></label>
-          <label>景深波动 <output>{particleTuning.depthWave.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.depthWave} onChange={(event) => updateParticleTuning("depthWave", Number(event.target.value))} /></label>
-          <label>画面保真 <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.38" max="0.96" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
-          <p className={styles.synthDisclosure}>{providerMode === "mock" ? "当前为离线预览模式，不会调用外部模型。" : "当前为实时文字模式。"}此 Demo 暂时使用浏览器合成语音；配置流式语音服务后可替换为更丰富的 AI 音色。</p>
         </aside>
       )}
 

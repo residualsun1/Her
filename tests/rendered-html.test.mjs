@@ -53,12 +53,14 @@ test("mock provider routes keep the demo runnable without API keys", async () =>
 });
 
 test("starter preview is removed and project modules are present", async () => {
-  const [page, layout, packageJson, herApp, particle, particleStyles, store] = await Promise.all([
+  const [page, layout, packageJson, herApp, particle, gpu, particleConfig, particleStyles, store] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
     readFile(new URL("app/components/HerApp.tsx", root), "utf8"),
     readFile(new URL("app/components/ParticleGarden.tsx", root), "utf8"),
+    readFile(new URL("app/components/GpuParticleField.tsx", root), "utf8"),
+    readFile(new URL("app/components/particleConfig.ts", root), "utf8"),
     readFile(new URL("app/components/ParticleGarden.module.css", root), "utf8"),
     readFile(new URL("app/lib/memory/store.ts", root), "utf8"),
   ]);
@@ -66,52 +68,45 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(page, /<HerApp \/>/);
   assert.match(layout, /AI Memory Garden/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
-  assert.match(herApp, /粒子扩散/);
-  assert.match(herApp, /粒子大小/);
-  assert.match(herApp, /流动速度/);
+  assert.match(packageJson, /@react-three\/fiber/);
+  assert.match(packageJson, /"three"/);
+  assert.match(herApp, /粒子数量/);
+  assert.match(herApp, /粒子基础大小/);
   assert.match(herApp, /画面保真/);
-  assert.match(herApp, /鼠标力场强度/);
-  assert.match(herApp, /辉光强度/);
   assert.match(herApp, /拖尾长度/);
-  assert.match(herApp, /泛光阈值/);
+  assert.match(herApp, /边缘剥离阈值/);
+  assert.match(herApp, /时间侵蚀率/);
+  assert.match(herApp, /余烬寿命/);
+  assert.match(herApp, /粒子扩散/);
   assert.match(herApp, /边缘扩散/);
   assert.match(herApp, /边缘扰动/);
-  assert.match(herApp, /鼠标扰动/);
-  assert.match(herApp, /漩涡强度/);
-  assert.match(herApp, /引力井强度/);
-  assert.match(herApp, /湍流强度/);
-  assert.match(herApp, /噪声尺度/);
-  assert.match(herApp, /吸引／排斥/);
+  assert.match(herApp, /噪声强度/);
+  assert.match(herApp, /噪声频率/);
+  assert.match(herApp, /风向 X/);
+  assert.match(herApp, /风向 Y/);
+  assert.match(herApp, /律动映射目标/);
+  assert.match(herApp, /音频平滑度/);
   assert.doesNotMatch(herApp, /Dispersion <|Particle Size <|Flow Speed <|Subject Detail <|Mouse Force </);
-  assert.match(particle, /webgl2/);
+  assert.match(particle, /@react-three\/fiber/);
+  assert.match(particle, /r3f-fbo/);
+  assert.match(particle, /debouncedCount/);
   assert.match(particle, /imageClarity/);
   assert.match(particle, /imageBase/);
-  assert.match(particle, /alpha: true/);
-  assert.match(particle, /uniform vec2 uDrag/);
-  assert.match(particle, /uniform float uDispersion/);
-  assert.match(particle, /uniform float uParticleSize/);
-  assert.match(particle, /uniform float uMouseRadius/);
-  assert.match(particle, /uniform float uGlowIntensity/);
-  assert.match(particle, /uniform float uBloomThreshold/);
-  assert.match(particle, /uniform float uEdgeDispersion/);
-  assert.match(particle, /uniform float uEdgeDisturbance/);
-  assert.match(particle, /uniform float uMouseDisturbance/);
-  assert.match(particle, /uniform float uSwirlStrength/);
-  assert.match(particle, /uniform float uGravityStrength/);
-  assert.match(particle, /uniform float uTurbulence/);
-  assert.match(particle, /uniform float uNoiseScale/);
-  assert.match(particle, /trailLength/);
-  assert.match(particle, /DEFAULT_PARTICLE_TUNING/);
-  assert.match(particle, /context\.drawImage\(image, 0, 0, columns, rows\)/);
-  assert.match(particle, /imageEnvelope = 1 - smoothstep\(0\.68, 1\.04/);
-  assert.match(particle, /haloChance = clamp\(outer \* 0\.44 \+ edge \* \(1 - coreProtection\) \* 0\.32/);
-  assert.doesNotMatch(particle, /analyzeSubject|backgroundSuppression|aSubject/);
-  assert.match(particle, /pointBudget \* 0\.2/);
+  assert.match(particle, /preserveDrawingBuffer/);
   assert.match(particle, /precomposed/);
-  assert.match(particle, /trailCanvasRef/);
-  assert.match(particle, /destination-out/);
-  assert.match(particleStyles, /\.imageBase[\s\S]*?opacity:\s*0;/);
-  assert.match(particleStyles, /\.fallback \.imageBase/);
+  assert.match(gpu, /WebGLRenderTarget/);
+  assert.match(gpu, /sobelEdge/);
+  assert.match(gpu, /curlNoise/);
+  assert.match(gpu, /uPeelThreshold/);
+  assert.match(gpu, /uErosionRate/);
+  assert.match(gpu, /uEmberLifespan/);
+  assert.match(gpu, /uBass/);
+  assert.match(gpu, /uTreble/);
+  assert.match(gpu, /smoothstep\(0\.38, 1\.0, age\)/);
+  assert.match(particleConfig, /particleCount: 256_000/);
+  assert.match(particleConfig, /reactTarget: "peel"/);
+  assert.match(particleStyles, /\.ready \.imageBase/);
+  assert.match(particleStyles, /transition:[\s\S]*opacity 2200ms/);
   assert.match(store, /indexedDB/);
   await assert.rejects(access(new URL("app/_sites-preview/SkeletonPreview.tsx", root)));
 });
