@@ -53,7 +53,7 @@ test("mock provider routes keep the demo runnable without API keys", async () =>
 });
 
 test("starter preview is removed and project modules are present", async () => {
-  const [page, layout, packageJson, herApp, particle, gpu, particleConfig, particleStyles, store] = await Promise.all([
+  const [page, layout, packageJson, herApp, particle, gpu, particleConfig, particleStyles, appStyles, store] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
@@ -62,6 +62,7 @@ test("starter preview is removed and project modules are present", async () => {
     readFile(new URL("app/components/GpuParticleField.tsx", root), "utf8"),
     readFile(new URL("app/components/particleConfig.ts", root), "utf8"),
     readFile(new URL("app/components/ParticleGarden.module.css", root), "utf8"),
+    readFile(new URL("app/components/HerApp.module.css", root), "utf8"),
     readFile(new URL("app/lib/memory/store.ts", root), "utf8"),
   ]);
 
@@ -90,6 +91,9 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /深度律动/);
   assert.match(herApp, /亮起速度/);
   assert.match(herApp, /回落速度/);
+  assert.match(herApp, /function ParameterNote/);
+  assert.match(herApp, /调高会让图像更细腻/);
+  assert.match(herApp, /数值越小，粒子越快随强拍亮起/);
   assert.match(herApp, /风向 X/);
   assert.match(herApp, /风向 Y/);
   assert.match(herApp, /律动映射目标/);
@@ -126,6 +130,7 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(particleConfig, /audioRelease: 0\.28/);
   assert.match(particleConfig, /reactTarget: "peel"/);
   assert.match(particleStyles, /\.ready \.imageBase/);
+  assert.match(appStyles, /\.parameterNote/);
   assert.match(particleStyles, /transition:[\s\S]*opacity 2200ms/);
   assert.match(store, /indexedDB/);
   await assert.rejects(access(new URL("app/_sites-preview/SkeletonPreview.tsx", root)));

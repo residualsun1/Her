@@ -94,6 +94,64 @@ const averageFrequencyBand = (data: Uint8Array, start: number, end: number) => {
   return total / (to - from) / 255;
 };
 
+const PARAMETER_NOTES = {
+  particleCount: "调高会让图像更细腻，也更消耗 GPU；出现卡顿时优先降低。",
+  particleSize: "调高后颗粒更醒目，调低后画面更细密、主体更清晰。",
+  trailLength: "调高会留下更长的运动轨迹；过高时画面可能糊成光带。",
+  imageClarity: "调高会保留更多原图，调低会让粒子成为画面主角。",
+  coreRetention: "调高可稳定主体轮廓，调低会让更多粒子离开原位。",
+  haloWidth: "调高会让外围星云扩展得更远，星团看起来更蓬松。",
+  haloDensity: "调高会让外缘更饱满，同时增加粒子叠加亮度。",
+  edgeFeather: "调高会让图像到黑色背景的过渡更柔和。",
+  clusterIrregularity: "调高可打破原图矩形边缘；过高可能侵蚀主体轮廓。",
+  densityGamma: "调低会保留更多暗部粒子，调高会集中突出明亮区域。",
+  peelThreshold: "调低会剥离更多边缘，调高则只影响最明显的轮廓。",
+  erosionRate: "调高会加快粒子的剥离与循环速度，调低更像慢动作。",
+  emberLifespan: "调高会让离开原位的粒子在空中停留更久。",
+  diffusion: "调高会让粒子偏离原位更远，画面也会更松散。",
+  edgePerturbation: "调高会增加边缘粒子的随机抖动和不确定感。",
+  edgeScatter: "调高会给边缘粒子更强的向外推力。",
+  flowSpeed: "控制整个流场的时间速度；调高后漩涡变化更快。",
+  flowAmplitude: "控制流场推动粒子的距离；调高后起伏更明显。",
+  depthStrength: "控制 Z 轴透视程度；调高后前后层次更强。",
+  depthWave: "控制画面折叠起伏的幅度；过高可能影响主体辨识。",
+  homeSpring: "调高会更快拉回原图位置，调低会让粒子漂浮更久。",
+  velocityDamping: "调高会保留更久的惯性，调低会让粒子更快停下。",
+  noiseStrength: "调高会让流体运动更明显，也会增加画面不稳定感。",
+  noiseFrequency: "调高会产生更细小的漩涡，调低则形成大范围流动。",
+  windX: "负值向左吹，正值向右吹；接近零时以噪声流场为主。",
+  windY: "负值向下吹，正值向上吹；微小正值更像缓慢上升。",
+  interactionStrength: "控制鼠标所有作用的总倍率；设为零可关闭交互。",
+  mouseRadius: "调高会扩大鼠标影响范围，调低只扰动指针附近粒子。",
+  mouseSwirl: "调高会增强鼠标周围的旋转和黑洞涡流感。",
+  mouseRepulsion: "调高会把中心粒子推得更远，形成更明显的空腔。",
+  mouseDepthPull: "调高会让鼠标附近的粒子产生更强的前后拉伸。",
+  contrast: "调高会拉开明暗差异；过高可能丢失暗部细节。",
+  hueDrift: "控制颜色可偏移的最大角度；零表示保持原图色彩。",
+  colorShiftSpeed: "控制颜色随时间变化的速度，不改变粒子运动速度。",
+  luminanceMultiplier: "整体放大高亮区域；过高会让亮部接近白色。",
+  highlightGain: "调高会强化每颗粒子的发光核心。",
+  bloomStrength: "调高会扩大柔和光晕；过高可能让粒子互相粘连。",
+  rhythmIntensity: "控制音乐对剥离和基础律动的总体影响。",
+  danceStrength: "控制低音推动深度波的幅度，适合表现鼓点。",
+  audioBrightnessStrength: "控制音量对亮度的影响；零表示亮度不随音乐变化。",
+  audioBloomStrength: "控制强音时增加的光晕，建议保持低于亮度强度。",
+  bassGain: "放大低频检测结果；低音较弱的音乐可适当调高。",
+  flowReactStrength: "控制音乐对流场速度与幅度的附加影响。",
+  depthReactStrength: "控制低音对 Z 轴折叠的影响，过高会产生剧烈翻涌。",
+  sparkleReactStrength: "控制高频触发的星光闪烁，适合旋律和镲片。",
+  audioNoiseGate: "调高会忽略较弱声音，可过滤环境底噪和静音杂波。",
+  audioDynamicCurve: "低于 1 会放大弱音乐响应，高于 1 会突出强拍。",
+  audioAttack: "数值越小，粒子越快随强拍亮起；过小可能产生频闪。",
+  audioRelease: "数值越大，亮度和律动回落得越慢、越有呼吸感。",
+  reactTarget: "选择音乐额外影响的视觉属性，不会关闭其他基础映射。",
+  audioSmoothing: "调高会更平稳但反应更慢，调低会更灵敏。",
+} as const;
+
+function ParameterNote({ name }: { name: keyof typeof PARAMETER_NOTES }) {
+  return <small className={styles.parameterNote}>{PARAMETER_NOTES[name]}</small>;
+}
+
 const SAMPLE_GARDEN: GardenVisualItem[] = [
   { id: "winter-light", title: "Light in winter", imageUrl: "/demo/light-in-winter.jpg", precomposed: true },
   { id: "blue-rain", title: "Blue rain", imageUrl: "/demo/dark-blue.jpg", precomposed: true },
@@ -1776,75 +1834,76 @@ export function HerApp() {
             <span>基础物理</span>
             <button onClick={() => { setParticleTuning({ ...DEFAULT_PARTICLE_TUNING }); setImageClarity(0.72); setInteractionStrength(1.25); }}>重置</button>
           </div>
-          <label>粒子数量 <output>{Math.round(particleTuning.particleCount / 1000)}k</output><input type="range" min="10000" max="1000000" step="10000" value={particleTuning.particleCount} onChange={(event) => updateParticleTuning("particleCount", Number(event.target.value))} /></label>
-          <label>粒子基础大小 <output>{particleTuning.particleSize.toFixed(1)}</output><input type="range" min="0.1" max="5" step="0.1" value={particleTuning.particleSize} onChange={(event) => updateParticleTuning("particleSize", Number(event.target.value))} /></label>
-          <label>拖尾长度 <output>{particleTuning.trailLength.toFixed(2)}</output><input type="range" min="0" max="0.99" step="0.01" value={particleTuning.trailLength} onChange={(event) => updateParticleTuning("trailLength", Number(event.target.value))} /></label>
-          <label>画面保真 <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.38" max="0.96" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
+          <label>粒子数量 <output>{Math.round(particleTuning.particleCount / 1000)}k</output><input type="range" min="10000" max="1000000" step="10000" value={particleTuning.particleCount} onChange={(event) => updateParticleTuning("particleCount", Number(event.target.value))} /><ParameterNote name="particleCount" /></label>
+          <label>粒子基础大小 <output>{particleTuning.particleSize.toFixed(1)}</output><input type="range" min="0.1" max="5" step="0.1" value={particleTuning.particleSize} onChange={(event) => updateParticleTuning("particleSize", Number(event.target.value))} /><ParameterNote name="particleSize" /></label>
+          <label>拖尾长度 <output>{particleTuning.trailLength.toFixed(2)}</output><input type="range" min="0" max="0.99" step="0.01" value={particleTuning.trailLength} onChange={(event) => updateParticleTuning("trailLength", Number(event.target.value))} /><ParameterNote name="trailLength" /></label>
+          <label>画面保真 <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.38" max="0.96" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /><ParameterNote name="imageClarity" /></label>
 
           <div className={styles.settingsSectionLabel}><span>星团形态</span></div>
-          <label>核心保留 <output>{particleTuning.coreRetention.toFixed(2)}</output><input type="range" min="0.5" max="0.98" step="0.01" value={particleTuning.coreRetention} onChange={(event) => updateParticleTuning("coreRetention", Number(event.target.value))} /></label>
-          <label>星云宽度 <output>{particleTuning.haloWidth.toFixed(2)}</output><input type="range" min="0" max="0.5" step="0.01" value={particleTuning.haloWidth} onChange={(event) => updateParticleTuning("haloWidth", Number(event.target.value))} /></label>
-          <label>星云密度 <output>{particleTuning.haloDensity.toFixed(2)}</output><input type="range" min="0" max="0.8" step="0.01" value={particleTuning.haloDensity} onChange={(event) => updateParticleTuning("haloDensity", Number(event.target.value))} /></label>
-          <label>边缘羽化 <output>{particleTuning.edgeFeather.toFixed(2)}</output><input type="range" min="0.02" max="0.6" step="0.01" value={particleTuning.edgeFeather} onChange={(event) => updateParticleTuning("edgeFeather", Number(event.target.value))} /></label>
-          <label>轮廓不规则度 <output>{particleTuning.clusterIrregularity.toFixed(2)}</output><input type="range" min="0" max="0.8" step="0.01" value={particleTuning.clusterIrregularity} onChange={(event) => updateParticleTuning("clusterIrregularity", Number(event.target.value))} /></label>
-          <label>暗部粒子保留 <output>{particleTuning.densityGamma.toFixed(2)}</output><input type="range" min="0.3" max="1.5" step="0.01" value={particleTuning.densityGamma} onChange={(event) => updateParticleTuning("densityGamma", Number(event.target.value))} /></label>
+          <label>核心保留 <output>{particleTuning.coreRetention.toFixed(2)}</output><input type="range" min="0.5" max="0.98" step="0.01" value={particleTuning.coreRetention} onChange={(event) => updateParticleTuning("coreRetention", Number(event.target.value))} /><ParameterNote name="coreRetention" /></label>
+          <label>星云宽度 <output>{particleTuning.haloWidth.toFixed(2)}</output><input type="range" min="0" max="0.5" step="0.01" value={particleTuning.haloWidth} onChange={(event) => updateParticleTuning("haloWidth", Number(event.target.value))} /><ParameterNote name="haloWidth" /></label>
+          <label>星云密度 <output>{particleTuning.haloDensity.toFixed(2)}</output><input type="range" min="0" max="0.8" step="0.01" value={particleTuning.haloDensity} onChange={(event) => updateParticleTuning("haloDensity", Number(event.target.value))} /><ParameterNote name="haloDensity" /></label>
+          <label>边缘羽化 <output>{particleTuning.edgeFeather.toFixed(2)}</output><input type="range" min="0.02" max="0.6" step="0.01" value={particleTuning.edgeFeather} onChange={(event) => updateParticleTuning("edgeFeather", Number(event.target.value))} /><ParameterNote name="edgeFeather" /></label>
+          <label>轮廓不规则度 <output>{particleTuning.clusterIrregularity.toFixed(2)}</output><input type="range" min="0" max="0.8" step="0.01" value={particleTuning.clusterIrregularity} onChange={(event) => updateParticleTuning("clusterIrregularity", Number(event.target.value))} /><ParameterNote name="clusterIrregularity" /></label>
+          <label>暗部粒子保留 <output>{particleTuning.densityGamma.toFixed(2)}</output><input type="range" min="0.3" max="1.5" step="0.01" value={particleTuning.densityGamma} onChange={(event) => updateParticleTuning("densityGamma", Number(event.target.value))} /><ParameterNote name="densityGamma" /></label>
 
           <div className={styles.settingsSectionLabel}><span>诗意消散</span></div>
-          <label>边缘剥离阈值 <output>{particleTuning.peelThreshold.toFixed(2)}</output><input type="range" min="0.02" max="0.98" step="0.01" value={particleTuning.peelThreshold} onChange={(event) => updateParticleTuning("peelThreshold", Number(event.target.value))} /></label>
-          <label>时间侵蚀率 <output>{particleTuning.erosionRate.toFixed(2)}</output><input type="range" min="0.02" max="1.5" step="0.01" value={particleTuning.erosionRate} onChange={(event) => updateParticleTuning("erosionRate", Number(event.target.value))} /></label>
-          <label>余烬寿命 <output>{particleTuning.emberLifespan.toFixed(1)}s</output><input type="range" min="0.5" max="15" step="0.1" value={particleTuning.emberLifespan} onChange={(event) => updateParticleTuning("emberLifespan", Number(event.target.value))} /></label>
-          <label>粒子扩散 <output>{particleTuning.diffusion.toFixed(1)}</output><input type="range" min="0" max="4" step="0.1" value={particleTuning.diffusion} onChange={(event) => updateParticleTuning("diffusion", Number(event.target.value))} /></label>
-          <label>边缘扰动 <output>{particleTuning.edgePerturbation.toFixed(1)}</output><input type="range" min="0" max="5" step="0.1" value={particleTuning.edgePerturbation} onChange={(event) => updateParticleTuning("edgePerturbation", Number(event.target.value))} /></label>
-          <label>边缘扩散 <output>{particleTuning.edgeScatter.toFixed(1)}</output><input type="range" min="0" max="20" step="0.2" value={particleTuning.edgeScatter} onChange={(event) => updateParticleTuning("edgeScatter", Number(event.target.value))} /></label>
+          <label>边缘剥离阈值 <output>{particleTuning.peelThreshold.toFixed(2)}</output><input type="range" min="0.02" max="0.98" step="0.01" value={particleTuning.peelThreshold} onChange={(event) => updateParticleTuning("peelThreshold", Number(event.target.value))} /><ParameterNote name="peelThreshold" /></label>
+          <label>时间侵蚀率 <output>{particleTuning.erosionRate.toFixed(2)}</output><input type="range" min="0.02" max="1.5" step="0.01" value={particleTuning.erosionRate} onChange={(event) => updateParticleTuning("erosionRate", Number(event.target.value))} /><ParameterNote name="erosionRate" /></label>
+          <label>余烬寿命 <output>{particleTuning.emberLifespan.toFixed(1)}s</output><input type="range" min="0.5" max="15" step="0.1" value={particleTuning.emberLifespan} onChange={(event) => updateParticleTuning("emberLifespan", Number(event.target.value))} /><ParameterNote name="emberLifespan" /></label>
+          <label>粒子扩散 <output>{particleTuning.diffusion.toFixed(1)}</output><input type="range" min="0" max="4" step="0.1" value={particleTuning.diffusion} onChange={(event) => updateParticleTuning("diffusion", Number(event.target.value))} /><ParameterNote name="diffusion" /></label>
+          <label>边缘扰动 <output>{particleTuning.edgePerturbation.toFixed(1)}</output><input type="range" min="0" max="5" step="0.1" value={particleTuning.edgePerturbation} onChange={(event) => updateParticleTuning("edgePerturbation", Number(event.target.value))} /><ParameterNote name="edgePerturbation" /></label>
+          <label>边缘扩散 <output>{particleTuning.edgeScatter.toFixed(1)}</output><input type="range" min="0" max="20" step="0.2" value={particleTuning.edgeScatter} onChange={(event) => updateParticleTuning("edgeScatter", Number(event.target.value))} /><ParameterNote name="edgeScatter" /></label>
 
           <div className={styles.settingsSectionLabel}><span>风场与噪声</span></div>
-          <label>流动速度 <output>{particleTuning.flowSpeed.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.flowSpeed} onChange={(event) => updateParticleTuning("flowSpeed", Number(event.target.value))} /></label>
-          <label>流动幅度 <output>{particleTuning.flowAmplitude.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.flowAmplitude} onChange={(event) => updateParticleTuning("flowAmplitude", Number(event.target.value))} /></label>
-          <label>深度强度 <output>{particleTuning.depthStrength.toFixed(0)}</output><input type="range" min="0" max="100" step="1" value={particleTuning.depthStrength} onChange={(event) => updateParticleTuning("depthStrength", Number(event.target.value))} /></label>
-          <label>深度波 <output>{particleTuning.depthWave.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.depthWave} onChange={(event) => updateParticleTuning("depthWave", Number(event.target.value))} /></label>
-          <label>回弹强度 <output>{particleTuning.homeSpring.toFixed(3)}</output><input type="range" min="0.005" max="0.15" step="0.005" value={particleTuning.homeSpring} onChange={(event) => updateParticleTuning("homeSpring", Number(event.target.value))} /></label>
-          <label>速度阻尼 <output>{particleTuning.velocityDamping.toFixed(2)}</output><input type="range" min="0.8" max="0.99" step="0.01" value={particleTuning.velocityDamping} onChange={(event) => updateParticleTuning("velocityDamping", Number(event.target.value))} /></label>
-          <label>噪声强度 <output>{particleTuning.noiseStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.noiseStrength} onChange={(event) => updateParticleTuning("noiseStrength", Number(event.target.value))} /></label>
-          <label>噪声频率 <output>{particleTuning.noiseFrequency.toFixed(2)}</output><input type="range" min="0.1" max="5" step="0.05" value={particleTuning.noiseFrequency} onChange={(event) => updateParticleTuning("noiseFrequency", Number(event.target.value))} /></label>
-          <label>风向 X <output>{particleTuning.windX.toFixed(2)}</output><input type="range" min="-1" max="1" step="0.01" value={particleTuning.windX} onChange={(event) => updateParticleTuning("windX", Number(event.target.value))} /></label>
-          <label>风向 Y <output>{particleTuning.windY.toFixed(2)}</output><input type="range" min="-1" max="1" step="0.01" value={particleTuning.windY} onChange={(event) => updateParticleTuning("windY", Number(event.target.value))} /></label>
-          <label>鼠标力场 <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /></label>
-          <label>鼠标半径 <output>{particleTuning.mouseRadius.toFixed(0)}px</output><input type="range" min="20" max="240" step="2" value={particleTuning.mouseRadius} onChange={(event) => updateParticleTuning("mouseRadius", Number(event.target.value))} /></label>
-          <label>涡流强度 <output>{particleTuning.mouseSwirl.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseSwirl} onChange={(event) => updateParticleTuning("mouseSwirl", Number(event.target.value))} /></label>
-          <label>空腔推力 <output>{particleTuning.mouseRepulsion.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseRepulsion} onChange={(event) => updateParticleTuning("mouseRepulsion", Number(event.target.value))} /></label>
-          <label>深度拉伸 <output>{particleTuning.mouseDepthPull.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseDepthPull} onChange={(event) => updateParticleTuning("mouseDepthPull", Number(event.target.value))} /></label>
+          <label>流动速度 <output>{particleTuning.flowSpeed.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.flowSpeed} onChange={(event) => updateParticleTuning("flowSpeed", Number(event.target.value))} /><ParameterNote name="flowSpeed" /></label>
+          <label>流动幅度 <output>{particleTuning.flowAmplitude.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.flowAmplitude} onChange={(event) => updateParticleTuning("flowAmplitude", Number(event.target.value))} /><ParameterNote name="flowAmplitude" /></label>
+          <label>深度强度 <output>{particleTuning.depthStrength.toFixed(0)}</output><input type="range" min="0" max="100" step="1" value={particleTuning.depthStrength} onChange={(event) => updateParticleTuning("depthStrength", Number(event.target.value))} /><ParameterNote name="depthStrength" /></label>
+          <label>深度波 <output>{particleTuning.depthWave.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.depthWave} onChange={(event) => updateParticleTuning("depthWave", Number(event.target.value))} /><ParameterNote name="depthWave" /></label>
+          <label>回弹强度 <output>{particleTuning.homeSpring.toFixed(3)}</output><input type="range" min="0.005" max="0.15" step="0.005" value={particleTuning.homeSpring} onChange={(event) => updateParticleTuning("homeSpring", Number(event.target.value))} /><ParameterNote name="homeSpring" /></label>
+          <label>速度阻尼 <output>{particleTuning.velocityDamping.toFixed(2)}</output><input type="range" min="0.8" max="0.99" step="0.01" value={particleTuning.velocityDamping} onChange={(event) => updateParticleTuning("velocityDamping", Number(event.target.value))} /><ParameterNote name="velocityDamping" /></label>
+          <label>噪声强度 <output>{particleTuning.noiseStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.noiseStrength} onChange={(event) => updateParticleTuning("noiseStrength", Number(event.target.value))} /><ParameterNote name="noiseStrength" /></label>
+          <label>噪声频率 <output>{particleTuning.noiseFrequency.toFixed(2)}</output><input type="range" min="0.1" max="5" step="0.05" value={particleTuning.noiseFrequency} onChange={(event) => updateParticleTuning("noiseFrequency", Number(event.target.value))} /><ParameterNote name="noiseFrequency" /></label>
+          <label>风向 X <output>{particleTuning.windX.toFixed(2)}</output><input type="range" min="-1" max="1" step="0.01" value={particleTuning.windX} onChange={(event) => updateParticleTuning("windX", Number(event.target.value))} /><ParameterNote name="windX" /></label>
+          <label>风向 Y <output>{particleTuning.windY.toFixed(2)}</output><input type="range" min="-1" max="1" step="0.01" value={particleTuning.windY} onChange={(event) => updateParticleTuning("windY", Number(event.target.value))} /><ParameterNote name="windY" /></label>
+          <label>鼠标力场 <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /><ParameterNote name="interactionStrength" /></label>
+          <label>鼠标半径 <output>{particleTuning.mouseRadius.toFixed(0)}px</output><input type="range" min="20" max="240" step="2" value={particleTuning.mouseRadius} onChange={(event) => updateParticleTuning("mouseRadius", Number(event.target.value))} /><ParameterNote name="mouseRadius" /></label>
+          <label>涡流强度 <output>{particleTuning.mouseSwirl.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseSwirl} onChange={(event) => updateParticleTuning("mouseSwirl", Number(event.target.value))} /><ParameterNote name="mouseSwirl" /></label>
+          <label>空腔推力 <output>{particleTuning.mouseRepulsion.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseRepulsion} onChange={(event) => updateParticleTuning("mouseRepulsion", Number(event.target.value))} /><ParameterNote name="mouseRepulsion" /></label>
+          <label>深度拉伸 <output>{particleTuning.mouseDepthPull.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseDepthPull} onChange={(event) => updateParticleTuning("mouseDepthPull", Number(event.target.value))} /><ParameterNote name="mouseDepthPull" /></label>
 
           <div className={styles.settingsSectionLabel}><span>色彩与材质</span></div>
-          <label>对比度 <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.7" max="2.2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /></label>
-          <label>色相漂移 <output>{particleTuning.hueDrift.toFixed(0)}°</output><input type="range" min="0" max="360" step="1" value={particleTuning.hueDrift} onChange={(event) => updateParticleTuning("hueDrift", Number(event.target.value))} /></label>
-          <label>色彩漂移速度 <output>{particleTuning.colorShiftSpeed.toFixed(1)}</output><input type="range" min="0" max="5" step="0.1" value={particleTuning.colorShiftSpeed} onChange={(event) => updateParticleTuning("colorShiftSpeed", Number(event.target.value))} /></label>
-          <label>亮度乘数 <output>{particleTuning.luminanceMultiplier.toFixed(1)}</output><input type="range" min="1" max="5" step="0.1" value={particleTuning.luminanceMultiplier} onChange={(event) => updateParticleTuning("luminanceMultiplier", Number(event.target.value))} /></label>
-          <label>高光增益 <output>{particleTuning.highlightGain.toFixed(1)}</output><input type="range" min="0.5" max="3" step="0.1" value={particleTuning.highlightGain} onChange={(event) => updateParticleTuning("highlightGain", Number(event.target.value))} /></label>
-          <label>光晕强度 <output>{particleTuning.bloomStrength.toFixed(2)}</output><input type="range" min="0" max="2.5" step="0.05" value={particleTuning.bloomStrength} onChange={(event) => updateParticleTuning("bloomStrength", Number(event.target.value))} /></label>
+          <label>对比度 <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.7" max="2.2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /><ParameterNote name="contrast" /></label>
+          <label>色相漂移 <output>{particleTuning.hueDrift.toFixed(0)}°</output><input type="range" min="0" max="360" step="1" value={particleTuning.hueDrift} onChange={(event) => updateParticleTuning("hueDrift", Number(event.target.value))} /><ParameterNote name="hueDrift" /></label>
+          <label>色彩漂移速度 <output>{particleTuning.colorShiftSpeed.toFixed(1)}</output><input type="range" min="0" max="5" step="0.1" value={particleTuning.colorShiftSpeed} onChange={(event) => updateParticleTuning("colorShiftSpeed", Number(event.target.value))} /><ParameterNote name="colorShiftSpeed" /></label>
+          <label>亮度乘数 <output>{particleTuning.luminanceMultiplier.toFixed(1)}</output><input type="range" min="1" max="5" step="0.1" value={particleTuning.luminanceMultiplier} onChange={(event) => updateParticleTuning("luminanceMultiplier", Number(event.target.value))} /><ParameterNote name="luminanceMultiplier" /></label>
+          <label>高光增益 <output>{particleTuning.highlightGain.toFixed(1)}</output><input type="range" min="0.5" max="3" step="0.1" value={particleTuning.highlightGain} onChange={(event) => updateParticleTuning("highlightGain", Number(event.target.value))} /><ParameterNote name="highlightGain" /></label>
+          <label>光晕强度 <output>{particleTuning.bloomStrength.toFixed(2)}</output><input type="range" min="0" max="2.5" step="0.05" value={particleTuning.bloomStrength} onChange={(event) => updateParticleTuning("bloomStrength", Number(event.target.value))} /><ParameterNote name="bloomStrength" /></label>
 
           <div className={styles.settingsSectionLabel}><span>音频律动</span></div>
           <div className={styles.settingsAudioActions}>
             <button onClick={() => musicInputRef.current?.click()}>上传音乐</button>
             <button onClick={() => replyState === "listening" ? void stopListening(false) : void beginListening()}>{replyState === "listening" ? "关闭麦克风" : "麦克风输入"}</button>
           </div>
-          <label>律动总强度 <output>{particleTuning.rhythmIntensity.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.rhythmIntensity} onChange={(event) => updateParticleTuning("rhythmIntensity", Number(event.target.value))} /></label>
-          <label>舞动幅度 <output>{particleTuning.danceStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.danceStrength} onChange={(event) => updateParticleTuning("danceStrength", Number(event.target.value))} /></label>
-          <label>音频亮度 <output>{particleTuning.audioBrightnessStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.audioBrightnessStrength} onChange={(event) => updateParticleTuning("audioBrightnessStrength", Number(event.target.value))} /></label>
-          <label>音频光晕 <output>{particleTuning.audioBloomStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={particleTuning.audioBloomStrength} onChange={(event) => updateParticleTuning("audioBloomStrength", Number(event.target.value))} /></label>
-          <label>低音增益 <output>{particleTuning.bassGain.toFixed(2)}</output><input type="range" min="0" max="3" step="0.05" value={particleTuning.bassGain} onChange={(event) => updateParticleTuning("bassGain", Number(event.target.value))} /></label>
-          <label>流动律动 <output>{particleTuning.flowReactStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={particleTuning.flowReactStrength} onChange={(event) => updateParticleTuning("flowReactStrength", Number(event.target.value))} /></label>
-          <label>深度律动 <output>{particleTuning.depthReactStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={particleTuning.depthReactStrength} onChange={(event) => updateParticleTuning("depthReactStrength", Number(event.target.value))} /></label>
-          <label>闪烁律动 <output>{particleTuning.sparkleReactStrength.toFixed(2)}</output><input type="range" min="0" max="1" step="0.02" value={particleTuning.sparkleReactStrength} onChange={(event) => updateParticleTuning("sparkleReactStrength", Number(event.target.value))} /></label>
-          <label>音频噪声门 <output>{particleTuning.audioNoiseGate.toFixed(2)}</output><input type="range" min="0" max="0.3" step="0.01" value={particleTuning.audioNoiseGate} onChange={(event) => updateParticleTuning("audioNoiseGate", Number(event.target.value))} /></label>
-          <label>动态曲线 <output>{particleTuning.audioDynamicCurve.toFixed(2)}</output><input type="range" min="0.3" max="1.5" step="0.02" value={particleTuning.audioDynamicCurve} onChange={(event) => updateParticleTuning("audioDynamicCurve", Number(event.target.value))} /></label>
-          <label>亮起速度 <output>{particleTuning.audioAttack.toFixed(3)}s</output><input type="range" min="0.01" max="0.3" step="0.005" value={particleTuning.audioAttack} onChange={(event) => updateParticleTuning("audioAttack", Number(event.target.value))} /></label>
-          <label>回落速度 <output>{particleTuning.audioRelease.toFixed(2)}s</output><input type="range" min="0.05" max="1" step="0.01" value={particleTuning.audioRelease} onChange={(event) => updateParticleTuning("audioRelease", Number(event.target.value))} /></label>
+          <label>律动总强度 <output>{particleTuning.rhythmIntensity.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.rhythmIntensity} onChange={(event) => updateParticleTuning("rhythmIntensity", Number(event.target.value))} /><ParameterNote name="rhythmIntensity" /></label>
+          <label>舞动幅度 <output>{particleTuning.danceStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.danceStrength} onChange={(event) => updateParticleTuning("danceStrength", Number(event.target.value))} /><ParameterNote name="danceStrength" /></label>
+          <label>音频亮度 <output>{particleTuning.audioBrightnessStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.audioBrightnessStrength} onChange={(event) => updateParticleTuning("audioBrightnessStrength", Number(event.target.value))} /><ParameterNote name="audioBrightnessStrength" /></label>
+          <label>音频光晕 <output>{particleTuning.audioBloomStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={particleTuning.audioBloomStrength} onChange={(event) => updateParticleTuning("audioBloomStrength", Number(event.target.value))} /><ParameterNote name="audioBloomStrength" /></label>
+          <label>低音增益 <output>{particleTuning.bassGain.toFixed(2)}</output><input type="range" min="0" max="3" step="0.05" value={particleTuning.bassGain} onChange={(event) => updateParticleTuning("bassGain", Number(event.target.value))} /><ParameterNote name="bassGain" /></label>
+          <label>流动律动 <output>{particleTuning.flowReactStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={particleTuning.flowReactStrength} onChange={(event) => updateParticleTuning("flowReactStrength", Number(event.target.value))} /><ParameterNote name="flowReactStrength" /></label>
+          <label>深度律动 <output>{particleTuning.depthReactStrength.toFixed(2)}</output><input type="range" min="0" max="1.5" step="0.05" value={particleTuning.depthReactStrength} onChange={(event) => updateParticleTuning("depthReactStrength", Number(event.target.value))} /><ParameterNote name="depthReactStrength" /></label>
+          <label>闪烁律动 <output>{particleTuning.sparkleReactStrength.toFixed(2)}</output><input type="range" min="0" max="1" step="0.02" value={particleTuning.sparkleReactStrength} onChange={(event) => updateParticleTuning("sparkleReactStrength", Number(event.target.value))} /><ParameterNote name="sparkleReactStrength" /></label>
+          <label>音频噪声门 <output>{particleTuning.audioNoiseGate.toFixed(2)}</output><input type="range" min="0" max="0.3" step="0.01" value={particleTuning.audioNoiseGate} onChange={(event) => updateParticleTuning("audioNoiseGate", Number(event.target.value))} /><ParameterNote name="audioNoiseGate" /></label>
+          <label>动态曲线 <output>{particleTuning.audioDynamicCurve.toFixed(2)}</output><input type="range" min="0.3" max="1.5" step="0.02" value={particleTuning.audioDynamicCurve} onChange={(event) => updateParticleTuning("audioDynamicCurve", Number(event.target.value))} /><ParameterNote name="audioDynamicCurve" /></label>
+          <label>亮起速度 <output>{particleTuning.audioAttack.toFixed(3)}s</output><input type="range" min="0.01" max="0.3" step="0.005" value={particleTuning.audioAttack} onChange={(event) => updateParticleTuning("audioAttack", Number(event.target.value))} /><ParameterNote name="audioAttack" /></label>
+          <label>回落速度 <output>{particleTuning.audioRelease.toFixed(2)}s</output><input type="range" min="0.05" max="1" step="0.01" value={particleTuning.audioRelease} onChange={(event) => updateParticleTuning("audioRelease", Number(event.target.value))} /><ParameterNote name="audioRelease" /></label>
           <label>律动映射目标
             <select value={particleTuning.reactTarget} onChange={(event) => updateParticleTuning("reactTarget", event.target.value as ParticleTuning["reactTarget"])}>
               <option value="peel">边缘剥离</option><option value="size">粒子大小</option><option value="diffusion">扩散范围</option><option value="noise">噪声速度</option><option value="hue">色相</option>
             </select>
+            <ParameterNote name="reactTarget" />
           </label>
-          <label>音频平滑度 <output>{particleTuning.audioSmoothing.toFixed(2)}</output><input type="range" min="0.1" max="0.99" step="0.01" value={particleTuning.audioSmoothing} onChange={(event) => updateParticleTuning("audioSmoothing", Number(event.target.value))} /></label>
+          <label>音频平滑度 <output>{particleTuning.audioSmoothing.toFixed(2)}</output><input type="range" min="0.1" max="0.99" step="0.01" value={particleTuning.audioSmoothing} onChange={(event) => updateParticleTuning("audioSmoothing", Number(event.target.value))} /><ParameterNote name="audioSmoothing" /></label>
           <p className={styles.settingsHint}>总音量控制亮度呼吸；低音推动深度与流动；高音只增加少量星光。亮起和回落分别平滑，强拍也不会突然过曝。</p>
 
           <div className={styles.settingsSectionLabel}><span>会话</span></div>
