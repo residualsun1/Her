@@ -320,7 +320,6 @@ export function HerApp() {
   const gardenStripRef = useRef<HTMLDivElement>(null);
   const gardenCursorRef = useRef<HTMLSpanElement>(null);
   const gardenWheelTimerRef = useRef<number | null>(null);
-  const gardenScrollFrameRef = useRef<number | null>(null);
   const gardenDragRef = useRef({
     pointerId: -1,
     startX: 0,
@@ -449,7 +448,6 @@ export function HerApp() {
       void musicAudioContextRef.current?.close();
       if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
       if (gardenWheelTimerRef.current) window.clearTimeout(gardenWheelTimerRef.current);
-      if (gardenScrollFrameRef.current) cancelAnimationFrame(gardenScrollFrameRef.current);
     };
   }, []);
 
@@ -1227,15 +1225,16 @@ export function HerApp() {
   const handleGardenPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button")) return;
     const strip = event.currentTarget;
+    const interactingWithArtwork = Boolean((event.target as HTMLElement).closest("[data-garden-index]"));
     gardenDragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       scrollLeft: strip.scrollLeft,
       moved: false,
-      mode: "gallery",
+      mode: interactingWithArtwork ? "artwork" : "gallery",
     };
     if (gardenCursorRef.current) gardenCursorRef.current.dataset.active = "true";
-    strip.setPointerCapture(event.pointerId);
+    if (!interactingWithArtwork) strip.setPointerCapture(event.pointerId);
   };
 
   const handleGardenPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1250,7 +1249,7 @@ export function HerApp() {
     if (drag.pointerId !== event.pointerId) return;
     const delta = event.clientX - drag.startX;
     if (Math.abs(delta) > 7) drag.moved = true;
-    if (drag.moved) event.currentTarget.scrollLeft = drag.scrollLeft - delta * 1.16;
+    if (drag.moved) event.currentTarget.scrollLeft = drag.scrollLeft - delta;
   };
 
   const settleGardenSelection = (strip: HTMLDivElement, snap = false) => {
@@ -1265,7 +1264,7 @@ export function HerApp() {
         nearestIndex = Number(item.dataset.gardenIndex);
       }
     });
-    setGardenIndex((current) => current === nearestIndex ? current : nearestIndex);
+    setGardenIndex(nearestIndex);
     if (snap) {
       strip.querySelector<HTMLElement>(`[data-garden-index="${nearestIndex}"]`)
         ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
@@ -1281,28 +1280,19 @@ export function HerApp() {
     gardenDragRef.current.pointerId = -1;
     gardenDragRef.current.mode = null;
     if (gardenCursorRef.current) gardenCursorRef.current.dataset.active = "false";
-    if (mode) settleGardenSelection(event.currentTarget);
+    if (mode) settleGardenSelection(event.currentTarget, true);
   };
 
   const handleGardenWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
-    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
-    if (!delta) return;
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
     event.preventDefault();
-    event.currentTarget.scrollLeft += delta * 1.16;
+    event.currentTarget.scrollLeft += event.deltaY;
     const strip = event.currentTarget;
     if (gardenWheelTimerRef.current) window.clearTimeout(gardenWheelTimerRef.current);
     gardenWheelTimerRef.current = window.setTimeout(() => {
-      settleGardenSelection(strip);
+      settleGardenSelection(strip, true);
       gardenWheelTimerRef.current = null;
-    }, 180);
-  };
-
-  const handleGardenScroll = (strip: HTMLDivElement) => {
-    if (gardenScrollFrameRef.current) return;
-    gardenScrollFrameRef.current = requestAnimationFrame(() => {
-      gardenScrollFrameRef.current = null;
-      settleGardenSelection(strip);
-    });
+    }, 160);
   };
 
   const focusGardenItem = (index: number) => {
@@ -1533,7 +1523,7 @@ export function HerApp() {
                 onPointerUpCapture={handleGardenPointerUp}
                 onPointerCancelCapture={handleGardenPointerUp}
                 onWheel={handleGardenWheel}
-                onScroll={(event) => handleGardenScroll(event.currentTarget)}
+                onScroll={(event) => settleGardenSelection(event.currentTarget)}
                 onPointerLeave={() => {
                   if (gardenDragRef.current.pointerId === -1 && gardenCursorRef.current) {
                     gardenCursorRef.current.style.opacity = "0";
@@ -1569,25 +1559,15 @@ export function HerApp() {
                       tabIndex={0}
                       aria-label={`Open ${item.title}`}
                     >
-                      {index === gardenIndex ? (
-                        <ParticleGarden
-                          imageUrl={item.imageUrl}
-                          audioLevel={0.08}
-                          interactionStrength={1.05}
-                          imageClarity={0.76}
-                          precomposed={item.precomposed}
-                          tuning={particleTuning}
-                          className={styles.gardenParticle}
-                        />
-                      ) : (
-                        <img
-                          className={styles.gardenClusterPreview}
-                          src={item.imageUrl}
-                          alt=""
-                          aria-hidden="true"
-                          loading="lazy"
-                        />
-                      )}
+                      <ParticleGarden
+                        imageUrl={item.imageUrl}
+                        audioLevel={index === gardenIndex ? 0.1 : 0.045}
+                        interactionStrength={1.1}
+                        imageClarity={0.72}
+                        precomposed={item.precomposed}
+                        tuning={particleTuning}
+                        className={styles.gardenParticle}
+                      />
                       <button
                         className={styles.deleteMemoryButton}
                         onClick={(event) => {
@@ -1759,6 +1739,7 @@ export function HerApp() {
           <label>对比度 <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.6" max="2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /></label>
           <div className={styles.settingsSectionLabel}><span>光效与边缘</span></div>
           <label>辉光强度 <output>{particleTuning.glowIntensity.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.glowIntensity} onChange={(event) => updateParticleTuning("glowIntensity", Number(event.target.value))} /></label>
+          <label>拖尾长度 <output>{particleTuning.trailLength.toFixed(2)}</output><input type="range" min="0" max="1" step="0.02" value={particleTuning.trailLength} onChange={(event) => updateParticleTuning("trailLength", Number(event.target.value))} /></label>
           <label>色相漂移幅度 <output>{particleTuning.hueDrift.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={particleTuning.hueDrift} onChange={(event) => updateParticleTuning("hueDrift", Number(event.target.value))} /></label>
           <label>色相漂移速度 <output>{particleTuning.colorShiftSpeed.toFixed(1)}</output><input type="range" min="0" max="4" step="0.1" value={particleTuning.colorShiftSpeed} onChange={(event) => updateParticleTuning("colorShiftSpeed", Number(event.target.value))} /></label>
           <label>泛光阈值 <output>{particleTuning.bloomThreshold.toFixed(2)}</output><input type="range" min="0" max="0.98" step="0.02" value={particleTuning.bloomThreshold} onChange={(event) => updateParticleTuning("bloomThreshold", Number(event.target.value))} /></label>

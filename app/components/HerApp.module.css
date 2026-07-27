@@ -1598,7 +1598,7 @@
   overflow-y: hidden;
   cursor: grab;
   scrollbar-width: none;
-  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -1622,17 +1622,16 @@
   position: absolute;
   top: var(--garden-top);
   left: var(--garden-left);
-  width: clamp(540px, 64vw, 920px);
-  height: min(80%, 700px);
+  width: clamp(700px, 76vw, 1180px);
+  height: min(84%, 780px);
   outline: none;
   z-index: 1;
   opacity: 0.72;
   transform: scale(0.965);
   transition:
-    opacity 300ms ease,
-    filter 300ms ease,
-    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform, opacity;
+    opacity 580ms ease,
+    filter 580ms ease,
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .gardenParticleFrame:focus-visible {
@@ -1656,28 +1655,8 @@
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  mix-blend-mode: normal;
-  pointer-events: none;
-}
-
-.gardenClusterPreview {
-  position: absolute;
-  inset: 4%;
-  width: 92%;
-  height: 92%;
-  object-fit: contain;
-  object-position: center;
-  opacity: 0.7;
-  filter: saturate(0.92) contrast(1.08) brightness(0.78);
   mix-blend-mode: screen;
-  pointer-events: none;
-  clip-path: polygon(50% 0%, 64% 3%, 78% 10%, 91% 24%, 96% 39%, 94% 54%, 98% 68%, 89% 82%, 74% 92%, 57% 98%, 41% 95%, 25% 99%, 10% 88%, 4% 71%, 7% 54%, 2% 40%, 9% 24%, 23% 11%, 37% 3%);
-  animation: clusterFloat 9s ease-in-out infinite alternate;
-}
-
-@keyframes clusterFloat {
-  from { transform: translate3d(-0.5%, 0.4%, 0) scale(0.98); }
-  to { transform: translate3d(0.7%, -0.6%, 0) scale(1.02); }
+  pointer-events: auto;
 }
 
 .deleteMemoryButton,
