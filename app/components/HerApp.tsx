@@ -392,7 +392,6 @@ export function HerApp() {
   const gardenCursorRef = useRef<HTMLSpanElement>(null);
   const gardenWheelDeltaRef = useRef(0);
   const gardenWheelLockRef = useRef(0);
-  const suppressGardenOpenUntilRef = useRef(0);
   const gardenDragRef = useRef({
     pointerId: -1,
     startX: 0,
@@ -1356,7 +1355,6 @@ export function HerApp() {
     if (Math.abs(delta) > 5) drag.moved = true;
     if (drag.moved) {
       event.preventDefault();
-      suppressGardenOpenUntilRef.current = event.timeStamp + 480;
       event.currentTarget.scrollLeft = drag.scrollLeft - delta * 1.08;
     }
   };
@@ -1394,7 +1392,6 @@ export function HerApp() {
     if (gardenCursorRef.current) gardenCursorRef.current.dataset.active = "false";
     if (!mode) return;
     if (moved && Math.abs(totalDelta) > 42) {
-      suppressGardenOpenUntilRef.current = event.timeStamp + 480;
       focusGardenItem(gardenIndex + (totalDelta < 0 ? 1 : -1));
       return;
     }
@@ -1416,7 +1413,6 @@ export function HerApp() {
     const direction = gardenWheelDeltaRef.current > 0 ? 1 : -1;
     gardenWheelDeltaRef.current = 0;
     gardenWheelLockRef.current = now + 360;
-    suppressGardenOpenUntilRef.current = now + 520;
     focusGardenItem(gardenIndex + direction);
   };
 
@@ -1441,18 +1437,8 @@ export function HerApp() {
       ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   };
 
-  const openGardenConversation = (
-    item = gardenItems[gardenIndex],
-    eventTime = Number.POSITIVE_INFINITY,
-  ) => {
-    if (
-      !item ||
-      gardenDragRef.current.moved ||
-      eventTime < suppressGardenOpenUntilRef.current
-    ) {
-      gardenDragRef.current.moved = false;
-      return;
-    }
+  const openGardenConversation = (item = gardenItems[gardenIndex]) => {
+    if (!item) return;
     setImageUrl(item.imageUrl);
     setImagePrecomposed(Boolean(item.precomposed));
     setImageTitle(item.title);
@@ -1719,18 +1705,21 @@ export function HerApp() {
                         "--garden-top": `${index % 4 === 0 ? 1 : index % 4 === 1 ? 7 : index % 4 === 2 ? 3 : 10}%`,
                       } as CSSProperties}
                       onClick={() => {
+                        if (gardenDragRef.current.moved) {
+                          gardenDragRef.current.moved = false;
+                          return;
+                        }
                         if (index !== gardenIndex) {
-                          suppressGardenOpenUntilRef.current = event.timeStamp + 320;
                           focusGardenItem(index);
                           return;
                         }
-                        openGardenConversation(item, event.timeStamp);
+                        openGardenConversation(item);
                       }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
                           if (index !== gardenIndex) focusGardenItem(index);
-                          else openGardenConversation(item, event.timeStamp);
+                          else openGardenConversation(item);
                         }
                       }}
                       role="button"
@@ -1774,7 +1763,6 @@ export function HerApp() {
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
-                  suppressGardenOpenUntilRef.current = event.timeStamp + 360;
                   focusGardenItem(gardenIndex - 1);
                 }}
                 disabled={gardenIndex === 0}
@@ -1787,7 +1775,6 @@ export function HerApp() {
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
-                  suppressGardenOpenUntilRef.current = event.timeStamp + 360;
                   focusGardenItem(gardenIndex + 1);
                 }}
                 disabled={gardenIndex === gardenItems.length - 1}

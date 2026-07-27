@@ -102,7 +102,9 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /immersiveMode/);
   assert.match(herApp, /Hide interface/);
   assert.match(herApp, /gardenWheelLockRef/);
-  assert.match(herApp, /suppressGardenOpenUntilRef/);
+  assert.match(herApp, /if \(gardenDragRef\.current\.moved\)/);
+  assert.doesNotMatch(herApp, /suppressGardenOpenUntilRef/);
+  assert.doesNotMatch(herApp, /openGardenConversation\(item,\s*event\.timeStamp\)/);
   assert.doesNotMatch(herApp, /onScroll=\{\(event\) => settleGardenSelection/);
   assert.doesNotMatch(herApp, /Dispersion <|Particle Size <|Flow Speed <|Subject Detail <|Mouse Force </);
   assert.match(particle, /@react-three\/fiber/);
