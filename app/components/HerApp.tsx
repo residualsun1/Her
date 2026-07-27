@@ -1562,7 +1562,7 @@ export function HerApp() {
               }}
               aria-pressed={immersiveMode}
               aria-label={immersiveMode ? "Show interface" : "Hide interface for immersive view"}
-              title="Mouse wheel zooms the particle image"
+              title={immersiveMode ? "Show interface (Esc)" : "Mouse wheel zooms the particle image"}
             >
               <span className={styles.immersiveIcon} aria-hidden="true" />
               <span>{immersiveMode ? "Show interface" : "Hide interface"}</span>

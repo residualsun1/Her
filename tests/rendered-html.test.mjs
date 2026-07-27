@@ -101,6 +101,10 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /handleParticleWheel/);
   assert.match(herApp, /immersiveMode/);
   assert.match(herApp, /Hide interface/);
+  assert.match(herApp, /Show interface \(Esc\)/);
+  assert.match(appStyles, /\.immersiveStage \.providerPill,[\s\S]*?animation: none !important/);
+  assert.match(appStyles, /\.immersiveStage \.uploadAnother \{[\s\S]*?display: none !important/);
+  assert.match(appStyles, /\.immersiveStage \.immersiveToggle > span:not\(\.immersiveIcon\)/);
   assert.match(herApp, /gardenWheelLockRef/);
   assert.match(herApp, /if \(gardenDragRef\.current\.moved\)/);
   assert.doesNotMatch(herApp, /suppressGardenOpenUntilRef/);

@@ -198,19 +198,45 @@
 .immersiveStage .conversationUi,
 .immersiveStage .particleMeta,
 .immersiveStage .vignette {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 360ms ease;
+  visibility: hidden;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  animation: none !important;
+  transition:
+    opacity 360ms ease,
+    visibility 0s linear 360ms;
+}
+
+.immersiveStage .uploadAnother {
+  display: none !important;
 }
 
 .immersiveStage .immersiveToggle {
-  top: 20px;
-  opacity: 0.46;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+  border-color: transparent !important;
+  background: rgba(5, 7, 8, 0.08);
+  color: rgba(255, 255, 255, 0.44);
+  opacity: 0.08;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.immersiveStage .immersiveToggle > span:not(.immersiveIcon),
+.immersiveStage .immersiveToggle small {
+  display: none;
 }
 
 .immersiveStage .immersiveToggle:hover,
 .immersiveStage .immersiveToggle:focus-visible {
-  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  background: rgba(5, 7, 8, 0.54);
+  opacity: 0.82;
 }
 
 .immersiveMode .toast {
