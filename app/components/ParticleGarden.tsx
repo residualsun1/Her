@@ -51,6 +51,7 @@ export function ParticleGarden({
     [tuning],
   );
   const [debouncedCount, setDebouncedCount] = useState(mergedTuning.particleCount);
+  const [particleCap, setParticleCap] = useState(262_144);
   const [readyKey, setReadyKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,7 +62,25 @@ export function ParticleGarden({
     return () => window.clearTimeout(timer);
   }, [mergedTuning.particleCount]);
 
-  const renderKey = `${imageUrl ?? "empty"}-${debouncedCount}-${preview ? "preview" : "hero"}`;
+  useEffect(() => {
+    const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
+    const cores = navigator.hardwareConcurrency ?? 8;
+    const narrow = window.innerWidth < 900;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let nextCap = 262_144;
+    if (reducedMotion || memory <= 4 || cores <= 4) {
+      nextCap = 65_536;
+    } else if (narrow || memory <= 8 || cores <= 8) {
+      nextCap = 131_072;
+    }
+    const frame = window.requestAnimationFrame(() => setParticleCap(nextCap));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  const adaptiveCount = preview
+    ? Math.min(debouncedCount, 65_536)
+    : Math.min(debouncedCount, particleCap);
+  const renderKey = `${imageUrl ?? "empty"}-${adaptiveCount}-${preview ? "preview" : "hero"}`;
   const ready = readyKey === renderKey;
 
   const rootClassName = [
@@ -79,20 +98,20 @@ export function ParticleGarden({
     <div
       className={rootClassName}
       role="img"
-      aria-label="由上传图片生成、随风与声音缓慢消散的粒子记忆"
+      aria-label="由上传图片生成、可随鼠标与声音流动的星团记忆"
       style={{ "--image-clarity": imageClarity } as CSSProperties}
     >
       <img className={styles.imageBase} src={imageUrl} alt="" aria-hidden="true" />
       <Canvas
         key={renderKey}
         className={styles.canvas}
-        dpr={preview ? [1, 1.2] : [1, 1.65]}
+        dpr={preview ? [1, 1.15] : [1, 1.5]}
         frameloop="always"
         gl={{
           alpha: true,
           antialias: false,
           powerPreference: "high-performance",
-          preserveDrawingBuffer: !preview,
+          preserveDrawingBuffer: false,
         }}
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0);
@@ -103,7 +122,7 @@ export function ParticleGarden({
         <Suspense fallback={null}>
           <GpuParticleScene
             imageUrl={imageUrl}
-            particleCount={debouncedCount}
+            particleCount={adaptiveCount}
             tuning={mergedTuning}
             audioLevel={audioLevel}
             audioBands={audioBands}

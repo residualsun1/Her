@@ -1758,7 +1758,7 @@ export function HerApp() {
       {settingsOpen && (
         <aside className={styles.settingsPanel} aria-label="设置">
           <div className={styles.settingsTitle}>
-            <div><span>Particle field</span><h2>让记忆缓慢风化。</h2></div>
+            <div><span>Particle field</span><h2>让记忆成为星团。</h2></div>
             <button onClick={() => setSettingsOpen(false)} aria-label="关闭设置">×</button>
           </div>
 
@@ -1771,24 +1771,46 @@ export function HerApp() {
           <label>拖尾长度 <output>{particleTuning.trailLength.toFixed(2)}</output><input type="range" min="0" max="0.99" step="0.01" value={particleTuning.trailLength} onChange={(event) => updateParticleTuning("trailLength", Number(event.target.value))} /></label>
           <label>画面保真 <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.38" max="0.96" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
 
+          <div className={styles.settingsSectionLabel}><span>星团形态</span></div>
+          <label>核心保留 <output>{particleTuning.coreRetention.toFixed(2)}</output><input type="range" min="0.5" max="0.98" step="0.01" value={particleTuning.coreRetention} onChange={(event) => updateParticleTuning("coreRetention", Number(event.target.value))} /></label>
+          <label>星云宽度 <output>{particleTuning.haloWidth.toFixed(2)}</output><input type="range" min="0" max="0.5" step="0.01" value={particleTuning.haloWidth} onChange={(event) => updateParticleTuning("haloWidth", Number(event.target.value))} /></label>
+          <label>星云密度 <output>{particleTuning.haloDensity.toFixed(2)}</output><input type="range" min="0" max="0.8" step="0.01" value={particleTuning.haloDensity} onChange={(event) => updateParticleTuning("haloDensity", Number(event.target.value))} /></label>
+          <label>边缘羽化 <output>{particleTuning.edgeFeather.toFixed(2)}</output><input type="range" min="0.02" max="0.6" step="0.01" value={particleTuning.edgeFeather} onChange={(event) => updateParticleTuning("edgeFeather", Number(event.target.value))} /></label>
+          <label>轮廓不规则度 <output>{particleTuning.clusterIrregularity.toFixed(2)}</output><input type="range" min="0" max="0.8" step="0.01" value={particleTuning.clusterIrregularity} onChange={(event) => updateParticleTuning("clusterIrregularity", Number(event.target.value))} /></label>
+          <label>暗部粒子保留 <output>{particleTuning.densityGamma.toFixed(2)}</output><input type="range" min="0.3" max="1.5" step="0.01" value={particleTuning.densityGamma} onChange={(event) => updateParticleTuning("densityGamma", Number(event.target.value))} /></label>
+
           <div className={styles.settingsSectionLabel}><span>诗意消散</span></div>
           <label>边缘剥离阈值 <output>{particleTuning.peelThreshold.toFixed(2)}</output><input type="range" min="0.02" max="0.98" step="0.01" value={particleTuning.peelThreshold} onChange={(event) => updateParticleTuning("peelThreshold", Number(event.target.value))} /></label>
           <label>时间侵蚀率 <output>{particleTuning.erosionRate.toFixed(2)}</output><input type="range" min="0.02" max="1.5" step="0.01" value={particleTuning.erosionRate} onChange={(event) => updateParticleTuning("erosionRate", Number(event.target.value))} /></label>
           <label>余烬寿命 <output>{particleTuning.emberLifespan.toFixed(1)}s</output><input type="range" min="0.5" max="15" step="0.1" value={particleTuning.emberLifespan} onChange={(event) => updateParticleTuning("emberLifespan", Number(event.target.value))} /></label>
-          <label>粒子扩散 <output>{particleTuning.diffusion.toFixed(0)}</output><input type="range" min="0" max="100" step="1" value={particleTuning.diffusion} onChange={(event) => updateParticleTuning("diffusion", Number(event.target.value))} /></label>
+          <label>粒子扩散 <output>{particleTuning.diffusion.toFixed(1)}</output><input type="range" min="0" max="4" step="0.1" value={particleTuning.diffusion} onChange={(event) => updateParticleTuning("diffusion", Number(event.target.value))} /></label>
           <label>边缘扰动 <output>{particleTuning.edgePerturbation.toFixed(1)}</output><input type="range" min="0" max="5" step="0.1" value={particleTuning.edgePerturbation} onChange={(event) => updateParticleTuning("edgePerturbation", Number(event.target.value))} /></label>
           <label>边缘扩散 <output>{particleTuning.edgeScatter.toFixed(1)}</output><input type="range" min="0" max="20" step="0.2" value={particleTuning.edgeScatter} onChange={(event) => updateParticleTuning("edgeScatter", Number(event.target.value))} /></label>
 
           <div className={styles.settingsSectionLabel}><span>风场与噪声</span></div>
+          <label>流动速度 <output>{particleTuning.flowSpeed.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.flowSpeed} onChange={(event) => updateParticleTuning("flowSpeed", Number(event.target.value))} /></label>
+          <label>流动幅度 <output>{particleTuning.flowAmplitude.toFixed(1)}</output><input type="range" min="0" max="3" step="0.1" value={particleTuning.flowAmplitude} onChange={(event) => updateParticleTuning("flowAmplitude", Number(event.target.value))} /></label>
+          <label>深度强度 <output>{particleTuning.depthStrength.toFixed(0)}</output><input type="range" min="0" max="100" step="1" value={particleTuning.depthStrength} onChange={(event) => updateParticleTuning("depthStrength", Number(event.target.value))} /></label>
+          <label>深度波 <output>{particleTuning.depthWave.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.depthWave} onChange={(event) => updateParticleTuning("depthWave", Number(event.target.value))} /></label>
+          <label>回弹强度 <output>{particleTuning.homeSpring.toFixed(3)}</output><input type="range" min="0.005" max="0.15" step="0.005" value={particleTuning.homeSpring} onChange={(event) => updateParticleTuning("homeSpring", Number(event.target.value))} /></label>
+          <label>速度阻尼 <output>{particleTuning.velocityDamping.toFixed(2)}</output><input type="range" min="0.8" max="0.99" step="0.01" value={particleTuning.velocityDamping} onChange={(event) => updateParticleTuning("velocityDamping", Number(event.target.value))} /></label>
           <label>噪声强度 <output>{particleTuning.noiseStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.noiseStrength} onChange={(event) => updateParticleTuning("noiseStrength", Number(event.target.value))} /></label>
           <label>噪声频率 <output>{particleTuning.noiseFrequency.toFixed(2)}</output><input type="range" min="0.1" max="5" step="0.05" value={particleTuning.noiseFrequency} onChange={(event) => updateParticleTuning("noiseFrequency", Number(event.target.value))} /></label>
           <label>风向 X <output>{particleTuning.windX.toFixed(2)}</output><input type="range" min="-1" max="1" step="0.01" value={particleTuning.windX} onChange={(event) => updateParticleTuning("windX", Number(event.target.value))} /></label>
           <label>风向 Y <output>{particleTuning.windY.toFixed(2)}</output><input type="range" min="-1" max="1" step="0.01" value={particleTuning.windY} onChange={(event) => updateParticleTuning("windY", Number(event.target.value))} /></label>
           <label>鼠标力场 <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /></label>
+          <label>鼠标半径 <output>{particleTuning.mouseRadius.toFixed(0)}px</output><input type="range" min="20" max="240" step="2" value={particleTuning.mouseRadius} onChange={(event) => updateParticleTuning("mouseRadius", Number(event.target.value))} /></label>
+          <label>涡流强度 <output>{particleTuning.mouseSwirl.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseSwirl} onChange={(event) => updateParticleTuning("mouseSwirl", Number(event.target.value))} /></label>
+          <label>空腔推力 <output>{particleTuning.mouseRepulsion.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseRepulsion} onChange={(event) => updateParticleTuning("mouseRepulsion", Number(event.target.value))} /></label>
+          <label>深度拉伸 <output>{particleTuning.mouseDepthPull.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseDepthPull} onChange={(event) => updateParticleTuning("mouseDepthPull", Number(event.target.value))} /></label>
 
           <div className={styles.settingsSectionLabel}><span>色彩与材质</span></div>
+          <label>对比度 <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.7" max="2.2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /></label>
           <label>色相漂移 <output>{particleTuning.hueDrift.toFixed(0)}°</output><input type="range" min="0" max="360" step="1" value={particleTuning.hueDrift} onChange={(event) => updateParticleTuning("hueDrift", Number(event.target.value))} /></label>
+          <label>色彩漂移速度 <output>{particleTuning.colorShiftSpeed.toFixed(1)}</output><input type="range" min="0" max="5" step="0.1" value={particleTuning.colorShiftSpeed} onChange={(event) => updateParticleTuning("colorShiftSpeed", Number(event.target.value))} /></label>
           <label>亮度乘数 <output>{particleTuning.luminanceMultiplier.toFixed(1)}</output><input type="range" min="1" max="5" step="0.1" value={particleTuning.luminanceMultiplier} onChange={(event) => updateParticleTuning("luminanceMultiplier", Number(event.target.value))} /></label>
+          <label>高光增益 <output>{particleTuning.highlightGain.toFixed(1)}</output><input type="range" min="0.5" max="3" step="0.1" value={particleTuning.highlightGain} onChange={(event) => updateParticleTuning("highlightGain", Number(event.target.value))} /></label>
+          <label>光晕强度 <output>{particleTuning.bloomStrength.toFixed(2)}</output><input type="range" min="0" max="2.5" step="0.05" value={particleTuning.bloomStrength} onChange={(event) => updateParticleTuning("bloomStrength", Number(event.target.value))} /></label>
 
           <div className={styles.settingsSectionLabel}><span>音频律动</span></div>
           <div className={styles.settingsAudioActions}>
@@ -1796,6 +1818,7 @@ export function HerApp() {
             <button onClick={() => replyState === "listening" ? void stopListening(false) : void beginListening()}>{replyState === "listening" ? "关闭麦克风" : "麦克风输入"}</button>
           </div>
           <label>律动总强度 <output>{particleTuning.rhythmIntensity.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.rhythmIntensity} onChange={(event) => updateParticleTuning("rhythmIntensity", Number(event.target.value))} /></label>
+          <label>舞动幅度 <output>{particleTuning.danceStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.1" value={particleTuning.danceStrength} onChange={(event) => updateParticleTuning("danceStrength", Number(event.target.value))} /></label>
           <label>律动映射目标
             <select value={particleTuning.reactTarget} onChange={(event) => updateParticleTuning("reactTarget", event.target.value as ParticleTuning["reactTarget"])}>
               <option value="peel">边缘剥离</option><option value="size">粒子大小</option><option value="diffusion">扩散范围</option><option value="noise">噪声速度</option><option value="hue">色相</option>
