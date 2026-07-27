@@ -152,6 +152,14 @@ vec3 rotateHue(vec3 color, float angle) {
   return color * cos(angle) + cross(axis, color) * sin(angle) + axis * dot(axis, color) * (1.0 - cos(angle));
 }
 
+float organicBoundary(vec2 point, vec2 seed) {
+  float angle = atan(point.y, point.x);
+  float ripple = sin(angle * 5.0 + seed.x * TAU) * 0.075;
+  ripple += sin(angle * 9.0 - seed.y * TAU) * 0.042;
+  ripple += cos(angle * 3.0 + seed.x * 10.0) * 0.032;
+  return 1.18 + ripple;
+}
+
 void main() {
   float viewportAspect = max(uViewport.x / max(uViewport.y, 1.0), 0.001);
   vec2 fit = vec2(0.88);
@@ -182,6 +190,9 @@ void main() {
   float envelopeNoise = sin(aHome.x * 4.1 * uNoiseScale + aMeta.x * TAU) * 0.055;
   envelopeNoise += cos(aHome.y * 5.2 * uNoiseScale + aMeta.y * TAU) * 0.045;
   float imageEnvelope = 1.0 - smoothstep(0.68, 1.04, outerMetric + envelopeNoise);
+  float clusterDistance = length(aHome);
+  float clusterBoundary = organicBoundary(aHome, aMeta.xy);
+  float clusterFringe = smoothstep(clusterBoundary - 0.2, clusterBoundary + 0.16, clusterDistance);
 
   // The dense surface is always alive; the face moves less, but never becomes a static photo.
   float motionTime = uTime * uMotion * max(uFlowSpeed, 0.0);
@@ -201,6 +212,9 @@ void main() {
     randomDirection * haloDistance * 0.34 * uEdgeDisturbance
   );
   base += randomDirection * aMeta.z * 0.008 * deform * uDispersion * uEdgeDisturbance * (0.72 + 0.28 * sin(motionTime + aMeta.x * TAU));
+  // Break the source rectangle into an uneven, memory-like cluster without losing the full scene.
+  base += radial * clusterFringe * (0.035 + aMeta.y * 0.095) * uDispersion;
+  base += curlDirection * clusterFringe * sin(uTime * 0.4 + aMeta.x * TAU) * 0.04 * uEdgeDisturbance;
 
   // Voice and music add breathing, depth and sparkle without erasing the subject.
   float audioWave = sin(uTime * (2.2 + aMeta.y * 2.1) + aMeta.x * TAU);
@@ -273,7 +287,8 @@ void main() {
   float surfaceOpacity = mix(0.82 + uSubjectDetail * 0.17, 0.92, 1.0 - core);
   float preservedEnvelope = 0.68 + imageEnvelope * 0.32;
   float envelopeOpacity = mix(preservedEnvelope, max(preservedEnvelope, 0.76), aMeta.w);
-  vColor = vec4(liftedColor * shimmer, aColor.a * surfaceOpacity * envelopeOpacity);
+  float cloudOpacity = mix(1.0, 0.14 + aMeta.w * 0.24, clusterFringe);
+  vColor = vec4(liftedColor * shimmer, aColor.a * surfaceOpacity * envelopeOpacity * cloudOpacity);
   vHalo = aMeta.w;
   vSpark = clamp(aMeta.z + audioPulse * 0.58 + ring * uPointer.z * 0.72, 0.0, 1.0);
   vField = ring * uPointer.z;
@@ -356,6 +371,16 @@ float hash(vec2 value) {
   return fract((p3.x + p3.y) * p3.z);
 }
 
+float organicMask(vec2 uv) {
+  vec2 point = uv * 2.0 - 1.0;
+  float angle = atan(point.y, point.x);
+  float ripple = sin(angle * 5.0 + sin(angle * 2.0) * 1.7) * 0.075;
+  ripple += sin(angle * 9.0 - 0.9) * 0.042;
+  ripple += cos(angle * 3.0 + 0.35) * 0.032;
+  float boundary = 1.18 + ripple;
+  return 1.0 - smoothstep(boundary - 0.19, boundary + 0.14, length(point));
+}
+
 void main() {
   float viewportAspect = max(uViewport.x / max(uViewport.y, 1.0), 0.001);
   vec2 uv = vUv;
@@ -418,8 +443,9 @@ void main() {
   float grain = hash(floor(gl_FragCoord.xy / 1.6) + floor(uTime * 2.0));
   float livingSurface = mix(0.92, 1.04, grain);
 
-  float alpha = fidelity * (0.1 + subject * 0.28 + edge * 0.22);
+  float alpha = fidelity * (0.1 + subject * 0.34 + edge * 0.22);
   alpha *= dragFade * dissolve * (1.0 - uAudio * 0.16) * center.a;
+  alpha *= organicMask(uv);
   alpha = clamp(alpha, 0.0, 0.58);
 
   vec3 color = mix(center.rgb, shifted, ring * 0.56);
@@ -502,17 +528,19 @@ function choosePointBudget(width: number, height: number, reducedMotion: boolean
   const lowPower =
     cores <= 4 || memory <= 4 || performanceNavigator.connection?.saveData === true;
   const compact = width < 700 || height < 700;
-  const areaBudget = Math.floor((width * height) / (lowPower ? 8 : compact ? 6 : 5));
+  // A single well-sampled cloud reads as dense; several hundred thousand points do not.
+  // Keep the hero responsive enough for pointer and gallery navigation on integrated GPUs.
+  const areaBudget = Math.floor((width * height) / (lowPower ? 18 : compact ? 14 : 12));
 
   if (reducedMotion) {
-    return clamp(areaBudget, 20_000, 42_000);
+    return clamp(areaBudget, 9_000, 18_000);
   }
 
   return lowPower
-    ? clamp(areaBudget, 38_000, 72_000)
+    ? clamp(areaBudget, 14_000, 28_000)
     : compact
-      ? clamp(areaBudget, 52_000, 96_000)
-      : clamp(areaBudget, 68_000, 132_000);
+      ? clamp(areaBudget, 20_000, 34_000)
+      : clamp(areaBudget, 26_000, 48_000);
 }
 
 function sampleImage(image: HTMLImageElement, pointBudget: number) {
@@ -535,7 +563,7 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
   context.drawImage(image, 0, 0, columns, rows);
   const pixels = context.getImageData(0, 0, columns, rows).data;
   const points: number[] = [];
-  const haloLimit = Math.floor(pointBudget * 0.2);
+  const haloLimit = Math.floor(pointBudget * 0.32);
   let haloCount = 0;
 
   const luminanceAt = (column: number, row: number) => {
@@ -610,8 +638,9 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
         0,
       );
 
-      const outer = smoothstep(0.48, 0.94, outerMetric + envelopeNoise * 0.6);
-      const haloChance = clamp(outer * 0.44 + edge * (1 - coreProtection) * 0.32, 0, 0.58);
+      const clusterDistance = Math.hypot(homeX, homeY);
+      const outer = smoothstep(0.62, 1.32, clusterDistance + envelopeNoise * 0.5);
+      const haloChance = clamp(outer * 0.62 + edge * (1 - coreProtection) * 0.34, 0, 0.7);
       if (haloCount < haloLimit && haloChance > 0.035 && random01(index * 2.31) < haloChance) {
         const haloSeedA = random01(index * 3.17 + 7);
         const haloSeedB = random01(index * 5.03 + 13);
@@ -650,7 +679,6 @@ export function ParticleGarden({
   onReady,
 }: ParticleGardenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const trailCanvasRef = useRef<HTMLCanvasElement>(null);
   const [showFallback, setShowFallback] = useState(false);
   const inputsRef = useRef<MutableInput>({
     audio: clamp(audioLevel, 0, 1),
@@ -682,13 +710,7 @@ export function ParticleGarden({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const trailCanvas = trailCanvasRef.current;
-    if (!canvas || !trailCanvas) {
-      return;
-    }
-
-    const trailContext = trailCanvas.getContext("2d", { alpha: true });
-    if (!trailContext) {
+    if (!canvas) {
       return;
     }
 
@@ -699,7 +721,6 @@ export function ParticleGarden({
     let pointCount = 0;
     let imageAspect = 1;
     let currentAudio = 0;
-    let trailFrame = 0;
     let lastFrameTime = performance.now();
     const startTime = lastFrameTime;
     const pointerTarget: PointerState = { x: 2, y: 2, active: 0 };
@@ -716,7 +737,7 @@ export function ParticleGarden({
       depth: false,
       powerPreference: "high-performance",
       premultipliedAlpha: false,
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: false,
     });
 
     if (!gl) {
@@ -902,14 +923,6 @@ export function ParticleGarden({
         canvas.width = width;
         canvas.height = height;
       }
-      const trailDpr = Math.min(dpr, 1.25);
-      const trailWidth = Math.max(1, Math.round(canvas.clientWidth * trailDpr));
-      const trailHeight = Math.max(1, Math.round(canvas.clientHeight * trailDpr));
-      if (trailCanvas.width !== trailWidth || trailCanvas.height !== trailHeight) {
-        trailCanvas.width = trailWidth;
-        trailCanvas.height = trailHeight;
-        trailContext.clearRect(0, 0, trailWidth, trailHeight);
-      }
       gl.viewport(0, 0, width, height);
     };
 
@@ -1057,7 +1070,6 @@ export function ParticleGarden({
       dragCurrent.y += (dragTarget.y - dragCurrent.y) * dragBlend;
       currentAudio += (inputsRef.current.audio - currentAudio) * audioBlend;
 
-      const dragActivity = clamp(Math.hypot(dragCurrent.x, dragCurrent.y), 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       if (imageTextureReady) {
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -1132,33 +1144,6 @@ export function ParticleGarden({
         gl.drawArrays(gl.POINTS, 0, pointCount);
         gl.bindVertexArray(null);
 
-        trailFrame += 1;
-        if (!reducedMotion && trailFrame % 2 === 0) {
-          trailContext.save();
-          trailContext.globalCompositeOperation = "destination-out";
-          trailContext.globalAlpha = 0.22 - clamp(inputsRef.current.tuning.trailLength, 0, 1) * (0.115 / 0.62);
-          trailContext.fillStyle = "#000";
-          trailContext.fillRect(0, 0, trailCanvas.width, trailCanvas.height);
-          trailContext.globalCompositeOperation = "lighter";
-          trailContext.globalAlpha = clamp(
-            0.075 + pointerCurrent.active * 0.08 + dragActivity * 0.12 + currentAudio * 0.055,
-            0.075,
-            0.28,
-          );
-          trailContext.filter = "blur(0.65px)";
-          trailContext.drawImage(
-            canvas,
-            0,
-            0,
-            canvas.width,
-            canvas.height,
-            0,
-            0,
-            trailCanvas.width,
-            trailCanvas.height,
-          );
-          trailContext.restore();
-        }
       }
 
       animationFrame = window.requestAnimationFrame(render);
@@ -1176,7 +1161,6 @@ export function ParticleGarden({
       canvas.removeEventListener("pointerup", handlePointerUp);
       canvas.removeEventListener("pointercancel", handlePointerCancel);
       canvas.removeEventListener("pointerleave", handlePointerLeave);
-      trailContext.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
       if (image) {
         image.onload = null;
         image.onerror = null;
@@ -1205,7 +1189,6 @@ export function ParticleGarden({
       aria-label="由上传图片生成、可随声音与指针流动的粒子记忆"
     >
       {imageUrl && <img className={`${styles.imageBase} ${showFallback ? styles.imageBaseFallback : ""}`} src={imageUrl} alt="" aria-hidden="true" />}
-      <canvas ref={trailCanvasRef} className={styles.trailCanvas} aria-hidden="true" />
       <canvas ref={canvasRef} className={`${styles.canvas} ${showFallback ? styles.canvasHidden : ""}`} aria-hidden="true" />
       <span className={styles.vignette} aria-hidden="true" />
     </div>
