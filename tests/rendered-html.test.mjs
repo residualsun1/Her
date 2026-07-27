@@ -98,6 +98,12 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /风向 Y/);
   assert.match(herApp, /律动映射目标/);
   assert.match(herApp, /音频平滑度/);
+  assert.match(herApp, /handleParticleWheel/);
+  assert.match(herApp, /immersiveMode/);
+  assert.match(herApp, /Hide interface/);
+  assert.match(herApp, /gardenWheelLockRef/);
+  assert.match(herApp, /suppressGardenOpenUntilRef/);
+  assert.doesNotMatch(herApp, /onScroll=\{\(event\) => settleGardenSelection/);
   assert.doesNotMatch(herApp, /Dispersion <|Particle Size <|Flow Speed <|Subject Detail <|Mouse Force </);
   assert.match(particle, /@react-three\/fiber/);
   assert.match(particle, /r3f-fbo/);
@@ -123,6 +129,7 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(gpu, /uTreble/);
   assert.match(gpu, /uSurfaceLayer/);
   assert.match(gpu, /uImageClarity/);
+  assert.match(gpu, /uZoom/);
   assert.match(gpu, /surfaceMaterial/);
   assert.match(gpu, /rotateField/);
   assert.match(gpu, /rotationTargetRef/);

@@ -346,6 +346,8 @@ export function HerApp() {
   const [deleting, setDeleting] = useState(false);
   const [conversationFromGarden, setConversationFromGarden] = useState(false);
   const [conversationChromeVisible, setConversationChromeVisible] = useState(true);
+  const [immersiveMode, setImmersiveMode] = useState(false);
+  const [particleZoom, setParticleZoom] = useState(1);
   const [calendarMonth, setCalendarMonth] = useState(new Date(2025, 11, 1));
   const [selectedDate, setSelectedDate] = useState("2025-12-04");
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
@@ -388,7 +390,9 @@ export function HerApp() {
   const salonRunRef = useRef(0);
   const gardenStripRef = useRef<HTMLDivElement>(null);
   const gardenCursorRef = useRef<HTMLSpanElement>(null);
-  const gardenWheelTimerRef = useRef<number | null>(null);
+  const gardenWheelDeltaRef = useRef(0);
+  const gardenWheelLockRef = useRef(0);
+  const suppressGardenOpenUntilRef = useRef(0);
   const gardenDragRef = useRef({
     pointerId: -1,
     startX: 0,
@@ -519,9 +523,17 @@ export function HerApp() {
       void audioContextRef.current?.close();
       void musicAudioContextRef.current?.close();
       if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
-      if (gardenWheelTimerRef.current) window.clearTimeout(gardenWheelTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!immersiveMode) return;
+    const exitImmersive = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setImmersiveMode(false);
+    };
+    window.addEventListener("keydown", exitImmersive);
+    return () => window.removeEventListener("keydown", exitImmersive);
+  }, [immersiveMode]);
 
   const speak = useCallback(
     (text: string, onEnd?: () => void, voiceOffset = 0, languageOverride?: "en" | "zh") => {
@@ -824,6 +836,8 @@ export function HerApp() {
     setImagePrecomposed(false);
     setImageTitle(file.name.replace(/\.[^.]+$/, ""));
     setView("conversation");
+    setImmersiveMode(false);
+    setParticleZoom(1);
     setTurns([]);
     setElapsed(0);
     draftSessionIdRef.current = undefined;
@@ -1325,7 +1339,7 @@ export function HerApp() {
       mode: interactingWithArtwork ? "artwork" : "gallery",
     };
     if (gardenCursorRef.current) gardenCursorRef.current.dataset.active = "true";
-    if (!interactingWithArtwork) strip.setPointerCapture(event.pointerId);
+    strip.setPointerCapture(event.pointerId);
   };
 
   const handleGardenPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1339,8 +1353,12 @@ export function HerApp() {
     const drag = gardenDragRef.current;
     if (drag.pointerId !== event.pointerId) return;
     const delta = event.clientX - drag.startX;
-    if (Math.abs(delta) > 7) drag.moved = true;
-    if (drag.moved) event.currentTarget.scrollLeft = drag.scrollLeft - delta;
+    if (Math.abs(delta) > 5) drag.moved = true;
+    if (drag.moved) {
+      event.preventDefault();
+      suppressGardenOpenUntilRef.current = event.timeStamp + 480;
+      event.currentTarget.scrollLeft = drag.scrollLeft - delta * 1.08;
+    }
   };
 
   const settleGardenSelection = (strip: HTMLDivElement, snap = false) => {
@@ -1367,23 +1385,51 @@ export function HerApp() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    const mode = gardenDragRef.current.mode;
+    const drag = gardenDragRef.current;
+    const totalDelta = event.clientX - drag.startX;
+    const mode = drag.mode;
+    const moved = drag.moved;
     gardenDragRef.current.pointerId = -1;
     gardenDragRef.current.mode = null;
     if (gardenCursorRef.current) gardenCursorRef.current.dataset.active = "false";
-    if (mode) settleGardenSelection(event.currentTarget, true);
+    if (!mode) return;
+    if (moved && Math.abs(totalDelta) > 42) {
+      suppressGardenOpenUntilRef.current = event.timeStamp + 480;
+      focusGardenItem(gardenIndex + (totalDelta < 0 ? 1 : -1));
+      return;
+    }
+    settleGardenSelection(event.currentTarget, true);
   };
 
   const handleGardenWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
     event.preventDefault();
-    event.currentTarget.scrollLeft += event.deltaY;
-    const strip = event.currentTarget;
-    if (gardenWheelTimerRef.current) window.clearTimeout(gardenWheelTimerRef.current);
-    gardenWheelTimerRef.current = window.setTimeout(() => {
-      settleGardenSelection(strip, true);
-      gardenWheelTimerRef.current = null;
-    }, 160);
+    const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+      ? event.deltaY
+      : event.deltaX;
+    const now = event.timeStamp;
+    if (now < gardenWheelLockRef.current) {
+      gardenWheelDeltaRef.current = 0;
+      return;
+    }
+    gardenWheelDeltaRef.current += delta;
+    if (Math.abs(gardenWheelDeltaRef.current) < 24) return;
+    const direction = gardenWheelDeltaRef.current > 0 ? 1 : -1;
+    gardenWheelDeltaRef.current = 0;
+    gardenWheelLockRef.current = now + 360;
+    suppressGardenOpenUntilRef.current = now + 520;
+    focusGardenItem(gardenIndex + direction);
+  };
+
+  const handleParticleWheel = (event: ReactWheelEvent<HTMLElement>) => {
+    if (view !== "conversation") return;
+    const target = event.target as HTMLElement;
+    if (target.closest("input, textarea, select, button, [role='dialog']")) return;
+    event.preventDefault();
+    const delta = Math.max(-180, Math.min(180, event.deltaY));
+    setParticleZoom((current) => Math.max(
+      0.55,
+      Math.min(2.5, current * Math.exp(-delta * 0.0017)),
+    ));
   };
 
   const focusGardenItem = (index: number) => {
@@ -1395,8 +1441,15 @@ export function HerApp() {
       ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   };
 
-  const openGardenConversation = (item = gardenItems[gardenIndex]) => {
-    if (!item || gardenDragRef.current.moved) {
+  const openGardenConversation = (
+    item = gardenItems[gardenIndex],
+    eventTime = Number.POSITIVE_INFINITY,
+  ) => {
+    if (
+      !item ||
+      gardenDragRef.current.moved ||
+      eventTime < suppressGardenOpenUntilRef.current
+    ) {
       gardenDragRef.current.moved = false;
       return;
     }
@@ -1418,6 +1471,8 @@ export function HerApp() {
     setReplyState("ready");
     setConversationFromGarden(true);
     setConversationChromeVisible(false);
+    setImmersiveMode(false);
+    setParticleZoom(1);
     if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
     revealTimerRef.current = window.setTimeout(() => {
       setConversationChromeVisible(true);
@@ -1450,6 +1505,7 @@ export function HerApp() {
   }, [deleteTarget, deleting, flashNotice, refreshSavedCards]);
 
   const navigateTo = (nextView: View) => {
+    setImmersiveMode(false);
     if (nextView !== "conversation" && (replyState === "listening" || captureStartingRef.current)) {
       void stopListening(false);
     }
@@ -1469,7 +1525,7 @@ export function HerApp() {
   };
 
   return (
-    <main className={`${styles.app} ${view === "garden" ? styles.gardenMode : ""}`}>
+    <main className={`${styles.app} ${view === "garden" ? styles.gardenMode : ""} ${immersiveMode ? styles.immersiveMode : ""}`}>
       <header className={styles.header}>
         <button className={styles.wordmark} onClick={() => navigateTo("conversation")} aria-label="Open conversation">
           <span className={styles.wordmarkDot} /> Her
@@ -1486,7 +1542,11 @@ export function HerApp() {
       </header>
 
       {(view === "conversation" || view === "salon") && (
-        <section className={styles.stage} aria-label={view === "salon" ? "AI Salon stage" : "Conversation stage"}>
+        <section
+          className={`${styles.stage} ${immersiveMode ? styles.immersiveStage : ""}`}
+          onWheel={handleParticleWheel}
+          aria-label={view === "salon" ? "AI Salon stage" : "Conversation stage"}
+        >
           <Suspense fallback={<img className={styles.particleLoading} src={imageUrl} alt="" aria-hidden="true" />}>
             <ParticleGarden
               imageUrl={imageUrl}
@@ -1494,6 +1554,7 @@ export function HerApp() {
               audioBands={audioBands}
               interactionStrength={interactionStrength}
               imageClarity={imageClarity}
+              zoom={view === "conversation" ? particleZoom : 1}
               precomposed={imagePrecomposed}
               tuning={particleTuning}
               className={styles.particleCanvas}
@@ -1501,6 +1562,22 @@ export function HerApp() {
             />
           </Suspense>
           <div className={styles.vignette} />
+          {view === "conversation" && (
+            <button
+              className={styles.immersiveToggle}
+              onClick={() => {
+                setSettingsOpen(false);
+                setImmersiveMode((current) => !current);
+              }}
+              aria-pressed={immersiveMode}
+              aria-label={immersiveMode ? "Show interface" : "Hide interface for immersive view"}
+              title="Mouse wheel zooms the particle image"
+            >
+              <span className={styles.immersiveIcon} aria-hidden="true" />
+              <span>{immersiveMode ? "Show interface" : "Hide interface"}</span>
+              <small>{Math.round(particleZoom * 100)}%</small>
+            </button>
+          )}
           {(view === "salon" || !conversationFromGarden || conversationChromeVisible) && (
             <div className={`${styles.providerPill} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
               <span className={replyState === "speaking" ? styles.liveWave : styles.providerGlyph}>{replyState === "speaking" ? "≋" : "×"}</span>
@@ -1617,7 +1694,6 @@ export function HerApp() {
                 onPointerUpCapture={handleGardenPointerUp}
                 onPointerCancelCapture={handleGardenPointerUp}
                 onWheel={handleGardenWheel}
-                onScroll={(event) => settleGardenSelection(event.currentTarget)}
                 onPointerLeave={() => {
                   if (gardenDragRef.current.pointerId === -1 && gardenCursorRef.current) {
                     gardenCursorRef.current.style.opacity = "0";
@@ -1642,30 +1718,42 @@ export function HerApp() {
                         "--garden-mobile-left": `${2 + index * 72}vw`,
                         "--garden-top": `${index % 4 === 0 ? 1 : index % 4 === 1 ? 7 : index % 4 === 2 ? 3 : 10}%`,
                       } as CSSProperties}
-                      onClick={() => openGardenConversation(item)}
+                      onClick={() => {
+                        if (index !== gardenIndex) {
+                          suppressGardenOpenUntilRef.current = event.timeStamp + 320;
+                          focusGardenItem(index);
+                          return;
+                        }
+                        openGardenConversation(item, event.timeStamp);
+                      }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
-                          openGardenConversation(item);
+                          if (index !== gardenIndex) focusGardenItem(index);
+                          else openGardenConversation(item, event.timeStamp);
                         }
                       }}
                       role="button"
                       tabIndex={0}
                       aria-label={`Open ${item.title}`}
                     >
-                      <Suspense fallback={<img className={styles.particleLoading} src={item.imageUrl} alt="" aria-hidden="true" />}>
-                        <ParticleGarden
-                          imageUrl={item.imageUrl}
-                          audioLevel={index === gardenIndex ? 0.1 : 0.045}
-                          audioBands={audioBands}
-                          interactionStrength={1.1}
-                          imageClarity={0.82}
-                          precomposed={item.precomposed}
-                          preview
-                          tuning={particleTuning}
-                          className={styles.gardenParticle}
-                        />
-                      </Suspense>
+                      {Math.abs(index - gardenIndex) <= 1 ? (
+                        <Suspense fallback={<img className={styles.particleLoading} src={item.imageUrl} alt="" aria-hidden="true" />}>
+                          <ParticleGarden
+                            imageUrl={item.imageUrl}
+                            audioLevel={index === gardenIndex ? 0.1 : 0.045}
+                            audioBands={audioBands}
+                            interactionStrength={1.1}
+                            imageClarity={0.82}
+                            precomposed={item.precomposed}
+                            preview
+                            tuning={particleTuning}
+                            className={styles.gardenParticle}
+                          />
+                        </Suspense>
+                      ) : (
+                        <img className={styles.gardenDistantImage} src={item.imageUrl} alt="" aria-hidden="true" />
+                      )}
                       <button
                         className={styles.deleteMemoryButton}
                         onClick={(event) => {
@@ -1683,7 +1771,12 @@ export function HerApp() {
               </div>
               <button
                 className={`${styles.gardenArrow} ${styles.gardenArrowLeft}`}
-                onClick={() => focusGardenItem(gardenIndex - 1)}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  suppressGardenOpenUntilRef.current = event.timeStamp + 360;
+                  focusGardenItem(gardenIndex - 1);
+                }}
                 disabled={gardenIndex === 0}
                 aria-label="Previous memory"
               >
@@ -1691,7 +1784,12 @@ export function HerApp() {
               </button>
               <button
                 className={`${styles.gardenArrow} ${styles.gardenArrowRight}`}
-                onClick={() => focusGardenItem(gardenIndex + 1)}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  suppressGardenOpenUntilRef.current = event.timeStamp + 360;
+                  focusGardenItem(gardenIndex + 1);
+                }}
                 disabled={gardenIndex === gardenItems.length - 1}
                 aria-label="Next memory"
               >

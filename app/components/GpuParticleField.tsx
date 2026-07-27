@@ -244,6 +244,7 @@ uniform float uSurfaceLayer;
 uniform float uImageClarity;
 uniform float uDepthStrength;
 uniform vec2 uRotation;
+uniform float uZoom;
 uniform float uTime;
 uniform float uDpr;
 uniform float uAudio;
@@ -371,7 +372,7 @@ void main() {
   );
   vec3 rotatedPosition = rotateField(fieldPosition, uRotation);
   float perspective = clamp(1.0 / (1.0 - rotatedPosition.z * 0.42), 0.58, 1.7);
-  vec2 clipPosition = rotatedPosition.xy * fit * perspective;
+  vec2 clipPosition = rotatedPosition.xy * fit * perspective * uZoom;
   gl_Position = vec4(clipPosition, 0.0, 1.0);
 
   float detached = step(0.0, motion.w);
@@ -380,15 +381,16 @@ void main() {
   float softPulse = 0.94 + sin(uTime * 0.56 + particle.z * 19.0) * 0.06;
   float audioSize = step(-0.5, uReactTarget) * step(uReactTarget, 0.5) * uAudio * 0.08;
   float bloomSize = smoothstep(uBloomThreshold, 1.0, luminance) * uBloomRadius;
+  float zoomPointScale = sqrt(max(uZoom, 0.55));
   float luminousPointSize = clamp(
-    uParticleSize * uDpr * perspective *
+    uParticleSize * uDpr * perspective * zoomPointScale *
       (0.58 + sqrt(max(luminance, 0.0)) * 0.66 + audioSize + bloomSize * 0.34) *
       mix(1.0, 0.76, uHaloLayer),
     0.65 * uDpr,
     7.5 * uDpr
   );
   float surfacePointSize = clamp(
-    uParticleSize * uDpr * perspective *
+    uParticleSize * uDpr * perspective * zoomPointScale *
       (0.46 + sqrt(max(luminance, 0.0)) * 0.27),
     0.62 * uDpr,
     3.1 * uDpr
@@ -511,6 +513,7 @@ type GpuParticleFieldProps = {
   audioBands: AudioBands;
   interactionStrength: number;
   imageClarity: number;
+  zoom: number;
   preview?: boolean;
   onReady?: (pointCount: number) => void;
 };
@@ -601,6 +604,7 @@ function GpuParticleScene({
   audioBands,
   interactionStrength,
   imageClarity,
+  zoom,
   preview = false,
   onReady,
 }: GpuParticleFieldProps) {
@@ -647,6 +651,7 @@ function GpuParticleScene({
   const rotationRef = useRef(new THREE.Vector2(0, 0));
   const rotationTargetRef = useRef(new THREE.Vector2(0, 0));
   const rotationVelocityRef = useRef(new THREE.Vector2(0, 0));
+  const zoomRef = useRef(1);
   const dragRef = useRef({
     active: false,
     pointerId: -1,
@@ -739,6 +744,7 @@ function GpuParticleScene({
     rotationRef.current.set(0, 0);
     rotationTargetRef.current.set(0, 0);
     rotationVelocityRef.current.set(0, 0);
+    zoomRef.current = 1;
   }, [imageUrl]);
 
   const simulationMaterial = useMemo(() => new THREE.RawShaderMaterial({
@@ -842,6 +848,7 @@ function GpuParticleScene({
       uImageClarity: { value: imageClarity },
       uDepthStrength: { value: tuning.depthStrength },
       uRotation: { value: new THREE.Vector2(0, 0) },
+      uZoom: { value: 1 },
       uTime: { value: 0 },
       uDpr: { value: gl.getPixelRatio() },
       uAudio: { value: 0 },
@@ -973,12 +980,14 @@ function GpuParticleScene({
     }
     const rotationBlend = 1 - Math.exp(-delta * 12);
     rotationRef.current.lerp(rotationTargetRef.current, rotationBlend);
+    const zoomBlend = 1 - Math.exp(-delta * 10);
+    zoomRef.current += (clamp(zoom, 0.55, 2.5) - zoomRef.current) * zoomBlend;
 
     const simUniforms = simulationMaterial.uniforms;
     simUniforms.uPositionState.value = positionTextureRef.current;
     simUniforms.uVelocityState.value = velocityTextureRef.current;
     simUniforms.uViewport.value.set(size.width, size.height);
-    simUniforms.uFit.value.set(fitX, fitY);
+    simUniforms.uFit.value.set(fitX * zoomRef.current, fitY * zoomRef.current);
     simUniforms.uTime.value = state.clock.elapsedTime;
     simUniforms.uDelta.value = Math.min(delta, 0.05) * (preview ? 2 : 1);
     simUniforms.uPeelThreshold.value = tuning.peelThreshold;
@@ -1052,6 +1061,7 @@ function GpuParticleScene({
       pointUniforms.uImageClarity.value = imageClarity;
       pointUniforms.uDepthStrength.value = tuning.depthStrength;
       pointUniforms.uRotation.value.copy(rotationRef.current);
+      pointUniforms.uZoom.value = zoomRef.current;
       pointUniforms.uTime.value = state.clock.elapsedTime;
       pointUniforms.uDpr.value = gl.getPixelRatio();
       pointUniforms.uAudio.value = smoothed.level;

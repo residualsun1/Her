@@ -27,6 +27,7 @@ export interface ParticleGardenProps {
   audioBands?: AudioBands;
   interactionStrength?: number;
   imageClarity?: number;
+  zoom?: number;
   precomposed?: boolean;
   preview?: boolean;
   tuning?: Partial<ParticleTuning>;
@@ -40,6 +41,7 @@ export function ParticleGarden({
   audioBands = { bass: 0, mid: 0, treble: 0 },
   interactionStrength = 1,
   imageClarity = 0.82,
+  zoom = 1,
   precomposed = false,
   preview = false,
   tuning,
@@ -128,6 +130,7 @@ export function ParticleGarden({
             audioBands={audioBands}
             interactionStrength={interactionStrength}
             imageClarity={imageClarity}
+            zoom={zoom}
             preview={preview}
             onReady={(pointCount) => {
               setReadyKey(renderKey);
