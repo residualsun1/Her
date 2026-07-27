@@ -1760,7 +1760,7 @@ export function HerApp() {
           <div className={styles.settingsSectionLabel}><span>声音律动</span></div>
           <label>律动强度 <output>{particleTuning.danceStrength.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.danceStrength} onChange={(event) => updateParticleTuning("danceStrength", Number(event.target.value))} /></label>
           <label>景深波动 <output>{particleTuning.depthWave.toFixed(1)}</output><input type="range" min="0" max="10" step="0.5" value={particleTuning.depthWave} onChange={(event) => updateParticleTuning("depthWave", Number(event.target.value))} /></label>
-          <label>主体细节 <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.45" max="0.92" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
+          <label>画面保真 <output>{imageClarity.toFixed(2)}</output><input type="range" min="0.38" max="0.96" step="0.01" value={imageClarity} onChange={(event) => setImageClarity(Number(event.target.value))} /></label>
           <p className={styles.synthDisclosure}>{providerMode === "mock" ? "当前为离线预览模式，不会调用外部模型。" : "当前为实时文字模式。"}此 Demo 暂时使用浏览器合成语音；配置流式语音服务后可替换为更丰富的 AI 音色。</p>
         </aside>
       )}

@@ -69,7 +69,7 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /粒子扩散/);
   assert.match(herApp, /粒子大小/);
   assert.match(herApp, /流动速度/);
-  assert.match(herApp, /主体细节/);
+  assert.match(herApp, /画面保真/);
   assert.match(herApp, /鼠标力场强度/);
   assert.match(herApp, /辉光强度/);
   assert.match(herApp, /拖尾长度/);

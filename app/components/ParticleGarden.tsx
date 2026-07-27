@@ -271,7 +271,8 @@ void main() {
   liftedColor = max(rotateHue(liftedColor, hueAngle), vec3(0.0));
   float shimmer = 0.88 + 0.12 * sin(uTime * 0.82 + aMeta.x * TAU);
   float surfaceOpacity = mix(0.82 + uSubjectDetail * 0.17, 0.92, 1.0 - core);
-  float envelopeOpacity = mix(imageEnvelope, max(imageEnvelope, 0.44), aMeta.w);
+  float preservedEnvelope = 0.68 + imageEnvelope * 0.32;
+  float envelopeOpacity = mix(preservedEnvelope, max(preservedEnvelope, 0.76), aMeta.w);
   vColor = vec4(liftedColor * shimmer, aColor.a * surfaceOpacity * envelopeOpacity);
   vHalo = aMeta.w;
   vSpark = clamp(aMeta.z + audioPulse * 0.58 + ring * uPointer.z * 0.72, 0.0, 1.0);
@@ -318,6 +319,117 @@ void main() {
 }
 `;
 
+const IMAGE_VERTEX_SHADER = `#version 300 es
+precision highp float;
+
+layout(location = 0) in vec2 aPosition;
+out vec2 vUv;
+
+void main() {
+  vUv = aPosition * 0.5 + 0.5;
+  gl_Position = vec4(aPosition, 0.0, 1.0);
+}
+`;
+
+const IMAGE_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+
+uniform sampler2D uImage;
+uniform vec2 uTextureSize;
+uniform vec2 uViewport;
+uniform float uImageAspect;
+uniform float uTime;
+uniform float uAudio;
+uniform float uClarity;
+uniform float uInteraction;
+uniform float uMouseRadius;
+uniform vec3 uPointer;
+uniform vec2 uDrag;
+
+out vec4 outColor;
+
+float hash(vec2 value) {
+  vec3 p3 = fract(vec3(value.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+void main() {
+  float viewportAspect = max(uViewport.x / max(uViewport.y, 1.0), 0.001);
+  vec2 uv = vUv;
+  float inside = 1.0;
+
+  if (uImageAspect > viewportAspect) {
+    float coverage = viewportAspect / uImageAspect;
+    uv.y = (vUv.y - (1.0 - coverage) * 0.5) / max(coverage, 0.001);
+    inside *= step(0.0, uv.y) * step(uv.y, 1.0);
+  } else {
+    float coverage = uImageAspect / viewportAspect;
+    uv.x = (vUv.x - (1.0 - coverage) * 0.5) / max(coverage, 0.001);
+    inside *= step(0.0, uv.x) * step(uv.x, 1.0);
+  }
+
+  if (inside < 0.5) {
+    discard;
+  }
+
+  vec2 screen = vUv * 2.0 - 1.0;
+  screen.x *= viewportAspect;
+  vec2 pointer = vec2(uPointer.x * viewportAspect, uPointer.y);
+  vec2 delta = screen - pointer;
+  float distanceToPointer = max(length(delta), 0.0001);
+  vec2 direction = delta / distanceToPointer;
+  vec2 tangent = vec2(-direction.y, direction.x);
+  float radius = max((uMouseRadius * 2.0) / max(min(uViewport.x, uViewport.y), 1.0), 0.035);
+  float field = exp(-pow(distanceToPointer / radius, 2.0) * 1.45) * uPointer.z;
+  float ring = exp(-pow((distanceToPointer - radius * 0.56) / max(radius * 0.16, 0.001), 2.0)) * uPointer.z;
+
+  vec2 imageWarp = (
+    direction * field * 0.008 +
+    tangent * field * 0.011 * sin(uTime * 1.7 + distanceToPointer * 28.0)
+  ) * uInteraction;
+  imageWarp += vec2(
+    sin((uv.y + uTime * 0.025) * 17.0),
+    cos((uv.x - uTime * 0.021) * 15.0)
+  ) * 0.00055 * (1.0 - uClarity);
+
+  vec2 sampleUv = clamp(uv + imageWarp, vec2(0.001), vec2(0.999));
+  vec2 texel = 1.0 / max(uTextureSize, vec2(1.0));
+  vec4 center = texture(uImage, sampleUv);
+  vec3 shifted = vec3(
+    texture(uImage, clamp(sampleUv + direction * ring * texel * 3.0, vec2(0.001), vec2(0.999))).r,
+    center.g,
+    texture(uImage, clamp(sampleUv - direction * ring * texel * 3.0, vec2(0.001), vec2(0.999))).b
+  );
+
+  vec3 dx = texture(uImage, clamp(sampleUv + vec2(texel.x * 1.5, 0.0), vec2(0.001), vec2(0.999))).rgb
+    - texture(uImage, clamp(sampleUv - vec2(texel.x * 1.5, 0.0), vec2(0.001), vec2(0.999))).rgb;
+  vec3 dy = texture(uImage, clamp(sampleUv + vec2(0.0, texel.y * 1.5), vec2(0.001), vec2(0.999))).rgb
+    - texture(uImage, clamp(sampleUv - vec2(0.0, texel.y * 1.5), vec2(0.001), vec2(0.999))).rgb;
+  float edge = clamp(length(dx) + length(dy), 0.0, 1.0);
+
+  vec2 imageCenter = uv * 2.0 - 1.0;
+  float subject = 1.0 - smoothstep(0.28, 0.92, length(vec2(imageCenter.x * 0.9, (imageCenter.y + 0.08) * 0.76)));
+  float fidelity = smoothstep(0.34, 0.96, uClarity);
+  float dragFade = 1.0 - clamp(length(uDrag), 0.0, 1.0) * 0.72;
+  float dissolve = 1.0 - field * (0.7 + (1.0 - subject) * 0.2);
+  float grain = hash(floor(gl_FragCoord.xy / 1.6) + floor(uTime * 2.0));
+  float livingSurface = mix(0.92, 1.04, grain);
+
+  float alpha = fidelity * (0.1 + subject * 0.28 + edge * 0.22);
+  alpha *= dragFade * dissolve * (1.0 - uAudio * 0.16) * center.a;
+  alpha = clamp(alpha, 0.0, 0.58);
+
+  vec3 color = mix(center.rgb, shifted, ring * 0.56);
+  color = pow(max(color, vec3(0.0)), vec3(0.94));
+  color *= livingSurface * (0.86 + subject * 0.1);
+  color += vec3(0.08, 0.2, 0.34) * ring * edge * 0.42;
+  outColor = vec4(color, alpha);
+}
+`;
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
@@ -353,9 +465,13 @@ function compileShader(
   return shader;
 }
 
-function createProgram(gl: WebGL2RenderingContext) {
-  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-  const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+function createProgram(
+  gl: WebGL2RenderingContext,
+  vertexSource = VERTEX_SHADER,
+  fragmentSource = FRAGMENT_SHADER,
+) {
+  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
+  const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
   const program = gl.createProgram();
 
   if (!program) {
@@ -479,9 +595,6 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
       const envelopeNoise = Math.sin(homeX * 4.1 + seedA * Math.PI * 2) * 0.055
         + Math.cos(homeY * 5.2 + seedB * Math.PI * 2) * 0.045;
       const imageEnvelope = 1 - smoothstep(0.68, 1.04, outerMetric + envelopeNoise);
-      if (imageEnvelope < 0.006) {
-        continue;
-      }
       const visibility = clamp(0.58 + Math.sqrt(luminance) * 0.38, 0.54, 0.98);
 
       pushPoint(
@@ -490,7 +603,7 @@ function sampleImage(image: HTMLImageElement, pointBudget: number) {
         red,
         green,
         blue,
-        sourceAlpha * visibility * Math.pow(imageEnvelope, 0.76),
+        sourceAlpha * visibility * (0.68 + imageEnvelope * 0.32),
         seedA,
         seedB,
         edge,
@@ -617,8 +730,10 @@ export function ParticleGarden({
     }
 
     let program: WebGLProgram;
+    let imageProgram: WebGLProgram;
     try {
       program = createProgram(gl);
+      imageProgram = createProgram(gl, IMAGE_VERTEX_SHADER, IMAGE_FRAGMENT_SHADER);
     } catch (error) {
       console.warn("ParticleGarden could not initialize WebGL2.", error);
       window.setTimeout(() => setShowFallback(true), 0);
@@ -632,10 +747,17 @@ export function ParticleGarden({
 
     const buffer = gl.createBuffer();
     const vertexArray = gl.createVertexArray();
-    if (!buffer || !vertexArray) {
+    const imageBuffer = gl.createBuffer();
+    const imageVertexArray = gl.createVertexArray();
+    const imageTexture = gl.createTexture();
+    if (!buffer || !vertexArray || !imageBuffer || !imageVertexArray || !imageTexture) {
       gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vertexArray);
+      gl.deleteBuffer(imageBuffer);
+      gl.deleteVertexArray(imageVertexArray);
+      gl.deleteTexture(imageTexture);
       gl.deleteProgram(program);
+      gl.deleteProgram(imageProgram);
       return;
     }
 
@@ -649,6 +771,35 @@ export function ParticleGarden({
     gl.enableVertexAttribArray(2);
     gl.vertexAttribPointer(2, 4, gl.FLOAT, false, stride, 6 * Float32Array.BYTES_PER_ELEMENT);
     gl.bindVertexArray(null);
+
+    gl.bindVertexArray(imageVertexArray);
+    gl.bindBuffer(gl.ARRAY_BUFFER, imageBuffer);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+      gl.STATIC_DRAW,
+    );
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+
+    gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      1,
+      1,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      new Uint8Array([0, 0, 0, 0]),
+    );
+    gl.bindTexture(gl.TEXTURE_2D, null);
 
     const uniforms = {
       time: gl.getUniformLocation(program, "uTime"),
@@ -683,12 +834,58 @@ export function ParticleGarden({
       danceStrength: gl.getUniformLocation(program, "uDanceStrength"),
       depthWave: gl.getUniformLocation(program, "uDepthWave"),
     };
+    const imageUniforms = {
+      image: gl.getUniformLocation(imageProgram, "uImage"),
+      textureSize: gl.getUniformLocation(imageProgram, "uTextureSize"),
+      viewport: gl.getUniformLocation(imageProgram, "uViewport"),
+      imageAspect: gl.getUniformLocation(imageProgram, "uImageAspect"),
+      time: gl.getUniformLocation(imageProgram, "uTime"),
+      audio: gl.getUniformLocation(imageProgram, "uAudio"),
+      clarity: gl.getUniformLocation(imageProgram, "uClarity"),
+      interaction: gl.getUniformLocation(imageProgram, "uInteraction"),
+      mouseRadius: gl.getUniformLocation(imageProgram, "uMouseRadius"),
+      pointer: gl.getUniformLocation(imageProgram, "uPointer"),
+      drag: gl.getUniformLocation(imageProgram, "uDrag"),
+    };
 
     gl.clearColor(0, 0, 0, 0);
     gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendEquation(gl.FUNC_ADD);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+    let imageTextureReady = false;
+    let imageTextureWidth = 1;
+    let imageTextureHeight = 1;
+    const uploadImageTexture = (sourceImage: HTMLImageElement) => {
+      const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+      const naturalWidth = Math.max(sourceImage.naturalWidth, 1);
+      const naturalHeight = Math.max(sourceImage.naturalHeight, 1);
+      const scale = Math.min(1, maxTextureSize / Math.max(naturalWidth, naturalHeight));
+      let source: TexImageSource = sourceImage;
+
+      if (scale < 1) {
+        const scaledCanvas = document.createElement("canvas");
+        scaledCanvas.width = Math.max(1, Math.round(naturalWidth * scale));
+        scaledCanvas.height = Math.max(1, Math.round(naturalHeight * scale));
+        const scaledContext = scaledCanvas.getContext("2d", { alpha: true });
+        if (!scaledContext) throw new Error("Unable to prepare the high-resolution image texture.");
+        scaledContext.drawImage(sourceImage, 0, 0, scaledCanvas.width, scaledCanvas.height);
+        source = scaledCanvas;
+        imageTextureWidth = scaledCanvas.width;
+        imageTextureHeight = scaledCanvas.height;
+      } else {
+        imageTextureWidth = naturalWidth;
+        imageTextureHeight = naturalHeight;
+      }
+
+      gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      imageTextureReady = true;
+    };
 
     let dpr = 1;
     const resize = () => {
@@ -789,6 +986,7 @@ export function ParticleGarden({
         }
 
         try {
+          uploadImageTexture(image);
           const budget = choosePointBudget(canvas.clientWidth, canvas.clientHeight, reducedMotion);
           const sampled = sampleImage(image, budget);
           pointCount = sampled.pointCount;
@@ -861,7 +1059,34 @@ export function ParticleGarden({
 
       const dragActivity = clamp(Math.hypot(dragCurrent.x, dragCurrent.y), 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
+      if (imageTextureReady) {
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.useProgram(imageProgram);
+        gl.bindVertexArray(imageVertexArray);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+        gl.uniform1i(imageUniforms.image, 0);
+        gl.uniform2f(imageUniforms.textureSize, imageTextureWidth, imageTextureHeight);
+        gl.uniform2f(imageUniforms.viewport, canvas.width, canvas.height);
+        gl.uniform1f(imageUniforms.imageAspect, imageAspect);
+        gl.uniform1f(imageUniforms.time, elapsed);
+        gl.uniform1f(imageUniforms.audio, currentAudio);
+        gl.uniform1f(imageUniforms.clarity, inputsRef.current.clarity);
+        gl.uniform1f(imageUniforms.interaction, inputsRef.current.interaction);
+        gl.uniform1f(imageUniforms.mouseRadius, inputsRef.current.tuning.mouseRadius * dpr);
+        gl.uniform3f(
+          imageUniforms.pointer,
+          pointerCurrent.x,
+          pointerCurrent.y,
+          pointerCurrent.active,
+        );
+        gl.uniform2f(imageUniforms.drag, dragCurrent.x, dragCurrent.y);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.bindVertexArray(null);
+      }
       if (pointCount > 0) {
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
         gl.useProgram(program);
         gl.bindVertexArray(vertexArray);
         gl.uniform1f(uniforms.time, elapsed);
@@ -959,7 +1184,11 @@ export function ParticleGarden({
       }
       gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vertexArray);
+      gl.deleteBuffer(imageBuffer);
+      gl.deleteVertexArray(imageVertexArray);
+      gl.deleteTexture(imageTexture);
       gl.deleteProgram(program);
+      gl.deleteProgram(imageProgram);
     };
   }, [imageUrl]);
 
