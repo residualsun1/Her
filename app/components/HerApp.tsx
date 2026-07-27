@@ -108,7 +108,7 @@ const PARAMETER_NOTES = {
   peelThreshold: "调低会剥离更多边缘，调高则只影响最明显的轮廓。",
   erosionRate: "调高会加快粒子的剥离与循环速度，调低更像慢动作。",
   emberLifespan: "调高会让离开原位的粒子在空中停留更久。",
-  diffusion: "调高会让粒子偏离原位更远，画面也会更松散。",
+  diffusion: "主要控制边缘粒子的扩散距离；主体会保持稳定，调高后外围更松散。",
   edgePerturbation: "调高会增加边缘粒子的随机抖动和不确定感。",
   edgeScatter: "调高会给边缘粒子更强的向外推力。",
   flowSpeed: "控制整个流场的时间速度；调高后漩涡变化更快。",
@@ -124,8 +124,8 @@ const PARAMETER_NOTES = {
   interactionStrength: "控制鼠标所有作用的总倍率；设为零可关闭交互。",
   mouseRadius: "调高会扩大鼠标影响范围，调低只扰动指针附近粒子。",
   mouseSwirl: "调高会增强鼠标周围的旋转和黑洞涡流感。",
-  mouseRepulsion: "调高会把中心粒子推得更远，形成更明显的空腔。",
-  mouseDepthPull: "调高会让鼠标附近的粒子产生更强的前后拉伸。",
+  mouseRepulsion: "控制波谷周围少量横向推开的力度；过高会削弱主体辨识度。",
+  mouseDepthPull: "控制鼠标波谷的深度与隆起边缘，是悬停立体感的主要参数。",
   contrast: "调高会拉开明暗差异；过高可能丢失暗部细节。",
   hueDrift: "控制颜色可偏移的最大角度；零表示保持原图色彩。",
   colorShiftSpeed: "控制颜色随时间变化的速度，不改变粒子运动速度。",
@@ -135,11 +135,11 @@ const PARAMETER_NOTES = {
   rhythmIntensity: "控制音乐对剥离和基础律动的总体影响。",
   danceStrength: "控制低音推动深度波的幅度，适合表现鼓点。",
   audioBrightnessStrength: "控制音量对亮度的影响；零表示亮度不随音乐变化。",
-  audioBloomStrength: "控制强音时增加的光晕，建议保持低于亮度强度。",
+  audioBloomStrength: "控制强音时外围粒子的光晕，主体区域只会受到很轻的影响。",
   bassGain: "放大低频检测结果；低音较弱的音乐可适当调高。",
   flowReactStrength: "控制音乐对流场速度与幅度的附加影响。",
   depthReactStrength: "控制低音对 Z 轴折叠的影响，过高会产生剧烈翻涌。",
-  sparkleReactStrength: "控制高频触发的星光闪烁，适合旋律和镲片。",
+  sparkleReactStrength: "控制高频触发的边缘星光闪烁，适合旋律和镲片。",
   audioNoiseGate: "调高会忽略较弱声音，可过滤环境底噪和静音杂波。",
   audioDynamicCurve: "低于 1 会放大弱音乐响应，高于 1 会突出强拍。",
   audioAttack: "数值越小，粒子越快随强拍亮起；过小可能产生频闪。",
@@ -334,7 +334,7 @@ export function HerApp() {
   const [audioLevel, setAudioLevel] = useState(0.06);
   const [audioBands, setAudioBands] = useState({ bass: 0.02, mid: 0.015, treble: 0.01 });
   const [interactionStrength, setInteractionStrength] = useState(1.25);
-  const [imageClarity, setImageClarity] = useState(0.72);
+  const [imageClarity, setImageClarity] = useState(0.82);
   const [particleTuning, setParticleTuning] = useState<ParticleTuning>({ ...DEFAULT_PARTICLE_TUNING });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1659,7 +1659,7 @@ export function HerApp() {
                           audioLevel={index === gardenIndex ? 0.1 : 0.045}
                           audioBands={audioBands}
                           interactionStrength={1.1}
-                          imageClarity={0.72}
+                          imageClarity={0.82}
                           precomposed={item.precomposed}
                           preview
                           tuning={particleTuning}
@@ -1869,8 +1869,8 @@ export function HerApp() {
           <label>鼠标力场 <output>{interactionStrength.toFixed(2)}</output><input type="range" min="0" max="2" step="0.05" value={interactionStrength} onChange={(event) => setInteractionStrength(Number(event.target.value))} /><ParameterNote name="interactionStrength" /></label>
           <label>鼠标半径 <output>{particleTuning.mouseRadius.toFixed(0)}px</output><input type="range" min="20" max="240" step="2" value={particleTuning.mouseRadius} onChange={(event) => updateParticleTuning("mouseRadius", Number(event.target.value))} /><ParameterNote name="mouseRadius" /></label>
           <label>涡流强度 <output>{particleTuning.mouseSwirl.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseSwirl} onChange={(event) => updateParticleTuning("mouseSwirl", Number(event.target.value))} /><ParameterNote name="mouseSwirl" /></label>
-          <label>空腔推力 <output>{particleTuning.mouseRepulsion.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseRepulsion} onChange={(event) => updateParticleTuning("mouseRepulsion", Number(event.target.value))} /><ParameterNote name="mouseRepulsion" /></label>
-          <label>深度拉伸 <output>{particleTuning.mouseDepthPull.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseDepthPull} onChange={(event) => updateParticleTuning("mouseDepthPull", Number(event.target.value))} /><ParameterNote name="mouseDepthPull" /></label>
+          <label>波谷横向推力 <output>{particleTuning.mouseRepulsion.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseRepulsion} onChange={(event) => updateParticleTuning("mouseRepulsion", Number(event.target.value))} /><ParameterNote name="mouseRepulsion" /></label>
+          <label>波谷深度 <output>{particleTuning.mouseDepthPull.toFixed(2)}</output><input type="range" min="0" max="2" step="0.02" value={particleTuning.mouseDepthPull} onChange={(event) => updateParticleTuning("mouseDepthPull", Number(event.target.value))} /><ParameterNote name="mouseDepthPull" /></label>
 
           <div className={styles.settingsSectionLabel}><span>色彩与材质</span></div>
           <label>对比度 <output>{particleTuning.contrast.toFixed(1)}</output><input type="range" min="0.7" max="2.2" step="0.1" value={particleTuning.contrast} onChange={(event) => updateParticleTuning("contrast", Number(event.target.value))} /><ParameterNote name="contrast" /></label>

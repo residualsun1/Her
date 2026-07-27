@@ -126,6 +126,9 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(gpu, /surfaceMaterial/);
   assert.match(gpu, /rotateField/);
   assert.match(gpu, /rotationTargetRef/);
+  assert.match(gpu, /centerTrough/);
+  assert.match(gpu, /raisedRim/);
+  assert.match(gpu, /flowWeight = 0\.018/);
   assert.doesNotMatch(gpu, /TEXTURE_CORE_FRAGMENT|textureCoreMaterial/);
   assert.match(gpu, /contentBounds/);
   assert.match(gpu, /smoothstep\(0\.38, 1\.0, age\)/);

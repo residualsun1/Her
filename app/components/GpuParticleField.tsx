@@ -127,7 +127,7 @@ void main() {
   float edgeWeight = smoothstep(threshold - 0.12, threshold + 0.12, edge);
   float stagger = hash21(vUv * 1931.17 + seed);
   float haloParticle = smoothstep(uCoreRetention - 0.08, 1.0, seed);
-  float release = edgeWeight * mix(0.12, 1.0, haloParticle);
+  float release = edgeWeight * mix(0.035, 1.0, haloParticle);
 
   float pace = max(uErosionRate, 0.001);
   if (life < 0.0) {
@@ -141,10 +141,11 @@ void main() {
   float depthWave = sin(home.x * 3.7 + depthPhase + seed * 1.8);
   depthWave *= cos(home.y * 3.1 - depthPhase * 0.73 + seed * 2.7);
   float depthTarget = depthWave * waveAmount * clamp(uDepthStrength / 100.0, 0.0, 1.5) * 0.72;
-  depthTarget *= 0.28 + release * 0.72;
+  depthTarget *= 0.1 + release * 0.9;
 
   vec3 targetHome = vec3(home.xy, depthTarget);
-  velocity += (targetHome - position) * uHomeSpring * frameScale;
+  float springWeight = mix(1.38, 0.72, release);
+  velocity += (targetHome - position) * uHomeSpring * springWeight * frameScale;
 
   float noiseTime = uTime * uFlowSpeed * (0.16 + pace * 0.18) *
     (1.0 + uAudioEnergy * uFlowReactStrength * 0.18);
@@ -153,7 +154,7 @@ void main() {
   noisePoint += vec2(noiseTime, -noiseTime * 0.71);
   vec2 curl = curlNoise(noisePoint);
   float diffusion = clamp(uDiffusion / 1.5, 0.0, 3.0);
-  float flowWeight = 0.08 + release * 0.92;
+  float flowWeight = 0.018 + release * 0.982;
   velocity.xy += curl * uNoiseStrength * uFlowAmplitude * reactiveFlow *
     flowWeight * 0.0028 * frameScale * diffusion;
   velocity.xy += uWind * detached * 0.0018 * frameScale;
@@ -183,12 +184,18 @@ void main() {
   float radius = max((uMouseRadius * 2.0) / max(uViewport.y, 1.0), 0.025);
   float normalizedDistance = pointerDistance / radius;
   float pointerField = (1.0 - smoothstep(0.0, 1.0, normalizedDistance)) * uPointerActive * uPointerForce;
-  float ring = exp(-pow((normalizedDistance - 0.72) / max(uMouseRingWidth, 0.03), 2.0));
+  float ring = exp(-pow((normalizedDistance - 0.66) / max(uMouseRingWidth, 0.03), 2.0));
+  float centerTrough = 1.0 - smoothstep(0.0, 0.54, normalizedDistance);
+  float raisedRim = ring * (1.0 - smoothstep(0.82, 1.0, normalizedDistance));
   vec2 radial = pointerDelta / pointerDistance;
   vec2 tangent = vec2(-radial.y, radial.x);
-  velocity.xy += radial * pointerField * uMouseRepulsion * (0.009 + ring * 0.013) * frameScale;
-  velocity.xy += tangent * pointerField * uMouseSwirl * (0.006 + ring * 0.009) * frameScale;
-  velocity.z += pointerField * uMouseDepthPull * (0.008 + ring * 0.014) * frameScale;
+  velocity.xy += radial * pointerField * uMouseRepulsion *
+    (0.0025 + raisedRim * 0.0055) * frameScale;
+  velocity.xy += tangent * pointerField * uMouseSwirl *
+    (0.0018 + raisedRim * 0.0042) * frameScale;
+  float depthBowl = raisedRim * 0.031 - centerTrough * 0.012;
+  velocity.z += depthBowl * uPointerActive * uPointerForce *
+    uMouseDepthPull * frameScale;
 
   velocity *= pow(clamp(uVelocityDamping, 0.75, 0.999), frameScale);
   position += velocity * frameScale;
@@ -344,6 +351,7 @@ void main() {
   float haloFlutter = sin(uTime * 0.31 + seed * 21.0) * 0.5 + 0.5;
   float trailLength = uHaloWidth * haloBand *
     (0.18 + seed * 0.46 + trailSelector * 1.55);
+  trailLength *= 1.0 + uAudio * (0.22 + trailSelector * 0.9);
   vec2 haloOffset = mix(
     haloDirection,
     plumeDirection,
@@ -381,7 +389,7 @@ void main() {
   );
   float surfacePointSize = clamp(
     uParticleSize * uDpr * perspective *
-      (0.42 + sqrt(max(luminance, 0.0)) * 0.24),
+      (0.46 + sqrt(max(luminance, 0.0)) * 0.27),
     0.62 * uDpr,
     3.1 * uDpr
   );
@@ -400,25 +408,40 @@ void main() {
   surfaceColor *= 1.0 + uAudio * uAudioBrightnessStrength * 0.72;
   color = mix(color, surfaceColor, uSurfaceLayer);
 
-  vColor = color * softPulse;
+  float surfacePulse = 0.99 + sin(uTime * 0.38 + seed * 8.0) * 0.01;
+  vColor = color * mix(softPulse, surfacePulse, uSurfaceLayer);
   float density = pow(max(luminance, 0.012), max(uDensityGamma, 0.1));
   float coreAlpha = source.a * clusterMask * (0.24 + density * 0.92);
   float surfaceAlpha = source.a * clusterMask * uImageClarity *
-    (0.38 + density * 0.5) * (0.88 + hash21(aParticleUv * 613.1) * 0.12);
+    (0.48 + density * 0.48) * (0.9 + hash21(aParticleUv * 613.1) * 0.1);
   float haloAlpha = source.a * haloGate * uHaloDensity *
     (0.16 + density * 0.48 + imageEdge * 0.34) * mix(1.0, decay, detached);
-  vAlpha = mix(
+  haloAlpha *= 1.0 + uAudio * (0.72 + trailSelector * 0.88);
+  float luminousAlpha = mix(
     mix(coreAlpha, haloAlpha, uHaloLayer),
     surfaceAlpha,
     uSurfaceLayer
-  ) * (1.0 + uAudio * 0.12);
+  );
+  float audioAlphaGain = mix(
+    1.0 + uAudio * mix(0.06, 0.82, uHaloLayer),
+    1.0 + uAudio * 0.035,
+    uSurfaceLayer
+  );
+  vAlpha = luminousAlpha * audioAlphaGain;
   vGlow = (
     smoothstep(uBloomThreshold, 1.0, luminance) + imageEdge * 0.28 +
-    detached * 0.12 + uAudio * uAudioBloomStrength
+    detached * 0.12 +
+    uAudio * uAudioBloomStrength * mix(0.22, 1.0, uHaloLayer)
   ) * mix(1.0, 0.22, uSurfaceLayer);
   vSparkle = hash21(aParticleUv * 787.13) * uSparkleAmount *
     (0.35 + 0.65 * sin(uTime * (0.8 + seed) + seed * 31.0) * 0.5 + 0.5);
   vSparkle += hash21(aParticleUv * 1291.37 + seed) * uTreble * uSparkleReactStrength;
+  float sparkleZone = mix(
+    0.2 + imageEdge * 0.8,
+    0.46 + haloBand * 0.74,
+    uHaloLayer
+  );
+  vSparkle *= sparkleZone;
   vSparkle *= 1.0 - uSurfaceLayer;
   vSurface = uSurfaceLayer;
 }

@@ -39,7 +39,7 @@ export function ParticleGarden({
   audioLevel = 0,
   audioBands = { bass: 0, mid: 0, treble: 0 },
   interactionStrength = 1,
-  imageClarity = 0.72,
+  imageClarity = 0.82,
   precomposed = false,
   preview = false,
   tuning,
