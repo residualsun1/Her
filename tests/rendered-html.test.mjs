@@ -131,6 +131,7 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(gpu, /upperHalfMask/);
   assert.match(gpu, /outerRimBand/);
   assert.match(gpu, /lowerDetailAnchor/);
+  assert.equal((gpu.match(/float detailAnchor =/g) ?? []).length, 2);
   assert.match(gpu, /dreamReleaseZone/);
   assert.match(gpu, /uDreamRimWidth/);
   assert.match(gpu, /uWebReach/);

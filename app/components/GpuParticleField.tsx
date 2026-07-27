@@ -405,6 +405,9 @@ void main() {
   float rimStart = clamp(0.91 - uDreamRimWidth, 0.5, 0.86);
   float outerRimBand = smoothstep(rimStart, min(rimStart + 0.15, 0.99), radius);
   float dreamReleaseZone = upperHalfMask * outerRimBand;
+  float lowerDetailAnchor = 1.0 - smoothstep(-0.62, 0.08, home.y);
+  float centralDetailAnchor = 1.0 - smoothstep(0.26, 0.72, radius);
+  float detailAnchor = max(lowerDetailAnchor, centralDetailAnchor * 0.72);
   float webWave = clamp(
     0.5 + 0.5 * (
       sin(angle * uWebFrequency + 1.4) * 0.62 +
