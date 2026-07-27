@@ -14,6 +14,10 @@ export type ParticleTuning = {
   haloDensity: number;
   edgeFeather: number;
   clusterIrregularity: number;
+  dreamRimWidth: number;
+  webReach: number;
+  webTension: number;
+  webFrequency: number;
   densityGamma: number;
   sparkleAmount: number;
   homeSpring: number;
@@ -72,6 +76,10 @@ export const DEFAULT_PARTICLE_TUNING: ParticleTuning = {
   haloDensity: 0.52,
   edgeFeather: 0.27,
   clusterIrregularity: 0.42,
+  dreamRimWidth: 0.2,
+  webReach: 1.15,
+  webTension: 0.62,
+  webFrequency: 5.2,
   densityGamma: 0.75,
   sparkleAmount: 0.12,
   homeSpring: 0.068,

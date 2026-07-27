@@ -36,6 +36,10 @@ uniform float uFlowAmplitude;
 uniform float uDepthStrength;
 uniform float uDepthWave;
 uniform float uCoreRetention;
+uniform float uDreamRimWidth;
+uniform float uWebReach;
+uniform float uWebTension;
+uniform float uWebFrequency;
 uniform float uHomeSpring;
 uniform float uVelocityDamping;
 uniform float uEdgePerturbation;
@@ -135,28 +139,27 @@ void main() {
   float stagger = hash21(vUv * 1931.17 + seed);
   float haloParticle = smoothstep(uCoreRetention - 0.08, 1.0, seed);
   float fieldRadius = length(home.xy / vec2(1.0, 1.08));
-  float upperDreamZone = smoothstep(-0.08, 0.86, home.y);
-  float sideDreamZone = smoothstep(0.48, 0.94, abs(home.x)) *
-    smoothstep(-0.45, 0.72, home.y);
+  float rimAngle = atan(home.y, home.x);
+  float upperHalfMask = smoothstep(-0.16, 0.14, home.y);
+  float rimStart = clamp(0.91 - uDreamRimWidth, 0.5, 0.86);
+  float outerRimBand = smoothstep(rimStart, min(rimStart + 0.15, 0.99), fieldRadius);
   float lowerDetailAnchor = 1.0 - smoothstep(-0.62, 0.08, home.y);
   float centralDetailAnchor = 1.0 - smoothstep(0.26, 0.72, fieldRadius);
   float detailAnchor = max(lowerDetailAnchor, centralDetailAnchor * 0.72);
-  float dreamReleaseZone = clamp(
-    max(upperDreamZone, sideDreamZone * 0.88) * (1.0 - detailAnchor * 0.86),
-    0.0,
-    1.0
-  );
-  float lobeSignal = clamp(
+  float dreamReleaseZone = upperHalfMask * outerRimBand;
+  float webWave = clamp(
     0.5 + 0.5 * (
-      sin(home.x * 8.3 + home.y * 3.1 + 1.4) * 0.58 +
-      sin(home.x * 15.7 - home.y * 2.4 - 0.8) * 0.42
+      sin(rimAngle * uWebFrequency + 1.4) * 0.62 +
+      sin(rimAngle * (uWebFrequency * 0.53 + 1.7) - 0.9) * 0.38
     ),
     0.0,
     1.0
   );
-  float coherentPlume = smoothstep(0.5, 0.82, lobeSignal);
-  float contourEdge = smoothstep(0.58, 0.94, fieldRadius) *
-    dreamReleaseZone * (0.42 + coherentPlume * 0.78);
+  float coherentPlume = pow(webWave, mix(4.8, 2.2, uWebTension));
+  float webBridge = 0.1 + uWebTension * 0.3;
+  float webProfile = webBridge + coherentPlume * (1.0 - webBridge);
+  float contourEdge = outerRimBand * dreamReleaseZone *
+    (0.28 + webProfile * 0.94);
   float releaseEdge = max(edgeWeight, contourEdge);
   float release = releaseEdge * mix(0.055, 1.0, haloParticle) *
     mix(0.07, 1.0, dreamReleaseZone);
@@ -212,17 +215,27 @@ void main() {
 
   vec2 edgeDirection = normalize(home.xy + vec2(0.0001));
   float filamentSelector = pow(hash21(vUv * 2687.41 + seed * 13.0), 3.4);
-  vec2 plumeDirection = normalize(vec2(
-    home.x * 0.28 + (stagger - 0.5) * (0.62 + filamentSelector * 0.8),
-    0.72 + filamentSelector * 0.9 +
-      fieldNoise(vec2(home.x * 2.1, seed * 5.0)) * 0.2
+  vec2 liftedRimDirection = normalize(mix(
+    edgeDirection,
+    normalize(vec2(home.x * 0.38, 0.92)),
+    0.2 + coherentPlume * 0.16
   ));
+  vec2 plumeDirection = normalize(
+    liftedRimDirection +
+    vec2(stagger - 0.5, filamentSelector * 0.42) *
+      (0.12 + filamentSelector * 0.2)
+  );
   vec2 scatterDirection = normalize(mix(
     edgeDirection,
     plumeDirection,
     0.24 + dreamReleaseZone * 0.58 + filamentSelector * 0.16
   ));
-  float plumeForce = mix(0.16, 1.0 + filamentSelector * 1.35, dreamReleaseZone);
+  float plumeForce = mix(
+    0.16,
+    uWebReach * (webProfile * 0.82 + coherentPlume * 1.18 +
+      filamentSelector * 0.42),
+    dreamReleaseZone
+  );
   velocity.xy += scatterDirection * detached * releaseEdge * uEdgeScatter *
     plumeForce * 0.00042 * frameScale;
   velocity.xy += vec2(seed - 0.5, stagger - 0.5) * detached *
@@ -241,7 +254,7 @@ void main() {
     (0.0005 + uDanceStrength * 0.0002) * frameScale;
   velocity.xy += plumeDirection * detached * dreamReleaseZone * beatImpulse *
     (0.00042 + uDanceStrength * 0.00016) *
-    (0.52 + coherentPlume * 0.88) * frameScale;
+    uWebReach * (webBridge * 0.42 + coherentPlume * 1.08) * frameScale;
 
   vec2 pointerOnPlane = uPointer / max(uFit, vec2(0.001));
   float cosYaw = max(cos(uRotation.y), 0.14);
@@ -307,6 +320,10 @@ uniform float uHaloWidth;
 uniform float uHaloDensity;
 uniform float uEdgeFeather;
 uniform float uClusterIrregularity;
+uniform float uDreamRimWidth;
+uniform float uWebReach;
+uniform float uWebTension;
+uniform float uWebFrequency;
 uniform float uDensityGamma;
 uniform float uSparkleAmount;
 uniform float uBloomRadius;
@@ -384,26 +401,21 @@ void main() {
   float seed = particle.w;
   float radius = length(home / vec2(1.0, 1.06));
   float angle = atan(home.y, home.x);
-  float upperDreamZone = smoothstep(-0.08, 0.86, home.y);
-  float sideDreamZone = smoothstep(0.48, 0.94, abs(home.x)) *
-    smoothstep(-0.45, 0.72, home.y);
-  float lowerDetailAnchor = 1.0 - smoothstep(-0.62, 0.08, home.y);
-  float centralDetailAnchor = 1.0 - smoothstep(0.26, 0.72, radius);
-  float detailAnchor = max(lowerDetailAnchor, centralDetailAnchor * 0.72);
-  float dreamReleaseZone = clamp(
-    max(upperDreamZone, sideDreamZone * 0.88) * (1.0 - detailAnchor * 0.86),
-    0.0,
-    1.0
-  );
-  float lobeSignal = clamp(
+  float upperHalfMask = smoothstep(-0.16, 0.14, home.y);
+  float rimStart = clamp(0.91 - uDreamRimWidth, 0.5, 0.86);
+  float outerRimBand = smoothstep(rimStart, min(rimStart + 0.15, 0.99), radius);
+  float dreamReleaseZone = upperHalfMask * outerRimBand;
+  float webWave = clamp(
     0.5 + 0.5 * (
-      sin(home.x * 8.3 + home.y * 3.1 + 1.4) * 0.58 +
-      sin(home.x * 15.7 - home.y * 2.4 - 0.8) * 0.42
+      sin(angle * uWebFrequency + 1.4) * 0.62 +
+      sin(angle * (uWebFrequency * 0.53 + 1.7) - 0.9) * 0.38
     ),
     0.0,
     1.0
   );
-  float coherentPlume = smoothstep(0.5, 0.82, lobeSignal);
+  float coherentPlume = pow(webWave, mix(4.8, 2.2, uWebTension));
+  float webBridge = 0.1 + uWebTension * 0.3;
+  float webProfile = webBridge + coherentPlume * (1.0 - webBridge);
   float audioDreamPulse = pow(clamp(uAudio, 0.0, 1.0), 0.68);
   float contourNoise =
     sin(angle * 3.0 + 1.7) * 0.55 +
@@ -434,27 +446,41 @@ void main() {
     uCoreRetention * contentBounds;
   float clusterMask = max(shapeMask, contentOverride);
 
-  float haloGate = step(1.0 - uHaloDensity, hash21(aParticleUv * 1723.91 + seed));
+  float haloRandom = hash21(aParticleUv * 1723.91 + seed);
+  float haloGate = step(1.0 - uHaloDensity, haloRandom);
+  float webGate = step(
+    1.0 - dreamReleaseZone * (0.16 + uWebTension * 0.36),
+    haloRandom
+  );
+  haloGate = max(haloGate, webGate);
   float haloBand = smoothstep(0.42, 1.02, radius) *
-    mix(0.1, 1.0 + coherentPlume * 0.28, dreamReleaseZone);
+    mix(0.1, 0.72 + webProfile * 0.52, dreamReleaseZone);
   vec2 haloDirection = normalize(home + vec2(0.0001));
   float trailSelector = pow(hash21(aParticleUv * 2309.73 + seed), 2.4);
   float plumeSelector = pow(hash21(aParticleUv * 3181.27 + seed * 17.0), 4.2);
-  vec2 plumeDirection = normalize(vec2(
-    home.x * 0.24 +
-      sin(seed * 31.0 + angle * 1.7) * (0.24 + plumeSelector * 0.68),
-    0.78 + cos(seed * 19.0 - angle) * 0.2 + plumeSelector * 0.76
+  vec2 liftedRimDirection = normalize(mix(
+    haloDirection,
+    normalize(vec2(home.x * 0.38, 0.92)),
+    0.2 + coherentPlume * 0.16
   ));
+  vec2 plumeDirection = normalize(
+    liftedRimDirection +
+    vec2(
+      sin(seed * 31.0 + angle * 1.7),
+      cos(seed * 19.0 - angle)
+    ) * (0.06 + plumeSelector * 0.16)
+  );
   float haloFlutter = sin(uTime * 0.31 + seed * 21.0) * 0.5 + 0.5;
   float trailLength = uHaloWidth * haloBand *
     (0.16 + seed * 0.42 + trailSelector * 1.12 +
-      coherentPlume * dreamReleaseZone * 1.95 +
-      plumeSelector * dreamReleaseZone * 2.35);
+      uWebReach * dreamReleaseZone *
+        (webBridge * 0.68 + webProfile * 1.55 +
+          coherentPlume * 1.72 + plumeSelector * 0.72));
   trailLength *= mix(0.12, 1.08, dreamReleaseZone);
   trailLength *= 1.0 + audioDreamPulse *
     (0.52 + coherentPlume * 0.92 +
       plumeSelector * dreamReleaseZone * 1.55);
-  trailLength = min(trailLength, uHaloWidth * 4.35);
+  trailLength = min(trailLength, uHaloWidth * (1.5 + uWebReach * 3.25));
   vec2 haloOffset = mix(
     haloDirection,
     plumeDirection,
@@ -894,6 +920,10 @@ function GpuParticleScene({
       uDepthStrength: { value: tuning.depthStrength },
       uDepthWave: { value: tuning.depthWave },
       uCoreRetention: { value: tuning.coreRetention },
+      uDreamRimWidth: { value: tuning.dreamRimWidth },
+      uWebReach: { value: tuning.webReach },
+      uWebTension: { value: tuning.webTension },
+      uWebFrequency: { value: tuning.webFrequency },
       uHomeSpring: { value: tuning.homeSpring },
       uVelocityDamping: { value: tuning.velocityDamping },
       uEdgePerturbation: { value: tuning.edgePerturbation },
@@ -962,6 +992,10 @@ function GpuParticleScene({
       uHaloDensity: { value: tuning.haloDensity },
       uEdgeFeather: { value: tuning.edgeFeather },
       uClusterIrregularity: { value: tuning.clusterIrregularity },
+      uDreamRimWidth: { value: tuning.dreamRimWidth },
+      uWebReach: { value: tuning.webReach },
+      uWebTension: { value: tuning.webTension },
+      uWebFrequency: { value: tuning.webFrequency },
       uDensityGamma: { value: tuning.densityGamma },
       uSparkleAmount: { value: tuning.sparkleAmount },
       uHighlightGain: { value: tuning.highlightGain },
@@ -1124,6 +1158,10 @@ function GpuParticleScene({
     simUniforms.uDepthStrength.value = tuning.depthStrength;
     simUniforms.uDepthWave.value = tuning.depthWave;
     simUniforms.uCoreRetention.value = tuning.coreRetention;
+    simUniforms.uDreamRimWidth.value = tuning.dreamRimWidth;
+    simUniforms.uWebReach.value = tuning.webReach;
+    simUniforms.uWebTension.value = tuning.webTension;
+    simUniforms.uWebFrequency.value = tuning.webFrequency;
     simUniforms.uHomeSpring.value = tuning.homeSpring;
     simUniforms.uVelocityDamping.value = tuning.velocityDamping;
     simUniforms.uEdgePerturbation.value = tuning.edgePerturbation;
@@ -1177,6 +1215,10 @@ function GpuParticleScene({
       pointUniforms.uHaloDensity.value = tuning.haloDensity;
       pointUniforms.uEdgeFeather.value = tuning.edgeFeather;
       pointUniforms.uClusterIrregularity.value = tuning.clusterIrregularity;
+      pointUniforms.uDreamRimWidth.value = tuning.dreamRimWidth;
+      pointUniforms.uWebReach.value = tuning.webReach;
+      pointUniforms.uWebTension.value = tuning.webTension;
+      pointUniforms.uWebFrequency.value = tuning.webFrequency;
       pointUniforms.uDensityGamma.value = tuning.densityGamma;
       pointUniforms.uSparkleAmount.value = tuning.sparkleAmount;
       pointUniforms.uHighlightGain.value = tuning.highlightGain;

@@ -104,6 +104,10 @@ const PARAMETER_NOTES = {
   haloDensity: "调高会让外缘更饱满，同时增加粒子叠加亮度。",
   edgeFeather: "调高会让图像到黑色背景的过渡更柔和。",
   clusterIrregularity: "调高可打破原图矩形边缘；过高可能侵蚀主体轮廓。",
+  dreamRimWidth: "只扩展主体上半部的最外围轮廓带；调高会让参与舞动的边缘变厚，过高可能侵入主体。",
+  webReach: "控制粘稠粒子网向外伸出的最大距离；高峰会变长，低谷仍由短粒子网连接。",
+  webTension: "控制高低粒子之间的连续黏连感；调高会抬起低谷，让粒子网更完整、更粘稠。",
+  webFrequency: "控制上半部外轮廓一圈出现多少组长短起伏；调低更宽缓，调高更细密。",
   densityGamma: "调低会保留更多暗部粒子，调高会集中突出明亮区域。",
   peelThreshold: "调低会剥离更多边缘，调高则只影响最明显的轮廓。",
   erosionRate: "调高会加快粒子的剥离与循环速度，调低更像慢动作。",
@@ -1935,6 +1939,10 @@ export function HerApp() {
           <label>星云密度 <output>{particleTuning.haloDensity.toFixed(2)}</output><input type="range" min="0" max="0.8" step="0.01" value={particleTuning.haloDensity} onChange={(event) => updateParticleTuning("haloDensity", Number(event.target.value))} /><ParameterNote name="haloDensity" /></label>
           <label>边缘羽化 <output>{particleTuning.edgeFeather.toFixed(2)}</output><input type="range" min="0.02" max="0.6" step="0.01" value={particleTuning.edgeFeather} onChange={(event) => updateParticleTuning("edgeFeather", Number(event.target.value))} /><ParameterNote name="edgeFeather" /></label>
           <label>轮廓不规则度 <output>{particleTuning.clusterIrregularity.toFixed(2)}</output><input type="range" min="0" max="0.8" step="0.01" value={particleTuning.clusterIrregularity} onChange={(event) => updateParticleTuning("clusterIrregularity", Number(event.target.value))} /><ParameterNote name="clusterIrregularity" /></label>
+          <label>梦境边缘宽度 <output>{particleTuning.dreamRimWidth.toFixed(2)}</output><input type="range" min="0.05" max="0.38" step="0.01" value={particleTuning.dreamRimWidth} onChange={(event) => updateParticleTuning("dreamRimWidth", Number(event.target.value))} /><ParameterNote name="dreamRimWidth" /></label>
+          <label>粒子网伸展 <output>{particleTuning.webReach.toFixed(2)}</output><input type="range" min="0" max="2.5" step="0.05" value={particleTuning.webReach} onChange={(event) => updateParticleTuning("webReach", Number(event.target.value))} /><ParameterNote name="webReach" /></label>
+          <label>粒子网黏度 <output>{particleTuning.webTension.toFixed(2)}</output><input type="range" min="0" max="1" step="0.01" value={particleTuning.webTension} onChange={(event) => updateParticleTuning("webTension", Number(event.target.value))} /><ParameterNote name="webTension" /></label>
+          <label>粒子网起伏 <output>{particleTuning.webFrequency.toFixed(1)}</output><input type="range" min="2" max="10" step="0.1" value={particleTuning.webFrequency} onChange={(event) => updateParticleTuning("webFrequency", Number(event.target.value))} /><ParameterNote name="webFrequency" /></label>
           <label>暗部粒子保留 <output>{particleTuning.densityGamma.toFixed(2)}</output><input type="range" min="0.3" max="1.5" step="0.01" value={particleTuning.densityGamma} onChange={(event) => updateParticleTuning("densityGamma", Number(event.target.value))} /><ParameterNote name="densityGamma" /></label>
 
           <div className={styles.settingsSectionLabel}><span>诗意消散</span></div>
