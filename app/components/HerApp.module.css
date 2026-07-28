@@ -150,7 +150,7 @@
   right: 24px;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   min-height: 38px;
   padding: 0 12px;
   border: 1px solid rgba(255, 255, 255, 0.11) !important;
@@ -181,11 +181,42 @@
 }
 
 .immersiveIcon {
-  width: 13px;
-  height: 13px;
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 3px rgba(5, 7, 8, 0.9);
+  position: relative;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+}
+
+.immersiveIcon i {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-color: currentColor;
+  border-style: solid;
+}
+
+.immersiveIcon i:nth-child(1) {
+  top: 0;
+  left: 0;
+  border-width: 1px 0 0 1px;
+}
+
+.immersiveIcon i:nth-child(2) {
+  top: 0;
+  right: 0;
+  border-width: 1px 1px 0 0;
+}
+
+.immersiveIcon i:nth-child(3) {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 1px 1px;
+}
+
+.immersiveIcon i:nth-child(4) {
+  right: 0;
+  bottom: 0;
+  border-width: 0 1px 1px 0;
 }
 
 .immersiveMode .header {
@@ -214,22 +245,18 @@
 .immersiveStage .immersiveToggle {
   top: 16px;
   right: 16px;
-  width: 32px;
+  width: auto;
+  min-width: 72px;
   min-height: 32px;
-  padding: 0;
+  padding: 0 10px;
   justify-content: center;
-  gap: 0;
+  gap: 8px;
   border-color: transparent !important;
   background: rgba(5, 7, 8, 0.08);
   color: rgba(255, 255, 255, 0.44);
   opacity: 0.08;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-}
-
-.immersiveStage .immersiveToggle > span:not(.immersiveIcon),
-.immersiveStage .immersiveToggle small {
-  display: none;
 }
 
 .immersiveStage .immersiveToggle:hover,
@@ -1668,10 +1695,10 @@
 }
 
 .gardenQuestion {
-  top: 48%;
-  right: 5vw;
+  top: 47%;
+  right: 2.2vw;
   left: auto;
-  width: min(450px, 39vw);
+  width: min(390px, 32vw);
   padding: 8px 4px;
   border: 0;
   background: transparent;
@@ -1687,8 +1714,9 @@
   margin-right: 0;
   margin-left: 0;
   color: rgba(225, 227, 230, 0.53);
-  font-size: clamp(17px, 1.7vw, 22px);
-  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.74), 0 0 26px rgba(0, 0, 0, 0.35);
+  font-size: clamp(15px, 1.35vw, 19px);
+  line-height: 1.72;
+  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.92), 0 0 32px rgba(0, 0, 0, 0.58);
 }
 
 .gardenQuestion .miniWave {
@@ -1792,13 +1820,13 @@
 .deleteMemoryButton,
 .cardDeleteButton {
   position: absolute;
-  z-index: 8;
+  z-index: 30;
   top: 18px;
   right: 20px;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.13) !important;
   border-radius: 50%;
@@ -1808,6 +1836,8 @@
   font-weight: 200;
   line-height: 1;
   opacity: 0;
+  cursor: pointer !important;
+  touch-action: manipulation;
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   transition: opacity 180ms ease, color 180ms ease, border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
@@ -1832,7 +1862,7 @@
 
 .gardenParticleFrame:hover .deleteMemoryButton,
 .gardenParticleFrame:focus-within .deleteMemoryButton {
-  opacity: 0.62;
+  opacity: 0.82;
 }
 
 .galleryPage .uploadMore {
@@ -2137,20 +2167,20 @@
 
   .gardenQuestion {
     top: 43%;
-    right: 18px;
-    width: calc(100vw - 36px);
-    padding: 24px 23px 20px;
-    background: rgba(8, 10, 12, 0.12);
+    right: 12px;
+    width: min(72vw, 330px);
+    padding: 8px 4px;
+    background: transparent;
   }
 
   .gardenQuestion > p {
-    font-size: 22px;
+    font-size: 16px;
   }
 
   .deleteMemoryButton {
-    top: 12px;
-    right: 12px;
-    opacity: 0.5;
+    top: 10px;
+    right: 10px;
+    opacity: 0.86;
   }
 
   .gardenArrow {
@@ -2208,7 +2238,7 @@
 }
 
 .gardenQuestion > p {
-  font-size: clamp(16px, 1.55vw, 21px);
+  font-size: clamp(15px, 1.35vw, 19px);
 }
 
 .cardBody h2 {

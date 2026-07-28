@@ -122,7 +122,11 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /显示界面（Esc）/);
   assert.match(appStyles, /\.immersiveStage \.providerPill,[\s\S]*?animation: none !important/);
   assert.match(appStyles, /\.immersiveStage \.uploadAnother \{[\s\S]*?display: none !important/);
-  assert.match(appStyles, /\.immersiveStage \.immersiveToggle > span:not\(\.immersiveIcon\)/);
+  assert.match(herApp, /immersiveIcon[\s\S]*?<i \/><i \/><i \/><i \/>/);
+  assert.doesNotMatch(herApp, /<span>\{immersiveMode \? "显示界面" : "隐藏界面"\}<\/span>/);
+  assert.doesNotMatch(appStyles, /\.immersiveStage \.immersiveToggle small \{[\s\S]*?display: none/);
+  assert.match(appStyles, /\.gardenQuestion \{[\s\S]*?right: 2\.2vw;[\s\S]*?width: min\(390px, 32vw\)/);
+  assert.match(appStyles, /\.gardenQuestion > p \{[\s\S]*?font-size: clamp\(15px, 1\.35vw, 19px\)/);
   assert.match(herApp, /gardenWheelLockRef/);
   assert.match(herApp, /if \(gardenDragRef\.current\.moved\)/);
   assert.doesNotMatch(herApp, /suppressGardenOpenUntilRef/);
@@ -132,6 +136,9 @@ test("starter preview is removed and project modules are present", async () => {
   assert.doesNotMatch(gardenPointerDown, /setPointerCapture/);
   assert.match(gardenPointerMove, /setPointerCapture/);
   assert.match(herApp, /if \(!moved && mode === "artwork"\) return/);
+  assert.match(herApp, /closest\("button"\)\) return/);
+  assert.match(herApp, /onPointerUp=\{\(event\) => \{[\s\S]*?setDeleteTarget\(\{ kind: "garden", item \}\)/);
+  assert.match(appStyles, /\.deleteMemoryButton,[\s\S]*?width: 44px;[\s\S]*?height: 44px/);
   assert.doesNotMatch(herApp, /onScroll=\{\(event\) => settleGardenSelection/);
   assert.doesNotMatch(herApp, /Dispersion <|Particle Size <|Flow Speed <|Subject Detail <|Mouse Force </);
   assert.match(particle, /@react-three\/fiber/);

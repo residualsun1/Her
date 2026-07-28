@@ -1365,8 +1365,9 @@ export function HerApp() {
               aria-label={immersiveMode ? "显示界面" : "隐藏界面并进入沉浸模式"}
               title={immersiveMode ? "显示界面（Esc）" : "滚动鼠标滚轮可缩放粒子图像"}
             >
-              <span className={styles.immersiveIcon} aria-hidden="true" />
-              <span>{immersiveMode ? "显示界面" : "隐藏界面"}</span>
+              <span className={styles.immersiveIcon} aria-hidden="true">
+                <i /><i /><i /><i />
+              </span>
               <small>{Math.round(particleZoom * 100)}%</small>
             </button>
           )}
@@ -1471,7 +1472,8 @@ export function HerApp() {
                         "--garden-mobile-left": `${2 + index * 72}vw`,
                         "--garden-top": `${index % 4 === 0 ? 1 : index % 4 === 1 ? 7 : index % 4 === 2 ? 3 : 10}%`,
                       } as CSSProperties}
-                      onClick={() => {
+                      onClick={(event) => {
+                        if ((event.target as HTMLElement).closest("button")) return;
                         if (gardenDragRef.current.moved) {
                           gardenDragRef.current.moved = false;
                           return;
@@ -1513,11 +1515,20 @@ export function HerApp() {
                       <button
                         className={styles.deleteMemoryButton}
                         onClick={(event) => {
+                          event.preventDefault();
                           event.stopPropagation();
                           setDeleteTarget({ kind: "garden", item });
                         }}
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onPointerUp={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onPointerMove={(event) => event.stopPropagation()}
+                        onPointerUp={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setDeleteTarget({ kind: "garden", item });
+                        }}
                         aria-label={`删除${item.title}`}
                       >
                         <span aria-hidden="true">×</span>
