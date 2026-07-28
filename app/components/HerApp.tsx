@@ -1520,7 +1520,7 @@ export function HerApp() {
                         onPointerUp={(event) => event.stopPropagation()}
                         aria-label={`删除${item.title}`}
                       >
-                        删除
+                        <span aria-hidden="true">×</span>
                       </button>
                     </article>
                   ))}
@@ -1566,7 +1566,9 @@ export function HerApp() {
           ) : (
             <div className={styles.emptyState}><span>这里还很安静</span><p>准备好时上传一张图片，让一段记忆从这里生长。</p></div>
           )}
-          <button className={styles.uploadMore} onClick={() => fileInputRef.current?.click()}>＋ 上传更多</button>
+          <button className={styles.uploadMore} onClick={() => fileInputRef.current?.click()} aria-label="上传更多图片">
+            <span aria-hidden="true">↥</span>
+          </button>
         </section>
       )}
 
@@ -1593,7 +1595,7 @@ export function HerApp() {
                           }}
                             aria-label={`删除${card.title}`}
                           >
-                            删除
+                            <span aria-hidden="true">×</span>
                         </button>
                       )}
                       <img src={card.imageUrl} alt="记忆封面" />

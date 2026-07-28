@@ -105,11 +105,18 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /主体音乐律动/);
   assert.match(herApp, /音乐列表/);
   assert.match(herApp, /\.mp3,.flac/);
+  assert.match(herApp, /aria-label="上传更多图片"[\s\S]*?aria-hidden="true">↥/);
+  assert.match(herApp, /deleteMemoryButton[\s\S]*?aria-hidden="true">×/);
+  assert.match(herApp, /cardDeleteButton[\s\S]*?aria-hidden="true">×/);
+  assert.doesNotMatch(herApp, /＋ 上传更多/);
   assert.doesNotMatch(herApp, /salon/i);
   assert.doesNotMatch(herApp, /api\/translate|点击翻译/);
   assert.doesNotMatch(herApp, /replyActions/);
   assert.match(appStyles, /\.replySpeaking \.miniWave i[\s\S]*?animation: wave/);
   assert.match(appStyles, /\.replyCard \{[\s\S]*?background: transparent/);
+  assert.match(appStyles, /--silver: #e7e8ea/);
+  assert.doesNotMatch(appStyles, /#89f5cf|137,\s*245,\s*207/);
+  assert.match(appStyles, /\.galleryPage \.uploadMore \{[\s\S]*?bottom: 22px;[\s\S]*?left: 50%/);
   assert.match(herApp, /immersiveMode/);
   assert.match(herApp, /隐藏界面/);
   assert.match(herApp, /显示界面（Esc）/);

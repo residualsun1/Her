@@ -45,11 +45,11 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid rgba(137, 245, 207, 0.86);
+  outline: 2px solid rgba(240, 241, 243, 0.86);
   outline-offset: 4px;
 }
 
 ::selection {
-  background: rgba(137, 245, 207, 0.24);
+  background: rgba(240, 241, 243, 0.24);
   color: #fff;
 }
