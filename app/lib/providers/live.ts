@@ -18,12 +18,9 @@ import type {
   MemorySummaryProvider,
   ProviderName,
   SupportedLanguage,
-  TranslationInput,
-  TranslationProvider,
-  TranslationResult,
 } from "./types";
 
-type TextCapability = "chat" | "translation" | "summary";
+type TextCapability = "chat" | "summary";
 type ConversationRole = "user" | "assistant";
 
 interface InternalMessage {
@@ -54,7 +51,6 @@ const JSON_ONLY =
 export class LiveTextProvider
   implements
     ChatProvider,
-    TranslationProvider,
     MemorySummaryProvider
 {
   constructor(
@@ -107,34 +103,6 @@ export class LiveTextProvider
     const chunks = result.text.match(/.{1,24}(?:\s|$)|.{1,24}/gu) ?? [result.text];
     for (const text of chunks) yield { type: "delta", text };
     yield { type: "done", text: result.text };
-  }
-
-  async translate(input: TranslationInput): Promise<TranslationResult> {
-    const sourceLanguage = input.sourceLanguage ?? "auto";
-    const completion = await this.complete({
-      system: `You are a precise literary translator for an intimate memory journal. ${JSON_ONLY}\nSchema: {"translation": string, "sourceLanguage": string, "targetLanguage": string}. Preserve tone and meaning; do not add commentary.`,
-      messages: [
-        {
-          role: "user",
-          text: JSON.stringify({
-            sourceLanguage,
-            targetLanguage: input.targetLanguage,
-            text: input.text,
-          }),
-        },
-      ],
-      json: true,
-      maxTokens: 1_200,
-    });
-    const value = parseJsonObject(completion.text, this.capability, this.provider);
-    return {
-      provider: this.provider,
-      model: completion.model,
-      mock: false,
-      translation: requiredString(value.translation, "translation", this.capability, this.provider),
-      sourceLanguage: optionalString(value.sourceLanguage) ?? sourceLanguage,
-      targetLanguage: optionalString(value.targetLanguage) ?? input.targetLanguage,
-    };
   }
 
   async summarizeMemory(input: MemorySummaryInput): Promise<MemorySummary> {

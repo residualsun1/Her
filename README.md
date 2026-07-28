@@ -80,13 +80,13 @@ Chrome/Edge 对 `MediaRecorder`、Web Speech API 和浏览器合成语音的支�
 HER_PROVIDER_MODE=mock
 ```
 
-该模式使用可重复的本地模拟响应，不调用 DeepSeek、Qwen、OpenAI、Anthropic 或 Gemini，适合先确认页面流程、粒子表现和保存逻辑。AI 回复、总结与翻译都是演示数据；AI 发声则来自浏览器自己的 `speechSynthesis`，不是任何模型供应商的专属音色。
+该模式使用可重复的本地模拟响应，不调用 DeepSeek、Qwen、OpenAI、Anthropic 或 Gemini，适合先确认页面流程、粒子表现和保存逻辑。AI 回复与总结都是演示数据；AI 发声则来自浏览器自己的 `speechSynthesis`，不是任何模型供应商的专属音色。
 
 ## 配置 live 文本模型
 
 项目已经为 DeepSeek、Qwen、OpenAI、Anthropic 和 Gemini 保留独立的服务端适配器。当前可进入 `live` 的能力是：
 
-- 五家供应商：Chat、Translation、Summary 文本生成。
+- 五家供应商：Chat、Summary 中文文本生成。
 - 仅 Qwen：图片理解。
 - 尚未接通：任何供应商的实时 ASR 与流式 TTS。
 
@@ -102,7 +102,6 @@ Copy-Item .env.example .env.local
 HER_PROVIDER_MODE=live
 
 HER_CHAT_PROVIDER=deepseek
-HER_TRANSLATION_PROVIDER=qwen
 HER_SUMMARY_PROVIDER=deepseek
 HER_IMAGE_PROVIDER=qwen
 
@@ -124,7 +123,7 @@ GOOGLE_API_KEY=
 
 `.env.example` 还提供：
 
-- `HER_CHAT_MODEL`、`HER_TRANSLATION_MODEL`、`HER_SUMMARY_MODEL`、`HER_IMAGE_MODEL`：按能力覆盖模型。
+- `HER_CHAT_MODEL`、`HER_SUMMARY_MODEL`、`HER_IMAGE_MODEL`：按能力覆盖模型。
 - `DEEPSEEK_MODEL`、`QWEN_MODEL`、`OPENAI_MODEL`、`ANTHROPIC_MODEL`、`GEMINI_MODEL`：按供应商覆盖默认模型。
 - 各供应商 `*_BASE_URL`：为区域、Workspace 或代理网关指定地址。
 - `HER_PROVIDER_TIMEOUT_MS`：设置上游请求超时，服务端会限制在 5–120 秒之间。

@@ -22,7 +22,7 @@ export async function POST(request: Request): Promise<Response> {
       message: requireString(body.message, "message"),
       history: normalizeHistory(body.history),
       imageContext: normalizeImageContext(body.imageContext),
-      replyLanguage: optionalString(body.replyLanguage, "replyLanguage", 20) ?? "en",
+      replyLanguage: "zh",
     };
     if (body.stream === true) return sseResponse(provider.streamChat(input));
     return Response.json(await provider.completeChat(input), {

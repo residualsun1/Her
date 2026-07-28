@@ -21,7 +21,6 @@ import type {
   ImageContextProvider,
   MemorySummaryProvider,
   ProviderAvailability,
-  TranslationProvider,
   TtsProvider,
 } from "./types";
 import { PROVIDER_NAMES } from "./types";
@@ -30,7 +29,6 @@ type CapabilityAdapter =
   | ChatProvider
   | ImageContextProvider
   | AsrProvider
-  | TranslationProvider
   | TtsProvider
   | MemorySummaryProvider;
 
@@ -52,11 +50,7 @@ function getAdapter(
     if (capability === "image" && provider === "qwen") {
       return new LiveQwenImageProvider();
     }
-    if (
-      capability === "chat" ||
-      capability === "translation" ||
-      capability === "summary"
-    ) {
+    if (capability === "chat" || capability === "summary") {
       return new LiveTextProvider(provider, capability);
     }
   }
@@ -77,12 +71,6 @@ export function getAsrProvider(provider?: unknown): AsrProvider {
   return getAdapter("asr", provider) as AsrProvider;
 }
 
-export function getTranslationProvider(
-  provider?: unknown,
-): TranslationProvider {
-  return getAdapter("translation", provider) as TranslationProvider;
-}
-
 export function getTtsProvider(provider?: unknown): TtsProvider {
   return getAdapter("tts", provider) as TtsProvider;
 }
@@ -98,7 +86,6 @@ export function listCapabilityStatus(): CapabilityStatus[] {
     "chat",
     "image",
     "asr",
-    "translation",
     "tts",
     "summary",
   ];

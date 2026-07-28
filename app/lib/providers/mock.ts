@@ -13,9 +13,6 @@ import type {
   MemorySummaryInput,
   MemorySummaryProvider,
   ProviderName,
-  TranslationInput,
-  TranslationProvider,
-  TranslationResult,
   TtsProvider,
   TtsSynthesisResult,
   TtsStatus,
@@ -62,13 +59,6 @@ const ZH_CHAT_LINES = [
   "你描述它时有一种很轻的温柔。拍下它的时候，你已经开始怀念了吗？",
 ] as const;
 
-const TRANSLATION_PAIRS = new Map<string, string>([
-  [EN_CHAT_LINES[0], ZH_CHAT_LINES[0]],
-  [EN_CHAT_LINES[1], ZH_CHAT_LINES[1]],
-  [EN_CHAT_LINES[2], ZH_CHAT_LINES[2]],
-  [EN_CHAT_LINES[3], ZH_CHAT_LINES[3]],
-]);
-
 function mockMeta(provider: ProviderName) {
   return { provider, model: MOCK_MODEL, mock: true as const };
 }
@@ -78,7 +68,6 @@ export class MockProvider
     ImageContextProvider,
     AsrProvider,
     ChatProvider,
-    TranslationProvider,
     TtsProvider,
     MemorySummaryProvider
 {
@@ -140,25 +129,6 @@ export class MockProvider
     const chunks = result.text.match(/.{1,18}(?:\s|$)|.{1,18}/gu) ?? [result.text];
     for (const text of chunks) yield { type: "delta", text };
     yield { type: "done", text: result.text };
-  }
-
-  async translate(input: TranslationInput): Promise<TranslationResult> {
-    const exact = TRANSLATION_PAIRS.get(input.text);
-    let translation: string;
-    if (isChineseLanguage(input.targetLanguage)) {
-      translation = exact ?? `【演示翻译】${input.text}`;
-    } else {
-      const reverse = [...TRANSLATION_PAIRS.entries()].find(
-        ([, chinese]) => chinese === input.text,
-      );
-      translation = reverse?.[0] ?? `[Demo translation] ${input.text}`;
-    }
-    return {
-      ...mockMeta(this.provider),
-      translation,
-      sourceLanguage: input.sourceLanguage ?? "auto",
-      targetLanguage: input.targetLanguage,
-    };
   }
 
   async getTtsStatus(): Promise<TtsStatus> {

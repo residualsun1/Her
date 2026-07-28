@@ -12,7 +12,6 @@ export type Capability =
   | "chat"
   | "image"
   | "asr"
-  | "translation"
   | "tts"
   | "summary";
 
@@ -106,22 +105,6 @@ export type ChatStreamEvent =
 export interface ChatProvider {
   completeChat(input: ChatInput): Promise<ChatResult>;
   streamChat(input: ChatInput): AsyncIterable<ChatStreamEvent>;
-}
-
-export interface TranslationInput {
-  text: string;
-  targetLanguage: SupportedLanguage;
-  sourceLanguage?: SupportedLanguage;
-}
-
-export interface TranslationResult extends ProviderMeta {
-  translation: string;
-  sourceLanguage: SupportedLanguage;
-  targetLanguage: SupportedLanguage;
-}
-
-export interface TranslationProvider {
-  translate(input: TranslationInput): Promise<TranslationResult>;
 }
 
 export interface TtsVoiceProfile {

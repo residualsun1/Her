@@ -41,9 +41,9 @@ test("mock provider routes keep the demo runnable without API keys", async () =>
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      message: "This picture reminds me of home.",
+      message: "这张图片让我想起家。",
       provider: "deepseek",
-      replyLanguage: "en",
+      replyLanguage: "zh",
     }),
   });
   assert.equal(chatResponse.status, 200);
@@ -106,6 +106,10 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /音乐列表/);
   assert.match(herApp, /\.mp3,.flac/);
   assert.doesNotMatch(herApp, /salon/i);
+  assert.doesNotMatch(herApp, /api\/translate|点击翻译/);
+  assert.doesNotMatch(herApp, /replyActions/);
+  assert.match(appStyles, /\.replySpeaking \.miniWave i[\s\S]*?animation: wave/);
+  assert.match(appStyles, /\.replyCard \{[\s\S]*?background: transparent/);
   assert.match(herApp, /immersiveMode/);
   assert.match(herApp, /隐藏界面/);
   assert.match(herApp, /显示界面（Esc）/);

@@ -30,7 +30,6 @@ type ChatTurn = {
   id: string;
   role: "user" | "assistant";
   original: string;
-  translation?: string;
   language: "en" | "zh";
   createdAt: number;
   audioBlob?: Blob;
@@ -268,7 +267,6 @@ export function HerApp() {
     "deepseek", "qwen", "openai", "anthropic", "gemini",
   ].map((name) => ({ provider: name, configured: true, liveAdapterImplemented: true })));
   const [voiceStyle, setVoiceStyle] = useState("intimate");
-  const [replyLanguage, setReplyLanguage] = useState<"en" | "zh">("zh");
   const [visionEnabled, setVisionEnabled] = useState(true);
   const [saveVoice, setSaveVoice] = useState(true);
   const [imageContext, setImageContext] = useState<{ description: string; possibleTopics: string[] } | null>({
@@ -482,7 +480,7 @@ export function HerApp() {
         return;
       }
       stopSpeechPlayback();
-      const spokenLanguage = languageOverride ?? replyLanguage;
+      const spokenLanguage = languageOverride ?? "zh";
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = window.speechSynthesis
         .getVoices()
@@ -512,7 +510,7 @@ export function HerApp() {
       };
       window.speechSynthesis.speak(utterance);
     },
-    [replyLanguage, stopSpeechPlayback, voiceStyle],
+    [stopSpeechPlayback, voiceStyle],
   );
 
   const playTurn = useCallback((turn: ChatTurn) => {
@@ -533,24 +531,6 @@ export function HerApp() {
     audio.onerror = finish;
     void audio.play().catch(finish);
   }, [speak, stopSpeechPlayback]);
-
-  const translateTurn = useCallback(async (turnId: string) => {
-    const target = replyLanguage === "en" ? "zh" : "en";
-    const turn = turns.find((item) => item.id === turnId);
-    if (!turn || turn.translation) return;
-    try {
-      const response = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: turn.original, sourceLanguage: turn.language, targetLanguage: target, provider }),
-      });
-      const result = (await response.json()) as { translation?: string };
-      if (!result.translation) throw new Error("translation unavailable");
-      setTurns((items) => items.map((item) => (item.id === turnId ? { ...item, translation: result.translation } : item)));
-    } catch {
-      flashNotice("翻译服务暂不可用，请检查模型配置。");
-    }
-  }, [flashNotice, provider, replyLanguage, turns]);
 
   const submitMessage = useCallback(
     async (raw: string, audioBlob?: Blob) => {
@@ -578,20 +558,18 @@ export function HerApp() {
           body: JSON.stringify({
             message,
             provider,
-            replyLanguage,
+            replyLanguage: "zh",
             imageContext: imageContext ?? undefined,
             history: nextTurns.slice(-10).map((turn) => ({ role: turn.role, text: turn.original, language: turn.language })),
           }),
         });
         const result = (await response.json()) as { text?: string; error?: { message?: string } };
-        const text = result.text ?? (replyLanguage === "en"
-          ? "I’m here. Tell me what in this image feels most alive to you."
-          : "我在。告诉我，这张图片里什么最像是仍然活着的？");
+        const text = result.text ?? "我在。告诉我，这张图片里什么最像是仍然活着的？";
         const assistantTurn: ChatTurn = {
           id: crypto.randomUUID(),
           role: "assistant",
           original: text,
-          language: replyLanguage,
+          language: "zh",
           createdAt: (elapsed + 1) * 1000,
         };
         setTurns((items) => [...items, assistantTurn]);
@@ -604,7 +582,7 @@ export function HerApp() {
         speak(fallback);
       }
     },
-    [elapsed, imageContext, provider, replyLanguage, replyState, saveVoice, speak, stopSpeechPlayback, turns],
+    [elapsed, imageContext, provider, replyState, saveVoice, speak, stopSpeechPlayback, turns],
   );
 
   const stopRecorder = useCallback(async () => {
@@ -638,12 +616,12 @@ export function HerApp() {
     setAudioLevel(0.05);
     setReplyState("idle");
     const captured = transcriptRef.current.trim();
-    if (submit) await submitMessage(captured || input || (replyLanguage === "en" ? "This picture feels strangely familiar." : "这张照片让我觉得很熟悉。"), blob);
+    if (submit) await submitMessage(captured || input || "这张照片让我觉得很熟悉。", blob);
     else {
       setLiveTranscript("");
       transcriptRef.current = "";
     }
-  }, [input, replyLanguage, stopRecorder, submitMessage]);
+  }, [input, stopRecorder, submitMessage]);
 
   const beginListening = useCallback(async () => {
     if (replyState === "listening" || captureStartingRef.current || mediaRecorderRef.current?.state === "recording") return;
@@ -701,7 +679,7 @@ export function HerApp() {
       }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
       if (SpeechRecognitionCtor) {
         const recognition = new SpeechRecognitionCtor();
-        recognition.lang = replyLanguage === "en" ? "en-US" : "zh-CN";
+        recognition.lang = "zh-CN";
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.onresult = (event) => {
@@ -738,7 +716,7 @@ export function HerApp() {
         flashNotice("语音对话需要麦克风权限。");
       }
     }
-  }, [flashNotice, replyLanguage, replyState, stopListening, stopSpeechPlayback]);
+  }, [flashNotice, replyState, stopListening, stopSpeechPlayback]);
 
   const handleMicPointerDown = () => {
     recordingStartedRef.current = performance.now();
@@ -809,7 +787,7 @@ export function HerApp() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             consent: true,
-            language: replyLanguage,
+            language: "zh",
             image: {
               name: file.name,
               mimeType: file.type,
@@ -828,14 +806,14 @@ export function HerApp() {
     }
     setImageContext(context);
     const welcome = context?.description
-      ? `I keep looking at this: ${context.description} What made you choose it today?`
-      : "I’m looking at the memory with you. What made you choose this image today?";
+      ? `我一直在看这里：${context.description} 今天为什么选择了它？`
+      : "我正和你一起看着这段记忆。今天为什么选择这张图片？";
     const assistantTurn: ChatTurn = {
-      id: crypto.randomUUID(), role: "assistant", original: welcome, language: "en", createdAt: 0,
+      id: crypto.randomUUID(), role: "assistant", original: welcome, language: "zh", createdAt: 0,
     };
     setTurns([assistantTurn]);
     speak(welcome);
-  }, [flashNotice, replyLanguage, replyState, speak, stopListening, stopSpeechPlayback, visionEnabled]);
+  }, [flashNotice, replyState, speak, stopListening, stopSpeechPlayback, visionEnabled]);
 
   const ensureCurrentGarden = useCallback(async () => {
     if (currentGardenIdRef.current) {
@@ -868,10 +846,8 @@ export function HerApp() {
     if (!turns.length || saving) return;
     setSaving(true);
     const now = new Date();
-    const fallbackTitle = replyLanguage === "zh" ? "一段安静的对话" : "A quiet conversation";
-    const fallbackSummary = replyLanguage === "zh"
-      ? "这段对话保留了图片唤起的感受，以及说出口之后仍留在心里的部分。"
-      : "A brief exchange about the image, the feeling behind it, and what remains after speaking.";
+    const fallbackTitle = "一段安静的对话";
+    const fallbackSummary = "这段对话保留了图片唤起的感受，以及说出口之后仍留在心里的部分。";
     try {
       const garden = await ensureCurrentGarden();
       const draftTurns: StoredTurn[] = turns.map((turn) => ({
@@ -881,7 +857,6 @@ export function HerApp() {
         text: {
           original: turn.original,
           originalLanguage: turn.language,
-          ...(turn.language === "en" ? { zh: turn.translation } : { en: turn.translation }),
         },
         offsetStartMs: turn.createdAt,
       }));
@@ -892,7 +867,7 @@ export function HerApp() {
         ? await memoryStore.updateSessionRecord(existingDraft.id, {
             turns: draftTurns,
             durationMs: elapsed * 1000,
-            primaryLanguage: replyLanguage,
+            primaryLanguage: "zh",
             saveStatus: "summarizing",
           })
         : await memoryStore.createSessionRecord({
@@ -904,7 +879,7 @@ export function HerApp() {
             ],
             turns: draftTurns,
             durationMs: elapsed * 1000,
-            primaryLanguage: replyLanguage,
+            primaryLanguage: "zh",
             saveStatus: "summarizing",
           });
       draftSessionIdRef.current = draft.id;
@@ -912,7 +887,7 @@ export function HerApp() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          language: "en",
+          language: "zh",
           provider,
           includeDiary: true,
           turns: turns.map((turn) => ({ role: turn.role, text: turn.original, language: turn.language, timestampMs: turn.createdAt })),
@@ -936,8 +911,8 @@ export function HerApp() {
       await memoryStore.updateSessionRecord(draft.id, {
         saveStatus: "draft",
         summary: {
-          title: { original: nextPreview.title, originalLanguage: replyLanguage },
-          abstract: { original: nextPreview.summary, originalLanguage: replyLanguage },
+          title: { original: nextPreview.title, originalLanguage: "zh" },
+          abstract: { original: nextPreview.summary, originalLanguage: "zh" },
           moodTags: ["reflective", "tender"],
           generatedAt: new Date().toISOString(),
         },
@@ -952,9 +927,7 @@ export function HerApp() {
         imageUrl,
         title: fallbackTitle,
         summary: fallbackSummary,
-        diary: replyLanguage === "zh"
-          ? `今天，我和一张图片待了一会儿。${turns.filter((turn) => turn.role === "user").map((turn) => turn.original).join(" ")}`
-          : `Today I stayed with an image for a while. ${turns.filter((turn) => turn.role === "user").map((turn) => turn.original).join(" ")}`,
+        diary: `今天，我和一张图片待了一会儿。${turns.filter((turn) => turn.role === "user").map((turn) => turn.original).join(" ")}`,
         date: now.toLocaleDateString("zh-CN", { month: "long", day: "2-digit", year: "numeric" }),
         time: now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
         duration: formatClock(elapsed),
@@ -964,7 +937,7 @@ export function HerApp() {
     } finally {
       setSaving(false);
     }
-  }, [elapsed, ensureCurrentGarden, flashNotice, imageUrl, provider, replyLanguage, saving, turns, voiceStyle]);
+  }, [elapsed, ensureCurrentGarden, flashNotice, imageUrl, provider, saving, turns, voiceStyle]);
 
   const confirmPreview = useCallback(async () => {
     if (!preview || confirming) return;
@@ -994,7 +967,6 @@ export function HerApp() {
         text: {
           original: turn.original,
           originalLanguage: turn.language,
-          ...(turn.language === "en" ? { zh: turn.translation } : { en: turn.translation }),
         },
         offsetStartMs: turn.createdAt,
         audioAssetId,
@@ -1008,16 +980,16 @@ export function HerApp() {
       ],
       turns: storedTurns,
       durationMs: elapsed * 1000,
-      primaryLanguage: replyLanguage,
+      primaryLanguage: "zh",
       saveStatus: "ready" as const,
       summary: {
-        title: { original: preview.title, originalLanguage: replyLanguage },
-        abstract: { original: preview.summary, originalLanguage: replyLanguage },
+        title: { original: preview.title, originalLanguage: "zh" },
+        abstract: { original: preview.summary, originalLanguage: "zh" },
         moodTags: ["reflective", "tender"],
         generatedAt: now,
         ...(preview.diary ? {
           diary: {
-            body: { original: preview.diary, originalLanguage: replyLanguage },
+            body: { original: preview.diary, originalLanguage: "zh" },
             generatedAt: now,
           },
         } : {}),
@@ -1052,7 +1024,7 @@ export function HerApp() {
     } finally {
       setConfirming(false);
     }
-  }, [confirming, elapsed, ensureCurrentGarden, flashNotice, preview, refreshSavedCards, replyLanguage, saveVoice, voiceStyle]);
+  }, [confirming, elapsed, ensureCurrentGarden, flashNotice, preview, refreshSavedCards, saveVoice, voiceStyle]);
 
   const pinNewestMemory = useCallback(async (date: string) => {
     const selectedCard = cards[cardIndex];
@@ -1289,10 +1261,8 @@ export function HerApp() {
     setTurns([{
       id: crypto.randomUUID(),
       role: "assistant",
-      original: replyLanguage === "en"
-        ? "I remember this image. What feels different when you return to it now?"
-        : "我记得这张图片。现在重新回到这里，什么感觉变得不一样了？",
-      language: replyLanguage,
+      original: "我记得这张图片。现在重新回到这里，什么感觉变得不一样了？",
+      language: "zh",
       createdAt: 0,
     }]);
     setElapsed(0);
@@ -1414,11 +1384,6 @@ export function HerApp() {
                 <article className={`${styles.replyCard} ${conversationFromGarden ? styles.gardenQuestion : ""} ${replyState === "speaking" ? styles.replySpeaking : ""}`}>
                   <div className={styles.miniWave} aria-hidden="true">{Array.from({ length: 11 }, (_, index) => <i key={index} />)}</div>
                   <p>{currentAssistant.original}</p>
-                  {currentAssistant.translation && <><span className={styles.divider} /><p className={styles.translation}>{currentAssistant.translation}</p></>}
-                  <div className={styles.replyActions}>
-                    {replyState === "ready" && <button onClick={() => playTurn(currentAssistant)}>▶ 重播</button>}
-                    <button onClick={() => void translateTurn(currentAssistant.id)}>{currentAssistant.translation ? "双语" : "点击翻译"}</button>
-                  </div>
                 </article>
               )}
               {replyState === "listening" && liveTranscript && <div className={styles.transcriptCard}>{liveTranscript}</div>}
@@ -1639,8 +1604,8 @@ export function HerApp() {
                         <div className={styles.turnList}>
                           {card.turns.map((turn) => (
                             <div key={turn.id} className={`${styles.turnBubble} ${turn.role === "user" ? styles.userBubble : ""}`}>
-                              {turn.speakerName && <b>{turn.speakerName}</b>}<p>{turn.original}</p>{turn.translation && <small>{turn.translation}</small>}
-                              <button onClick={(event) => { event.stopPropagation(); playTurn(turn); }} aria-label={turn.audioBlob ? "重播已保存语音" : "使用预览语音重播"}>▶</button>
+                              {turn.speakerName && <b>{turn.speakerName}</b>}<p>{turn.original}</p>
+                              <button onClick={(event) => { event.stopPropagation(); playTurn(turn); }} aria-label={turn.audioBlob ? "播放已保存语音" : "播放预览语音"}>▶</button>
                             </div>
                           ))}
                         </div>
@@ -1714,7 +1679,7 @@ export function HerApp() {
                 <div className={styles.previewTop}><div><h2>{preview.title}</h2><span>@你 ∩ 陪伴者 · {preview.duration}</span></div><time>{preview.date}<br />{preview.time}</time></div>
                 <p className={styles.previewSummary}>{preview.summary}</p>
                 {preview.diary && <blockquote className={styles.previewDiary}>{preview.diary}</blockquote>}
-                <div className={styles.previewTurns}>{preview.turns.map((turn) => <div key={turn.id} className={`${styles.turnBubble} ${turn.role === "user" ? styles.userBubble : ""}`}><p>{turn.original}</p>{turn.translation && <small>{turn.translation}</small>}<button onClick={() => playTurn(turn)} aria-label={turn.audioBlob ? "重播已保存语音" : "使用预览语音重播"}>▶</button></div>)}</div>
+                <div className={styles.previewTurns}>{preview.turns.map((turn) => <div key={turn.id} className={`${styles.turnBubble} ${turn.role === "user" ? styles.userBubble : ""}`}><p>{turn.original}</p><button onClick={() => playTurn(turn)} aria-label={turn.audioBlob ? "播放已保存语音" : "播放预览语音"}>▶</button></div>)}</div>
                 <div className={styles.previewActions}><button onClick={() => void confirmPreview()} disabled={confirming} aria-label="保存到回廊">{confirming ? "…" : "✓"}</button><button onClick={() => void navigator.clipboard.writeText(`${preview.title}\n\n${preview.summary}`)} aria-label="复制摘要">▣</button><button onClick={() => setPreview(null)} disabled={confirming} aria-label="关闭预览">×</button></div>
               </>
             ) : null}
@@ -1827,8 +1792,7 @@ export function HerApp() {
 
           <div className={styles.settingsSectionLabel}><span>会话</span></div>
           <label>AI 模型<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providerOptions.map((option) => <option key={option.provider} value={option.provider} disabled={providerMode === "live" && !option.configured}>{providerLabel(option.provider)}{providerMode === "live" && !option.configured ? " · 未配置密钥" : ""}</option>)}</select></label>
-          <label>语音音色<select value={voiceStyle} onChange={(event) => setVoiceStyle(event.target.value)}><option value="intimate">亲密英文</option><option value="reflective">沉思英文</option><option value="bright">明亮英文</option></select></label>
-          <label>回复语言<select value={replyLanguage} onChange={(event) => setReplyLanguage(event.target.value as "en" | "zh")}><option value="en">英文优先</option><option value="zh">中文优先</option></select></label>
+          <label>语音音色<select value={voiceStyle} onChange={(event) => setVoiceStyle(event.target.value)}><option value="intimate">亲密中文</option><option value="reflective">沉思中文</option><option value="bright">明亮中文</option></select></label>
           <label className={styles.toggleRow}><span><b>允许 AI 理解图片</b><small>仅在你同意后发送压缩副本。</small></span><input type="checkbox" checked={visionEnabled} onChange={(event) => setVisionEnabled(event.target.checked)} /></label>
           <label className={styles.toggleRow}><span><b>在本设备保存我的语音</b><small>每轮语音不会上传到云端存储。</small></span><input type="checkbox" checked={saveVoice} onChange={(event) => setSaveVoice(event.target.checked)} /></label>
         </aside>
@@ -1876,7 +1840,6 @@ function storedSessionToCard(session: SessionRecord, imageUrl: string): MemoryCa
       id: turn.id,
       role: turn.role === "user" ? "user" : "assistant",
       original: turn.text.original,
-      translation: turn.text.originalLanguage === "en" ? turn.text.zh : turn.text.en,
       language: turn.text.originalLanguage,
       createdAt: turn.offsetStartMs,
     })),

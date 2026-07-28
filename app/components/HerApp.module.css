@@ -321,6 +321,23 @@
   top: 30%;
   left: 50%;
   width: min(710px, calc(100vw - 40px));
+  text-align: center;
+  transform: translate(-50%, -50%);
+  animation: floatIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.replyCard {
+  width: min(640px, calc(100vw - 44px));
+  padding: 8px 20px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.transcriptCard {
   padding: 38px 52px 26px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 24px;
@@ -329,24 +346,24 @@
     radial-gradient(circle at 18% 68%, rgba(66, 76, 79, 0.22), transparent 38%),
     rgba(6, 7, 8, 0.78);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
-  text-align: center;
-  transform: translate(-50%, -50%);
+  -webkit-backdrop-filter: blur(24px) saturate(115%);
   backdrop-filter: blur(24px) saturate(115%);
-  animation: floatIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .replyCard > p {
-  margin: 16px 0 0;
-  font-family: var(--font-display), Georgia, serif;
-  font-size: clamp(24px, 3vw, 38px);
-  font-weight: 400;
-  line-height: 1.35;
-  letter-spacing: -0.015em;
+  max-width: 580px;
+  margin: 11px auto 0;
+  color: rgba(225, 227, 230, 0.56);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: clamp(17px, 1.72vw, 23px);
+  font-weight: 300;
+  line-height: 1.65;
+  letter-spacing: 0.018em;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.68), 0 0 28px rgba(0, 0, 0, 0.34);
 }
 
-.replySpeaking {
-  border-color: rgba(137, 245, 207, 0.24);
-  box-shadow: 0 28px 100px rgba(31, 104, 87, 0.12);
+.replySpeaking > p {
+  color: rgba(232, 234, 236, 0.64);
 }
 
 .miniWave {
@@ -360,43 +377,18 @@
 .miniWave i {
   width: 1px;
   height: 5px;
-  background: rgba(255, 255, 255, 0.45);
-  animation: wave 1.1s ease-in-out infinite alternate;
+  background: rgba(226, 230, 231, 0.38);
+  transform: scaleY(0.45);
+  transform-origin: center;
 }
 
 .miniWave i:nth-child(3n) { animation-delay: -0.7s; }
 .miniWave i:nth-child(4n) { animation-delay: -0.35s; }
 .miniWave i:nth-child(5n) { height: 12px; }
 
-.divider {
-  display: block;
-  width: 26px;
-  height: 1px;
-  margin: 22px auto 0;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.replyCard .translation {
-  margin-top: 14px;
-  color: rgba(255, 255, 255, 0.57);
-  font-family: var(--font-sans), sans-serif;
-  font-size: 13px;
-  line-height: 1.65;
-}
-
-.replyActions {
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-  margin-top: 20px;
-}
-
-.replyActions button {
-  padding: 6px;
-  background: none;
-  color: rgba(255, 255, 255, 0.34);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+.replySpeaking .miniWave i {
+  background: rgba(225, 233, 231, 0.62);
+  animation: wave 1.1s ease-in-out infinite alternate;
 }
 
 .transcriptCard {
@@ -948,8 +940,8 @@
   .nav button { padding: 9px 8px; font-size: 8px; }
   .iconButton { grid-column: 2; }
   .providerPill { top: 76px; }
-  .replyCard { top: 30%; padding: 28px 24px 22px; border-radius: 19px; }
-  .replyCard > p { font-size: 25px; }
+  .replyCard { top: 30%; padding: 6px 16px; }
+  .replyCard > p { font-size: 18px; }
   .conversationControls { bottom: 69px; }
   .sessionBar { width: 100%; grid-template-columns: 55px minmax(0, 1fr) 42px; gap: 6px; }
   .particleMeta { display: none; }
@@ -978,8 +970,8 @@
 }
 
 @media (max-height: 760px) and (min-width: 821px) {
-  .replyCard { top: 29%; padding-top: 26px; padding-bottom: 20px; }
-  .replyCard > p { font-size: 28px; }
+  .replyCard { top: 29%; padding-top: 6px; padding-bottom: 6px; }
+  .replyCard > p { font-size: 19px; }
   .conversationControls { bottom: 14px; }
   .inputBar { height: 50px; }
   .micButton { width: 42px; height: 42px; }
@@ -1111,7 +1103,6 @@
   letter-spacing: 0.1em;
 }
 
-.replyCard,
 .transcriptCard {
   border-color: rgba(255, 255, 255, 0.17);
   background:
@@ -1123,20 +1114,10 @@
   backdrop-filter: blur(32px) saturate(140%);
 }
 
-.replyCard {
-  border-radius: 28px;
-}
-
 .replyCard > p {
-  letter-spacing: -0.025em;
+  letter-spacing: 0.018em;
 }
 
-.replyCard .translation {
-  color: rgba(245, 245, 247, 0.62);
-  letter-spacing: 0.005em;
-}
-
-.replyActions button,
 .recordingTools button,
 .uploadAnother {
   min-height: 32px;
@@ -1575,10 +1556,6 @@
     top: 74px;
   }
 
-  .replyCard {
-    border-radius: 24px;
-  }
-
   .settingsPanel {
     top: auto;
     right: 0;
@@ -1603,7 +1580,6 @@
   .nav,
   .iconButton,
   .providerPill,
-  .replyCard,
   .transcriptCard,
   .inputBar,
   .timer,
@@ -1636,7 +1612,6 @@
   .nav,
   .iconButton,
   .providerPill,
-  .replyCard,
   .inputBar,
   .memoryCard,
   .calendarCard,
@@ -1683,39 +1658,28 @@
   right: 5vw;
   left: auto;
   width: min(450px, 39vw);
-  padding: 30px 34px 24px;
-  border-color: rgba(255, 255, 255, 0.075);
-  background:
-    radial-gradient(circle at 78% 22%, rgba(116, 85, 105, 0.08), transparent 52%),
-    rgba(8, 10, 12, 0.16);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.035),
-    0 24px 80px rgba(0, 0, 0, 0.16);
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   text-align: left;
   transform: translateY(-50%);
-  -webkit-backdrop-filter: blur(15px) saturate(82%);
-  backdrop-filter: blur(15px) saturate(82%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   animation: questionMistIn 1.15s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .gardenQuestion > p {
-  color: rgba(245, 245, 247, 0.56);
-  font-size: clamp(21px, 2.25vw, 31px);
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.18);
-  filter: blur(0.2px);
-}
-
-.gardenQuestion .miniWave,
-.gardenQuestion .replyActions {
-  justify-content: flex-start;
+  margin-right: 0;
+  margin-left: 0;
+  color: rgba(225, 227, 230, 0.53);
+  font-size: clamp(17px, 1.7vw, 22px);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.74), 0 0 26px rgba(0, 0, 0, 0.35);
 }
 
 .gardenQuestion .miniWave {
+  justify-content: flex-start;
   opacity: 0.48;
-}
-
-.gardenQuestion .replyActions {
-  opacity: 0.58;
 }
 
 .galleryPage {
@@ -2204,11 +2168,13 @@
 }
 
 .replyCard > p {
-  font-size: clamp(20px, 2.35vw, 31px);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif !important;
+  font-size: clamp(17px, 1.72vw, 23px);
+  font-weight: 300 !important;
 }
 
 .gardenQuestion > p {
-  font-size: clamp(18px, 1.9vw, 26px);
+  font-size: clamp(16px, 1.55vw, 21px);
 }
 
 .cardBody h2 {

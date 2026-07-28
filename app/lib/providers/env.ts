@@ -11,7 +11,6 @@ const DEFAULT_PROVIDERS: Record<Capability, ProviderName> = {
   chat: "deepseek",
   image: "qwen",
   asr: "qwen",
-  translation: "qwen",
   tts: "qwen",
   summary: "deepseek",
 };
@@ -20,7 +19,6 @@ const PROVIDER_ENV: Record<Capability, string> = {
   chat: "HER_CHAT_PROVIDER",
   image: "HER_IMAGE_PROVIDER",
   asr: "HER_ASR_PROVIDER",
-  translation: "HER_TRANSLATION_PROVIDER",
   tts: "HER_TTS_PROVIDER",
   summary: "HER_SUMMARY_PROVIDER",
 };
@@ -29,7 +27,6 @@ const MODEL_ENV: Record<Capability, string> = {
   chat: "HER_CHAT_MODEL",
   image: "HER_IMAGE_MODEL",
   asr: "HER_ASR_MODEL",
-  translation: "HER_TRANSLATION_MODEL",
   tts: "HER_TTS_MODEL",
   summary: "HER_SUMMARY_MODEL",
 };
@@ -76,7 +73,6 @@ const DEFAULT_BASE_URLS: Record<ProviderName, string> = {
 
 const TEXT_CAPABILITIES = new Set<Capability>([
   "chat",
-  "translation",
   "summary",
 ]);
 
@@ -172,7 +168,6 @@ export function listLiveCapabilities(provider: ProviderName): Capability[] {
     "chat",
     "image",
     "asr",
-    "translation",
     "tts",
     "summary",
   ];

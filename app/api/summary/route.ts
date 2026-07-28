@@ -18,7 +18,7 @@ export async function POST(request: Request): Promise<Response> {
     const provider = getMemorySummaryProvider(body.provider);
     const result = await provider.summarizeMemory({
       turns: normalizeTurns(body.turns),
-      language: optionalString(body.language, "language", 20) ?? "en",
+      language: "zh",
       includeDiary: body.includeDiary !== false,
     });
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
