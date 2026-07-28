@@ -36,7 +36,7 @@ function normalizeTurns(value: unknown): MemoryTurn[] {
       throw invalidRequest(`turns[${index}] must be an object.`);
     }
     const record = item as Record<string, unknown>;
-    if (!(["user", "assistant", "salon_speaker"] as unknown[]).includes(record.role)) {
+    if (!(["user", "assistant"] as unknown[]).includes(record.role)) {
       throw invalidRequest(`turns[${index}].role is invalid.`);
     }
     return {

@@ -349,8 +349,7 @@
   box-shadow: 0 28px 100px rgba(31, 104, 87, 0.12);
 }
 
-.miniWave,
-.salonWave {
+.miniWave {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -358,20 +357,16 @@
   height: 20px;
 }
 
-.miniWave i,
-.salonWave i {
+.miniWave i {
   width: 1px;
   height: 5px;
   background: rgba(255, 255, 255, 0.45);
   animation: wave 1.1s ease-in-out infinite alternate;
 }
 
-.miniWave i:nth-child(3n),
-.salonWave i:nth-child(3n) { animation-delay: -0.7s; }
-.miniWave i:nth-child(4n),
-.salonWave i:nth-child(4n) { animation-delay: -0.35s; }
-.miniWave i:nth-child(5n),
-.salonWave i:nth-child(5n) { height: 12px; }
+.miniWave i:nth-child(3n) { animation-delay: -0.7s; }
+.miniWave i:nth-child(4n) { animation-delay: -0.35s; }
+.miniWave i:nth-child(5n) { height: 12px; }
 
 .divider {
   display: block;
@@ -611,8 +606,7 @@
 
 .sectionIntro > span,
 .memoryHeader > div > span,
-.musicCopy > span,
-.salonSetup > span {
+.musicCopy > span {
   color: rgba(255, 255, 255, 0.38);
   font-size: 9px;
   letter-spacing: 0.22em;
@@ -620,8 +614,7 @@
 
 .sectionIntro h1,
 .memoryHeader h1,
-.musicCopy h1,
-.salonSetup h1 {
+.musicCopy h1 {
   margin: 12px 0 0;
   font-family: var(--font-display), Georgia, serif;
   font-size: clamp(34px, 4.6vw, 66px);
@@ -850,40 +843,8 @@
 .calendarGrid button small { color: var(--mint); font-size: 8px; }
 .calendarCard > p { margin: 18px 0 0; color: rgba(255, 255, 255, 0.28); text-align: center; font-size: 9px; letter-spacing: 0.1em; }
 
-/* Salon */
-.salonLayer { position: absolute; z-index: 3; inset: 0; display: grid; place-items: center; padding: 105px 28px 90px; }
-.roleRail { position: absolute; top: 48%; left: 28px; display: grid; gap: 16px; transform: translateY(-50%); }
-.roleRail span { position: relative; padding-left: 15px; color: rgba(255, 255, 255, 0.22); font-size: 8px; letter-spacing: 0.17em; transition: 240ms ease; }
-.roleRail span::before { content: ""; position: absolute; top: 3px; left: 0; width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); }
-.roleRail .roleActive { color: #fff; transform: translateX(6px); }
-.roleRail .roleActive::before { background: var(--mint); box-shadow: 0 0 10px var(--mint); }
-
-.salonSetup { width: min(660px, 100%); text-align: center; }
-.salonSetup h1 { font-size: clamp(43px, 6vw, 79px); }
-.topicList { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 28px auto; }
-.topicList button { padding: 9px 14px; border: 1px solid rgba(255, 255, 255, 0.12) !important; border-radius: 999px; background: rgba(0, 0, 0, 0.32); color: rgba(255, 255, 255, 0.42); font-size: 10px; backdrop-filter: blur(10px); }
-.topicList .topicActive { border-color: rgba(137, 245, 207, 0.35) !important; background: rgba(137, 245, 207, 0.08); color: var(--mint); }
-.primaryButton { padding: 13px 23px; border-radius: 999px; background: #e9e5dc; color: #111 !important; font-size: 11px; letter-spacing: 0.1em; }
-
-.salonVoiceCard {
-  width: min(760px, calc(100vw - 56px));
-  padding: 48px 56px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 28px;
-  background: rgba(4, 5, 7, 0.72);
-  box-shadow: 0 35px 100px rgba(0, 0, 0, 0.55);
-  text-align: center;
-  backdrop-filter: blur(22px);
-}
-
-.salonVoiceCard small { display: block; margin-top: 14px; color: var(--mint); font-size: 9px; letter-spacing: 0.18em; }
-.salonVoiceCard p { margin: 16px 0 0; font-family: var(--font-display), Georgia, serif; font-size: clamp(25px, 3.3vw, 43px); line-height: 1.32; }
-.salonVoiceCard em { display: block; margin-top: 18px; color: rgba(255, 255, 255, 0.42); font-size: 12px; font-style: normal; line-height: 1.6; }
-.salonControls { position: absolute; bottom: 32px; display: flex; gap: 8px; }
-.salonControls button { padding: 9px 13px; border: 1px solid rgba(255, 255, 255, 0.1) !important; border-radius: 999px; background: rgba(0, 0, 0, 0.46); color: rgba(255, 255, 255, 0.48); font-size: 9px; }
-
 /* Music */
-.musicPage { display: grid; grid-template-columns: minmax(320px, 0.8fr) minmax(360px, 1fr); grid-template-rows: 1fr auto; align-items: center; gap: 40px; padding-right: 10vw; padding-left: 10vw; }
+.musicPage { display: grid; grid-template-columns: minmax(320px, 0.8fr) minmax(360px, 1fr); align-items: center; gap: 40px; padding-right: 10vw; padding-left: 10vw; }
 .musicOrb { position: relative; display: grid; grid-row: 1 / span 2; place-items: center; width: min(42vw, 520px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 48% 48%, rgba(94, 142, 141, 0.23), rgba(17, 22, 26, 0.52) 36%, transparent 70%); }
 .musicOrb::before,
 .musicOrb::after { content: ""; position: absolute; inset: 12%; border: 1px solid rgba(137, 245, 207, 0.2); border-radius: 42% 58% 64% 36% / 54% 36% 64% 46%; animation: spin 14s linear infinite; box-shadow: 0 0 70px rgba(137, 245, 207, 0.06); }
@@ -891,11 +852,28 @@
 .musicOrb span { color: rgba(255, 255, 255, 0.65); font-size: 48px; }
 .musicCopy { align-self: end; }
 .musicCopy p { max-width: 480px; color: rgba(255, 255, 255, 0.45); font-family: var(--font-display), Georgia, serif; font-size: 16px; line-height: 1.6; }
-.musicPlayer { align-self: start; display: grid; grid-template-columns: 1fr 48px auto; align-items: center; gap: 12px; padding: 14px 14px 14px 18px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; background: rgba(255, 255, 255, 0.035); }
+.musicArea { align-self: start; display: grid; gap: 10px; min-width: 0; }
+.musicPlayer { display: grid; grid-template-columns: 1fr 48px auto; align-items: center; gap: 12px; padding: 14px 14px 14px 18px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; background: rgba(255, 255, 255, 0.035); }
 .musicPlayer div { min-width: 0; }
 .musicPlayer small { display: block; margin-bottom: 5px; color: rgba(255, 255, 255, 0.26); font-size: 8px; letter-spacing: 0.15em; }
 .musicPlayer strong { display: block; overflow: hidden; font-size: 12px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .musicPlayer button { height: 40px; padding: 0 14px; border: 1px solid rgba(255, 255, 255, 0.1) !important; border-radius: 12px; background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.58); font-size: 10px; }
+.musicLibrary { overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; background: rgba(12, 14, 16, 0.52); box-shadow: var(--glass-highlight), 0 18px 46px rgba(0, 0, 0, 0.25); backdrop-filter: blur(22px); }
+.musicLibraryToggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 50px; padding: 0 18px; color: rgba(255, 255, 255, 0.72); font-size: 11px; }
+.musicLibraryToggle span { display: flex; align-items: center; gap: 8px; }
+.musicLibraryToggle small { min-width: 22px; padding: 3px 6px; border-radius: 999px; background: rgba(137, 245, 207, 0.08); color: var(--mint); font-size: 8px; text-align: center; }
+.musicLibraryToggle b { color: rgba(255, 255, 255, 0.34); font-size: 9px; font-weight: 400; }
+.musicTrackList { max-height: min(260px, 30svh); overflow-y: auto; padding: 0 8px 8px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.musicTrackList > p { margin: 0; padding: 20px 10px; color: rgba(255, 255, 255, 0.34); font-size: 10px; line-height: 1.7; }
+.musicTrackList > button { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; width: 100%; min-height: 46px; padding: 0 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.055) !important; color: rgba(255, 255, 255, 0.45); text-align: left; transition: background 180ms ease, color 180ms ease; }
+.musicTrackList > button:last-child { border-bottom: 0 !important; }
+.musicTrackList > button:hover,
+.musicTrackList > button:focus-visible,
+.musicTrackList .musicTrackActive { background: rgba(137, 245, 207, 0.055); color: rgba(255, 255, 255, 0.85); }
+.musicTrackList > button > span { color: rgba(255, 255, 255, 0.22); font-size: 8px; }
+.musicTrackList > button > strong { overflow: hidden; font-size: 10px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.musicTrackList > button > i { color: rgba(255, 255, 255, 0.25); font-size: 8px; font-style: normal; }
+.musicTrackList .musicTrackActive > i { color: var(--mint); }
 
 /* Dialogs and settings */
 .modalBackdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(20px); }
@@ -991,15 +969,11 @@
   .calendarCard { padding: 18px 12px; }
   .calendarGrid > span,
   .calendarGrid > button { min-height: 44px; }
-  .roleRail { top: 112px; right: 18px; left: 18px; display: flex; justify-content: center; gap: 8px; transform: none; }
-  .roleRail span { padding: 0; font-size: 7px; }
-  .roleRail span::before { display: none; }
-  .salonVoiceCard { padding: 34px 22px; }
-  .salonControls { bottom: 72px; }
   .musicPage { display: flex; flex-direction: column; justify-content: center; gap: 24px; padding-right: 28px; padding-left: 28px; }
   .musicOrb { width: min(76vw, 380px); }
   .musicCopy { align-self: auto; }
   .musicCopy h1 { font-size: 42px; }
+  .musicArea,
   .musicPlayer { width: 100%; }
 }
 
@@ -1119,7 +1093,6 @@
 .closeButton,
 .tabSwitch,
 .topicList button,
-.salonControls button,
 .musicPlayer {
   border-color: var(--hairline);
   background-color: rgba(17, 18, 20, 0.6);
@@ -1139,8 +1112,7 @@
 }
 
 .replyCard,
-.transcriptCard,
-.salonVoiceCard {
+.transcriptCard {
   border-color: rgba(255, 255, 255, 0.17);
   background:
     radial-gradient(circle at 82% 28%, rgba(104, 59, 69, 0.2), transparent 38%),
@@ -1155,13 +1127,11 @@
   border-radius: 28px;
 }
 
-.replyCard > p,
-.salonVoiceCard p {
+.replyCard > p {
   letter-spacing: -0.025em;
 }
 
-.replyCard .translation,
-.salonVoiceCard em {
+.replyCard .translation {
   color: rgba(245, 245, 247, 0.62);
   letter-spacing: 0.005em;
 }
@@ -1222,8 +1192,7 @@
 
 .sectionIntro > span,
 .memoryHeader > div > span,
-.musicCopy > span,
-.salonSetup > span {
+.musicCopy > span {
   color: rgba(245, 245, 247, 0.46);
   font-weight: 560;
   letter-spacing: 0.16em;
@@ -1231,8 +1200,7 @@
 
 .sectionIntro h1,
 .memoryHeader h1,
-.musicCopy h1,
-.salonSetup h1 {
+.musicCopy h1 {
   line-height: 1.02;
   letter-spacing: -0.042em;
 }
@@ -1644,7 +1612,6 @@
   .centerMemory,
   .memoryCard,
   .calendarCard,
-  .salonVoiceCard,
   .musicPlayer,
   .modalBackdrop,
   .previewCard,
@@ -2232,8 +2199,7 @@
 }
 
 .memoryHeader h1,
-.musicCopy h1,
-.salonSetup h1 {
+.musicCopy h1 {
   font-size: clamp(28px, 3.55vw, 52px);
 }
 
@@ -2258,7 +2224,6 @@
 .providerPill,
 .cardMeta,
 .memoryHeader > div > span,
-.musicCopy > span,
-.salonSetup > span {
+.musicCopy > span {
   letter-spacing: 0.05em;
 }

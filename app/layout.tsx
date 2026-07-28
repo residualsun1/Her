@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Her — AI Memory Garden",
+  title: "Her — AI 记忆花园",
   description:
-    "An atmospheric bilingual AI voice companion where images become living particle memories.",
-  applicationName: "Her — AI Memory Garden",
+    "让图片化作流动的粒子记忆，在声音与对话中再次相遇。",
+  applicationName: "Her — AI 记忆花园",
   openGraph: {
-    title: "Her — AI Memory Garden",
-    description: "Speak with an image, save the conversation, return to the memory.",
+    title: "Her — AI 记忆花园",
+    description: "与图像对话，保存片刻，再次回到记忆之中。",
     type: "website",
     images: ["/og.png"],
   },

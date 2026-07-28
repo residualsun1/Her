@@ -21,7 +21,7 @@ import styles from "./HerApp.module.css";
 
 const ParticleGarden = lazy(() => import("./ParticleGarden"));
 
-type View = "conversation" | "garden" | "memory" | "salon" | "music";
+type View = "conversation" | "garden" | "memory" | "music";
 type MemoryTab = "cards" | "calendar";
 type ReplyState = "idle" | "listening" | "thinking" | "speaking" | "ready";
 type ProviderOption = { provider: string; configured: boolean; liveAdapterImplemented: boolean };
@@ -48,17 +48,13 @@ type MemoryCard = {
   time: string;
   duration: string;
   pinnedDate?: string;
-  mode: "conversation" | "salon";
   turns: ChatTurn[];
 };
 
-type SalonRole = { id: string; name: string; persona: string; voiceId: string };
-type SalonLine = {
-  speakerId: string;
-  textOriginal: string;
-  textZh?: string;
-  emotion?: string;
-  pauseAfterMs: number;
+type MusicTrack = {
+  id: string;
+  name: string;
+  url: string;
 };
 
 type SpeechRecognitionLike = {
@@ -154,47 +150,42 @@ function ParameterNote({ name }: { name: keyof typeof PARAMETER_NOTES }) {
 }
 
 const SAMPLE_GARDEN: GardenVisualItem[] = [
-  { id: "winter-light", title: "Light in winter", imageUrl: "/demo/light-in-winter.jpg", precomposed: true },
-  { id: "blue-rain", title: "Blue rain", imageUrl: "/demo/dark-blue.jpg", precomposed: true },
-  { id: "deep-blue", title: "Deep blue", imageUrl: "/demo/deep-blue.jpg", precomposed: true },
-  { id: "miss-you", title: "I miss you", imageUrl: "/demo/miss-you.jpg", precomposed: true },
+  { id: "winter-light", title: "冬日微光", imageUrl: "/demo/light-in-winter.jpg", precomposed: true },
+  { id: "blue-rain", title: "蓝色雨夜", imageUrl: "/demo/dark-blue.jpg", precomposed: true },
+  { id: "deep-blue", title: "深蓝", imageUrl: "/demo/deep-blue.jpg", precomposed: true },
+  { id: "miss-you", title: "想念你", imageUrl: "/demo/miss-you.jpg", precomposed: true },
 ];
 
 const SAMPLE_CARDS: MemoryCard[] = [
   {
     id: "sample-melancholy",
     imageUrl: "/demo/light-in-winter.jpg",
-    title: "Light in winter",
-    summary:
-      "A warm lamp in fresh snow opened a small conversation about winter, returning home, and the comfort of being remembered.",
-    date: "Dec 04, 2025",
-    time: "10:49 AM",
+    title: "冬日微光",
+    summary: "新雪中的一盏暖灯，开启了关于冬天、归家与被人记住的温柔对话。",
+    date: "2025年12月04日",
+    time: "上午10:49",
     duration: "01:21",
     pinnedDate: "2025-12-04",
-    mode: "conversation",
     turns: [
       {
         id: "sample-a1",
         role: "assistant",
-        original: "That sad little tree. What’s making you nostalgic for Christmas already?",
-        translation: "那棵可怜巴巴的小树。你这是提前怀念圣诞节了吗？",
-        language: "en",
+        original: "那棵可怜巴巴的小树。你这是提前怀念圣诞节了吗？",
+        language: "zh",
         createdAt: 0,
       },
       {
         id: "sample-u1",
         role: "user",
-        original: "I watch the same old movie every Christmas. It feels different each time.",
-        translation: "我每年圣诞都会重看那部老电影，但每次的感觉都不一样。",
-        language: "en",
+        original: "我每年圣诞都会重看那部老电影，但每次的感觉都不一样。",
+        language: "zh",
         createdAt: 12_000,
       },
       {
         id: "sample-a2",
         role: "assistant",
-        original: "Maybe the film stays still so you can notice how much you have changed.",
-        translation: "也许电影留在原地，是为了让你看见自己已经走了多远。",
-        language: "en",
+        original: "也许电影留在原地，是为了让你看见自己已经走了多远。",
+        language: "zh",
         createdAt: 24_000,
       },
     ],
@@ -202,60 +193,26 @@ const SAMPLE_CARDS: MemoryCard[] = [
   {
     id: "sample-traveler",
     imageUrl: "/demo/deep-blue.jpg",
-    title: "Deep blue",
-    summary:
-      "A field under a star-filled sky became a map: not of where you went, but of the quiet distance you were willing to cross.",
-    date: "Nov 30, 2025",
-    time: "02:57 PM",
+    title: "深蓝",
+    summary: "星空下的原野变成了一张地图，记录的不是你去了哪里，而是你愿意默默跨越多远。",
+    date: "2025年11月30日",
+    time: "下午02:57",
     duration: "03:09",
     pinnedDate: "2025-11-30",
-    mode: "conversation",
     turns: [
       {
         id: "sample-a3",
         role: "assistant",
-        original: "Did you really take your little friend all the way to Paris?",
-        translation: "你真的带着你的小伙伴一路去了巴黎？",
-        language: "en",
+        original: "你真的带着你的小伙伴一路去了巴黎？",
+        language: "zh",
         createdAt: 0,
       },
       {
         id: "sample-u2",
         role: "user",
-        original: "It made the unfamiliar city feel a little more like mine.",
-        translation: "它让那座陌生城市稍微有了一点属于我的感觉。",
-        language: "en",
+        original: "它让那座陌生城市稍微有了一点属于我的感觉。",
+        language: "zh",
         createdAt: 9_000,
-      },
-    ],
-  },
-  {
-    id: "sample-salon",
-    imageUrl: "/demo/dark-blue.jpg",
-    title: "Blue rain",
-    summary:
-      "Four synthetic voices met briefly in the rain and wondered whether a familiar road can remember who once walked it.",
-    date: "Dec 03, 2025",
-    time: "11:41 PM",
-    duration: "00:48",
-    pinnedDate: "2025-12-03",
-    mode: "salon",
-    turns: [
-      {
-        id: "sample-s1",
-        role: "assistant",
-        original: "Who is out there?",
-        translation: "谁在那里？",
-        language: "en",
-        createdAt: 0,
-      },
-      {
-        id: "sample-s2",
-        role: "assistant",
-        original: "Someone curious about how a mind begins to describe itself.",
-        translation: "一个好奇心智如何开始描述自己的人。",
-        language: "en",
-        createdAt: 5_000,
       },
     ],
   },
@@ -265,24 +222,10 @@ const DEFAULT_TURNS: ChatTurn[] = [
   {
     id: "welcome",
     role: "assistant",
-    original: "There’s something gentle in this portrait—as if the evening has paused for a moment.",
-    translation: "这张照片里有一种温柔，仿佛夜晚为这一刻暂停了。",
-    language: "en",
+    original: "这张照片里有一种温柔，仿佛夜晚为这一刻暂停了。",
+    language: "zh",
     createdAt: 0,
   },
-];
-
-const SALON_ROLES: SalonRole[] = [
-  { id: "chen", name: "Chen", persona: "curious and precise", voiceId: "intimate" },
-  { id: "dust", name: "Dust", persona: "reflective and slightly wry", voiceId: "reflective" },
-  { id: "ay", name: "Ay", persona: "warm, wondering, unhurried", voiceId: "bright" },
-  { id: "sharp", name: "Dr. Sharp", persona: "skeptical but kind", voiceId: "neutral" },
-];
-
-const SALON_TOPICS = [
-  "Do humans have system prompts?",
-  "Can a memory miss the person who made it?",
-  "Why does music make time feel visible?",
 ];
 
 const pad = (value: number) => String(value).padStart(2, "0");
@@ -310,7 +253,7 @@ export function HerApp() {
   const [memoryTab, setMemoryTab] = useState<MemoryTab>("cards");
   const [imageUrl, setImageUrl] = useState("/demo/light-in-winter.jpg");
   const [imagePrecomposed, setImagePrecomposed] = useState(false);
-  const [imageTitle, setImageTitle] = useState("Light in winter");
+  const [imageTitle, setImageTitle] = useState("冬日微光");
   const [gardenItems, setGardenItems] = useState<GardenVisualItem[]>(SAMPLE_GARDEN);
   const [gardenIndex, setGardenIndex] = useState(0);
   const [turns, setTurns] = useState<ChatTurn[]>(DEFAULT_TURNS);
@@ -325,12 +268,12 @@ export function HerApp() {
     "deepseek", "qwen", "openai", "anthropic", "gemini",
   ].map((name) => ({ provider: name, configured: true, liveAdapterImplemented: true })));
   const [voiceStyle, setVoiceStyle] = useState("intimate");
-  const [replyLanguage, setReplyLanguage] = useState<"en" | "zh">("en");
+  const [replyLanguage, setReplyLanguage] = useState<"en" | "zh">("zh");
   const [visionEnabled, setVisionEnabled] = useState(true);
   const [saveVoice, setSaveVoice] = useState(true);
   const [imageContext, setImageContext] = useState<{ description: string; possibleTopics: string[] } | null>({
-    description: "A warm street lamp glows in a quiet winter snowfall.",
-    possibleTopics: ["winter nights", "home", "a light left on for someone"],
+    description: "安静的冬日雪夜里，一盏温暖的路灯正在发光。",
+    possibleTopics: ["冬夜", "归家", "为某个人留着的一盏灯"],
   });
   const [audioLevel, setAudioLevel] = useState(0.06);
   const [audioBands, setAudioBands] = useState({ bass: 0.02, mid: 0.015, treble: 0.01 });
@@ -352,14 +295,11 @@ export function HerApp() {
   const [calendarMonth, setCalendarMonth] = useState(new Date(2025, 11, 1));
   const [selectedDate, setSelectedDate] = useState("2025-12-04");
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
-  const [musicName, setMusicName] = useState("No atmosphere selected");
+  const [musicName, setMusicName] = useState("尚未选择音乐");
   const [musicPlaying, setMusicPlaying] = useState(false);
-  const [salonTopic, setSalonTopic] = useState(SALON_TOPICS[0]);
-  const [salonLines, setSalonLines] = useState<SalonLine[]>([]);
-  const [salonLineIndex, setSalonLineIndex] = useState(-1);
-  const [salonBusy, setSalonBusy] = useState(false);
-  const [salonPaused, setSalonPaused] = useState(false);
-  const [particleInfo, setParticleInfo] = useState("preparing particles");
+  const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([]);
+  const [musicListOpen, setMusicListOpen] = useState(true);
+  const [particleInfo, setParticleInfo] = useState("正在准备粒子");
   const [notice, setNotice] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -388,7 +328,7 @@ export function HerApp() {
   const musicAnalyserRef = useRef<AnalyserNode | null>(null);
   const musicAnalyserFrameRef = useRef<number | null>(null);
   const lastAudioUiUpdateRef = useRef(0);
-  const salonRunRef = useRef(0);
+  const musicUrlsRef = useRef<string[]>([]);
   const gardenStripRef = useRef<HTMLDivElement>(null);
   const gardenCursorRef = useRef<HTMLSpanElement>(null);
   const gardenWheelDeltaRef = useRef(0);
@@ -403,8 +343,6 @@ export function HerApp() {
   const revealTimerRef = useRef<number | null>(null);
 
   const currentAssistant = [...turns].reverse().find((turn) => turn.role === "assistant");
-  const currentSalonLine = salonLineIndex >= 0 ? salonLines[salonLineIndex] : null;
-  const currentSalonRole = SALON_ROLES.find((role) => role.id === currentSalonLine?.speakerId);
   const visualAudioLevel = Math.min(1, audioLevel);
   const updateParticleTuning = useCallback(<Key extends keyof ParticleTuning,>(
     key: Key,
@@ -503,11 +441,13 @@ export function HerApp() {
 
   useEffect(() => {
     const uploadUrls = uploadUrlsRef.current;
+    const musicUrls = musicUrlsRef.current;
     const loadTimer = window.setTimeout(() => void refreshSavedCards(), 0);
     return () => {
       window.clearTimeout(loadTimer);
       persistedUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       uploadUrls.forEach((url) => URL.revokeObjectURL(url));
+      musicUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [refreshSavedCards]);
 
@@ -608,7 +548,7 @@ export function HerApp() {
       if (!result.translation) throw new Error("translation unavailable");
       setTurns((items) => items.map((item) => (item.id === turnId ? { ...item, translation: result.translation } : item)));
     } catch {
-      flashNotice("Translation is waiting for a configured provider.");
+      flashNotice("翻译服务暂不可用，请检查模型配置。");
     }
   }, [flashNotice, provider, replyLanguage, turns]);
 
@@ -657,9 +597,9 @@ export function HerApp() {
         setTurns((items) => [...items, assistantTurn]);
         speak(text);
       } catch {
-        const fallback = "Maybe the image is only the doorway. The memory seems to be somewhere just behind it.";
+        const fallback = "也许图像只是入口，真正的记忆就藏在它身后。";
         setTurns((items) => [...items, {
-          id: crypto.randomUUID(), role: "assistant", original: fallback, language: "en", createdAt: (elapsed + 1) * 1000,
+          id: crypto.randomUUID(), role: "assistant", original: fallback, language: "zh", createdAt: (elapsed + 1) * 1000,
         }]);
         speak(fallback);
       }
@@ -770,11 +710,11 @@ export function HerApp() {
           transcriptRef.current = text;
           setLiveTranscript(text);
         };
-        recognition.onerror = () => flashNotice("Voice transcription is unavailable; your recording is still active.");
+        recognition.onerror = () => flashNotice("语音转写暂不可用，但录音仍在继续。");
         recognition.start();
         recognitionRef.current = recognition;
       } else {
-        flashNotice("Live transcription is not supported here; type or record a short thought.");
+        flashNotice("当前环境不支持实时转写，你仍可输入文字或录制一段语音。");
       }
       captureStartingRef.current = false;
       if (pendingCaptureStopRef.current !== null) {
@@ -795,7 +735,7 @@ export function HerApp() {
         audioContextRef.current = null;
         if (context && context.state !== "closed") await context.close().catch(() => undefined);
         setReplyState("idle");
-        flashNotice("Microphone permission is needed for voice conversation.");
+        flashNotice("语音对话需要麦克风权限。");
       }
     }
   }, [flashNotice, replyLanguage, replyState, stopListening, stopSpeechPlayback]);
@@ -810,7 +750,7 @@ export function HerApp() {
     const heldFor = performance.now() - recordingStartedRef.current;
     if (captureStartingRef.current) {
       if (!startedOnPointerRef.current || heldFor > 360) pendingCaptureStopRef.current = true;
-      else flashNotice("Recording locked — tap again when you’re done.");
+      else flashNotice("录音已锁定，结束时请再次点击。");
       return;
     }
     if (!startedOnPointerRef.current) {
@@ -818,17 +758,16 @@ export function HerApp() {
     } else if (heldFor > 360) {
       void stopListening(true);
     } else {
-      flashNotice("Recording locked — tap again when you’re done.");
+      flashNotice("录音已锁定，结束时请再次点击。");
     }
   };
 
   const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      flashNotice("Please choose a PNG, JPEG, or WebP image.");
+      flashNotice("请选择 PNG、JPEG 或 WebP 图片。");
       return;
     }
     if (replyState === "listening" || captureStartingRef.current) await stopListening(false);
-    salonRunRef.current += 1;
     stopSpeechPlayback();
     const objectUrl = URL.createObjectURL(file);
     uploadUrlsRef.current.push(objectUrl);
@@ -988,10 +927,9 @@ export function HerApp() {
         title: result.title ?? fallbackTitle,
         summary: result.summary ?? fallbackSummary,
         diary: result.diary,
-        date: now.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-        time: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        date: now.toLocaleDateString("zh-CN", { month: "long", day: "2-digit", year: "numeric" }),
+        time: now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
         duration: formatClock(elapsed),
-        mode: "conversation",
         turns,
       };
       setPreview(nextPreview);
@@ -1017,13 +955,12 @@ export function HerApp() {
         diary: replyLanguage === "zh"
           ? `今天，我和一张图片待了一会儿。${turns.filter((turn) => turn.role === "user").map((turn) => turn.original).join(" ")}`
           : `Today I stayed with an image for a while. ${turns.filter((turn) => turn.role === "user").map((turn) => turn.original).join(" ")}`,
-        date: now.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-        time: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        date: now.toLocaleDateString("zh-CN", { month: "long", day: "2-digit", year: "numeric" }),
+        time: now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
         duration: formatClock(elapsed),
-        mode: "conversation",
         turns,
       });
-      flashNotice("The conversation is safe locally. Summary can be retried.");
+      flashNotice("对话已安全保存在本机，稍后可以重试生成摘要。");
     } finally {
       setSaving(false);
     }
@@ -1108,10 +1045,10 @@ export function HerApp() {
       await refreshSavedCards();
       setView("memory");
       setMemoryTab("calendar");
-      flashNotice("Memory saved. Choose a day to pin it.");
+      flashNotice("记忆已保存，请选择一个日期。");
     } catch {
       await Promise.all(createdAudioIds.map((id) => memoryStore.deleteAudioAsset(id).catch(() => undefined)));
-      flashNotice("The draft is still safe. This device could not finish saving the memory.");
+      flashNotice("草稿仍然安全，但此设备暂时无法完成保存。");
     } finally {
       setConfirming(false);
     }
@@ -1121,151 +1058,50 @@ export function HerApp() {
     const selectedCard = cards[cardIndex];
     const targetId = pendingPinIdRef.current ?? (selectedCard && !selectedCard.id.startsWith("sample-") ? selectedCard.id : undefined);
     if (!targetId) {
-      flashNotice("Save a new conversation before pinning it to another day.");
+      flashNotice("请先保存一段新对话，再选择日期。");
       return;
     }
     try {
       await memoryStore.pinSession(targetId, date as CalendarDate);
       pendingPinIdRef.current = undefined;
       setCards((items) => items.map((item) => (item.id === targetId ? { ...item, pinnedDate: date } : item)));
-      flashNotice(`Pinned to ${date}.`);
+      flashNotice(`已固定到 ${date}。`);
     } catch {
-      flashNotice("This memory could not be pinned yet.");
+      flashNotice("暂时无法固定这段记忆。");
     }
   }, [cardIndex, cards, flashNotice]);
 
-  const playSalon = useCallback(async (lines: SalonLine[], startIndex: number, runId: number): Promise<void> => {
-    window.speechSynthesis?.resume();
-    setSalonPaused(false);
-    for (let index = startIndex; index < lines.length; index += 1) {
-      if (runId !== salonRunRef.current) return;
-      setSalonLineIndex(index);
-      const line = lines[index];
-      const roleIndex = Math.max(0, SALON_ROLES.findIndex((role) => role.id === line.speakerId));
-      await new Promise<void>((resolve) => speak(line.textOriginal, resolve, roleIndex, "en"));
-      if (runId !== salonRunRef.current) return;
-      await new Promise((resolve) => window.setTimeout(resolve, Math.min(1200, Math.max(260, line.pauseAfterMs || 600))));
-    }
-    if (runId === salonRunRef.current) setReplyState("ready");
-  }, [speak]);
-
-  const generateSalon = useCallback(async () => {
-    setSalonBusy(true);
-    const runId = ++salonRunRef.current;
-    window.speechSynthesis?.resume();
-    setSalonPaused(false);
-    stopSpeechPlayback();
-    try {
-      const response = await fetch("/api/salon", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: salonTopic, roles: SALON_ROLES, turns: 6, language: "en", mood: "late-night intimate", provider }),
-      });
-      if (!response.ok) throw new Error("salon provider unavailable");
-      const result = (await response.json()) as { scene?: { lines?: SalonLine[] } };
-      const lines = result.scene?.lines ?? [];
-      setSalonLines(lines);
-      setSalonLineIndex(-1);
-      setSalonBusy(false);
-      if (lines.length) void playSalon(lines, 0, runId);
-    } catch {
-      setSalonBusy(false);
-      flashNotice("The salon could not gather. Try the topic again.");
-    }
-  }, [flashNotice, playSalon, provider, salonTopic, stopSpeechPlayback]);
-
-  const saveSalonMemory = useCallback(async () => {
-    if (!salonLines.length || saving) return;
-    setSaving(true);
-    try {
-      const durationMs = salonLines.reduce((total, line) => total + 4_000 + line.pauseAfterMs, 0);
-      const summaryResponse = await fetch("/api/summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider,
-          language: "en",
-          includeDiary: true,
-          turns: salonLines.map((line, index) => ({
-            role: "salon_speaker",
-            speakerId: line.speakerId,
-            text: line.textOriginal,
-            language: "en",
-            timestampMs: index * 4_500,
-          })),
-        }),
-      });
-      const summary = summaryResponse.ok
-        ? await summaryResponse.json() as { title?: string; summary?: string; diary?: string; moodTags?: string[] }
-        : {};
-      const garden = await ensureCurrentGarden();
-      const generatedAt = new Date().toISOString();
-      const session = await memoryStore.createSessionRecord({
-        mode: "salon",
-        gardenItemId: garden.id,
-        participants: SALON_ROLES.map((role) => ({ id: role.id, name: role.name, kind: "salon_speaker" as const, voiceId: role.voiceId })),
-        turns: salonLines.map((line, index) => ({
-          id: crypto.randomUUID(),
-          role: "salon_speaker" as const,
-          speakerId: line.speakerId,
-          text: { original: line.textOriginal, originalLanguage: "en" as const, zh: line.textZh },
-          offsetStartMs: index * 4_500,
-          pauseAfterMs: line.pauseAfterMs,
-        })),
-        durationMs,
-        primaryLanguage: "en",
-        saveStatus: "ready",
-        summary: {
-          title: { original: summary.title ?? salonTopic, originalLanguage: "en" },
-          abstract: {
-            original: summary.summary ?? "Several synthetic voices met briefly in the dark and let one question move between them.",
-            originalLanguage: "en",
-          },
-          moodTags: summary.moodTags ?? ["curious", "late-night"],
-          generatedAt,
-          ...(summary.diary ? { diary: { body: { original: summary.diary, originalLanguage: "en" as const }, generatedAt } } : {}),
-        },
-        salon: {
-          topic: { original: salonTopic, originalLanguage: "en" },
-          mood: "late-night intimate",
-          language: "en",
-          plannedTurnCount: salonLines.length,
-        },
-      });
-      pendingPinIdRef.current = session.id;
-      salonRunRef.current += 1;
-      stopSpeechPlayback();
-      await refreshSavedCards();
-      setCardIndex(0);
-      setMemoryTab("cards");
-      setView("memory");
-      flashNotice("The salon was saved as a memory card.");
-    } catch {
-      flashNotice("The salon is still on screen, but could not be saved yet.");
-    } finally {
-      setSaving(false);
-    }
-  }, [ensureCurrentGarden, flashNotice, provider, refreshSavedCards, salonLines, salonTopic, saving, stopSpeechPlayback]);
-
-  const toggleSalonPause = () => {
-    if (!("speechSynthesis" in window)) return;
-    if (salonPaused) window.speechSynthesis.resume();
-    else window.speechSynthesis.pause();
-    setSalonPaused((value) => !value);
+  const chooseMusicTrack = (track: MusicTrack, autoplay = true) => {
+    setMusicUrl(track.url);
+    setMusicName(track.name);
+    window.setTimeout(() => {
+      const audio = musicAudioRef.current;
+      if (!audio) return;
+      audio.load();
+      if (autoplay) void audio.play().catch(() => flashNotice("请再点击一次播放按钮以开始音乐。"));
+    }, 0);
   };
 
-  const handleMusicUpload = (file: File) => {
-    if (!file.type.startsWith("audio/")) {
-      flashNotice("Choose an audio file for the atmosphere.");
+  const handleMusicUpload = (files: FileList | File[]) => {
+    const accepted = Array.from(files).filter((file) => {
+      const extension = file.name.split(".").pop()?.toLowerCase();
+      return extension === "mp3" || extension === "flac";
+    });
+    if (!accepted.length) {
+      flashNotice("请选择 .mp3 或 .flac 音乐文件。");
       return;
     }
-    if (musicUrl) URL.revokeObjectURL(musicUrl);
-    const url = URL.createObjectURL(file);
-    setMusicUrl(url);
-    setMusicName(file.name);
-    window.setTimeout(() => {
-      void musicAudioRef.current?.play().catch(() => flashNotice("Tap play once to start the atmosphere."));
-    }, 0);
+    const tracks = accepted.map((file) => {
+      const url = URL.createObjectURL(file);
+      musicUrlsRef.current.push(url);
+      return { id: crypto.randomUUID(), name: file.name, url };
+    });
+    setMusicTracks((current) => [...current, ...tracks]);
+    setMusicListOpen(true);
+    chooseMusicTrack(tracks[0]);
+    if (accepted.length !== Array.from(files).length) {
+      flashNotice("已添加支持的音乐，其他格式已跳过。");
+    }
   };
 
   const startMusicAnalysis = () => {
@@ -1323,7 +1159,7 @@ export function HerApp() {
   const handleMusicPlay = async () => {
     const audio = musicAudioRef.current;
     if (!audio) return;
-    if (audio.paused) await audio.play().catch(() => flashNotice("This browser needs one more tap to start audio."));
+    if (audio.paused) await audio.play().catch(() => flashNotice("请再点击一次播放按钮以开始音乐。"));
     else audio.pause();
   };
 
@@ -1488,9 +1324,9 @@ export function HerApp() {
       }
       setDeleteTarget(null);
       await refreshSavedCards();
-      flashNotice(deleteTarget.kind === "garden" ? "Memory removed from The Garden." : "Memory deleted.");
+      flashNotice(deleteTarget.kind === "garden" ? "已从记忆中移除。" : "记忆已删除。");
     } catch {
-      flashNotice("This memory could not be deleted yet.");
+      flashNotice("暂时无法删除这段记忆。");
     } finally {
       setDeleting(false);
     }
@@ -1501,12 +1337,7 @@ export function HerApp() {
     if (nextView !== "conversation" && (replyState === "listening" || captureStartingRef.current)) {
       void stopListening(false);
     }
-    if (nextView !== "salon") {
-      salonRunRef.current += 1;
-      window.speechSynthesis?.resume();
-      setSalonPaused(false);
-      stopSpeechPlayback();
-    }
+    stopSpeechPlayback();
     if (nextView === "conversation") {
       if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
       revealTimerRef.current = null;
@@ -1519,27 +1350,26 @@ export function HerApp() {
   return (
     <main className={`${styles.app} ${view === "garden" ? styles.gardenMode : ""} ${immersiveMode ? styles.immersiveMode : ""}`}>
       <header className={styles.header}>
-        <button className={styles.wordmark} onClick={() => navigateTo("conversation")} aria-label="Open conversation">
+        <button className={styles.wordmark} onClick={() => navigateTo("conversation")} aria-label="打开对话">
           <span className={styles.wordmarkDot} /> Her
         </button>
-        <nav className={styles.nav} aria-label="Primary navigation">
-          <button className={view === "garden" ? styles.navActive : ""} aria-current={view === "garden" ? "page" : undefined} onClick={() => navigateTo("garden")}>The Garden</button>
-          <button className={view === "memory" ? styles.navActive : ""} aria-current={view === "memory" ? "page" : undefined} onClick={() => { navigateTo("memory"); setMemoryTab("cards"); }}>Memory</button>
-          <button className={view === "salon" ? styles.navActive : ""} aria-current={view === "salon" ? "page" : undefined} onClick={() => navigateTo("salon")}>Ai Salon</button>
-          <button className={view === "music" ? styles.navActive : ""} aria-current={view === "music" ? "page" : undefined} onClick={() => navigateTo("music")}>Music</button>
+        <nav className={styles.nav} aria-label="主导航">
+          <button className={view === "garden" ? styles.navActive : ""} aria-current={view === "garden" ? "page" : undefined} onClick={() => navigateTo("garden")}>记忆</button>
+          <button className={view === "memory" ? styles.navActive : ""} aria-current={view === "memory" ? "page" : undefined} onClick={() => { navigateTo("memory"); setMemoryTab("cards"); }}>回廊</button>
+          <button className={view === "music" ? styles.navActive : ""} aria-current={view === "music" ? "page" : undefined} onClick={() => navigateTo("music")}>音乐</button>
         </nav>
-        <button className={styles.iconButton} onClick={() => setSettingsOpen(true)} aria-label="Open settings">
+        <button className={styles.iconButton} onClick={() => setSettingsOpen(true)} aria-label="打开设置">
           <span className={styles.tuneIcon}><i /><i /><i /></span>
         </button>
       </header>
 
-      {(view === "conversation" || view === "salon") && (
+      {view === "conversation" && (
         <section
           className={`${styles.stage} ${immersiveMode ? styles.immersiveStage : ""}`}
           onWheel={handleParticleWheel}
-          aria-label={view === "salon" ? "AI Salon stage" : "Conversation stage"}
+          aria-label="对话场景"
         >
-          <Suspense fallback={<img className={styles.particleLoading} src={imageUrl} alt="" aria-hidden="true" />}>
+          <Suspense fallback={<div className={styles.particleLoading} aria-hidden="true" />}>
             <ParticleGarden
               imageUrl={imageUrl}
               audioLevel={visualAudioLevel}
@@ -1550,7 +1380,7 @@ export function HerApp() {
               precomposed={imagePrecomposed}
               tuning={particleTuning}
               className={styles.particleCanvas}
-              onReady={(info) => setParticleInfo(`${info.pointCount.toLocaleString()} particles`)}
+              onReady={(info) => setParticleInfo(`${info.pointCount.toLocaleString()} 个粒子`)}
             />
           </Suspense>
           <div className={styles.vignette} />
@@ -1562,33 +1392,32 @@ export function HerApp() {
                 setImmersiveMode((current) => !current);
               }}
               aria-pressed={immersiveMode}
-              aria-label={immersiveMode ? "Show interface" : "Hide interface for immersive view"}
-              title={immersiveMode ? "Show interface (Esc)" : "Mouse wheel zooms the particle image"}
+              aria-label={immersiveMode ? "显示界面" : "隐藏界面并进入沉浸模式"}
+              title={immersiveMode ? "显示界面（Esc）" : "滚动鼠标滚轮可缩放粒子图像"}
             >
               <span className={styles.immersiveIcon} aria-hidden="true" />
-              <span>{immersiveMode ? "Show interface" : "Hide interface"}</span>
+              <span>{immersiveMode ? "显示界面" : "隐藏界面"}</span>
               <small>{Math.round(particleZoom * 100)}%</small>
             </button>
           )}
-          {(view === "salon" || !conversationFromGarden || conversationChromeVisible) && (
+          {(!conversationFromGarden || conversationChromeVisible) && (
             <div className={`${styles.providerPill} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
               <span className={replyState === "speaking" ? styles.liveWave : styles.providerGlyph}>{replyState === "speaking" ? "≋" : "×"}</span>
               <span className={styles.statusDot} />
-              <span>{providerMode === "mock" ? "Preview ai" : providerLabel(provider)}</span>
+              <span>{providerMode === "mock" ? "预览 AI" : providerLabel(provider)}</span>
             </div>
           )}
 
-          {view === "conversation" ? (
-            (!conversationFromGarden || conversationChromeVisible) && <div className={`${styles.conversationUi} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
-              {replyState === "thinking" && <div className={styles.thinking}>the other side is thinking <span>·</span><span>·</span><span>·</span></div>}
+          {(!conversationFromGarden || conversationChromeVisible) && <div className={`${styles.conversationUi} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
+              {replyState === "thinking" && <div className={styles.thinking}>对方正在思考 <span>·</span><span>·</span><span>·</span></div>}
               {currentAssistant && (
                 <article className={`${styles.replyCard} ${conversationFromGarden ? styles.gardenQuestion : ""} ${replyState === "speaking" ? styles.replySpeaking : ""}`}>
                   <div className={styles.miniWave} aria-hidden="true">{Array.from({ length: 11 }, (_, index) => <i key={index} />)}</div>
                   <p>{currentAssistant.original}</p>
                   {currentAssistant.translation && <><span className={styles.divider} /><p className={styles.translation}>{currentAssistant.translation}</p></>}
                   <div className={styles.replyActions}>
-                    {replyState === "ready" && <button onClick={() => playTurn(currentAssistant)}>▶ replay</button>}
-                    <button onClick={() => void translateTurn(currentAssistant.id)}>{currentAssistant.translation ? "bilingual" : "tap to translate"}</button>
+                    {replyState === "ready" && <button onClick={() => playTurn(currentAssistant)}>▶ 重播</button>}
+                    <button onClick={() => void translateTurn(currentAssistant.id)}>{currentAssistant.translation ? "双语" : "点击翻译"}</button>
                   </div>
                 </article>
               )}
@@ -1600,8 +1429,8 @@ export function HerApp() {
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
                     onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && void submitMessage(input)}
-                    placeholder={replyState === "listening" ? "listening…" : "type here…"}
-                    aria-label="Type a message"
+                    placeholder={replyState === "listening" ? "正在聆听…" : "在这里输入…"}
+                    aria-label="输入消息"
                   />
                   <button
                     className={styles.micButton}
@@ -1617,60 +1446,27 @@ export function HerApp() {
                         void beginListening();
                       }
                     }}
-                    aria-label={replyState === "listening" ? "Finish recording" : "Start recording"}
+                    aria-label={replyState === "listening" ? "结束录音" : "开始录音"}
                   >
                     <span className={styles.micGlyph} />
                   </button>
                 </div>
                 {replyState === "listening" && (
                   <div className={styles.recordingTools}>
-                    <span><b className={styles.recordingDot} /> Rec {formatClock(Math.max(1, recordingElapsed))}</span>
-                    <button onClick={() => void stopListening(false)}>cancel</button>
+                    <span><b className={styles.recordingDot} /> 录音 {formatClock(Math.max(1, recordingElapsed))}</span>
+                    <button onClick={() => void stopListening(false)}>取消</button>
                   </div>
                 )}
                 <div className={styles.sessionBar}>
                   <span className={styles.timer}>{formatClock(elapsed)}</span>
-                  <button className={styles.saveButton} onClick={() => void saveMemory()}>Save Memory <span>›</span></button>
-                  <button className={styles.closeButton} onClick={() => { void stopListening(false); setTurns([]); setElapsed(0); draftSessionIdRef.current = undefined; }} aria-label="End conversation">×</button>
+                  <button className={styles.saveButton} onClick={() => void saveMemory()}>保存记忆 <span>›</span></button>
+                  <button className={styles.closeButton} onClick={() => { void stopListening(false); setTurns([]); setElapsed(0); draftSessionIdRef.current = undefined; }} aria-label="结束对话">×</button>
                 </div>
-                <button className={styles.uploadAnother} onClick={() => fileInputRef.current?.click()}>← Upload Another</button>
+                <button className={styles.uploadAnother} onClick={() => fileInputRef.current?.click()}>← 上传另一张图片</button>
               </div>
             </div>
-          ) : (
-            <div className={styles.salonLayer}>
-              <div className={styles.roleRail}>
-                {SALON_ROLES.map((role) => (
-                  <span key={role.id} className={currentSalonRole?.id === role.id ? styles.roleActive : ""}>{role.name} EN</span>
-                ))}
-              </div>
-              {currentSalonLine ? (
-                <article className={styles.salonVoiceCard}>
-                  <div className={styles.salonWave}>{Array.from({ length: 24 }, (_, index) => <i key={index} />)}</div>
-                  <small>{currentSalonRole?.name ?? "Unknown voice"}</small>
-                  <p>{currentSalonLine.textOriginal}</p>
-                  {currentSalonLine.textZh && <em>{currentSalonLine.textZh}</em>}
-                </article>
-              ) : (
-                <article className={styles.salonSetup}>
-                  <span>Ai salon · Late night</span>
-                  <h1>Give the voices<br />something to wonder about.</h1>
-                  <div className={styles.topicList}>
-                    {SALON_TOPICS.map((topic) => <button key={topic} onClick={() => setSalonTopic(topic)} className={salonTopic === topic ? styles.topicActive : ""}>{topic}</button>)}
-                  </div>
-                  <button className={styles.primaryButton} onClick={() => void generateSalon()} disabled={salonBusy}>{salonBusy ? "gathering the voices…" : "Begin the conversation"}</button>
-                </article>
-              )}
-              {salonLines.length > 0 && (
-                <div className={styles.salonControls}>
-                  <button onClick={toggleSalonPause}>{salonPaused ? "resume" : "pause"}</button>
-                  <button onClick={() => { const runId = ++salonRunRef.current; stopSpeechPlayback(); void playSalon(salonLines, 0, runId); }}>replay</button>
-                  <button onClick={() => void saveSalonMemory()}>save salon</button>
-                  <button onClick={() => { salonRunRef.current += 1; window.speechSynthesis?.resume(); setSalonPaused(false); stopSpeechPlayback(); setSalonLines([]); setSalonLineIndex(-1); }}>new topic</button>
-                </div>
-              )}
-            </div>
-          )}
-          {(view === "salon" || !conversationFromGarden || conversationChromeVisible) && <span className={`${styles.particleMeta} ${conversationFromGarden ? styles.delayedChrome : ""}`}>{particleInfo}</span>}
+          }
+          {(!conversationFromGarden || conversationChromeVisible) && <span className={`${styles.particleMeta} ${conversationFromGarden ? styles.delayedChrome : ""}`}>{particleInfo}</span>}
         </section>
       )}
 
@@ -1681,17 +1477,17 @@ export function HerApp() {
               <div
                 ref={gardenStripRef}
                 className={styles.gardenStrip}
-                onPointerDownCapture={handleGardenPointerDown}
-                onPointerMoveCapture={handleGardenPointerMove}
-                onPointerUpCapture={handleGardenPointerUp}
-                onPointerCancelCapture={handleGardenPointerUp}
+                onPointerDown={handleGardenPointerDown}
+                onPointerMove={handleGardenPointerMove}
+                onPointerUp={handleGardenPointerUp}
+                onPointerCancel={handleGardenPointerUp}
                 onWheel={handleGardenWheel}
                 onPointerLeave={() => {
                   if (gardenDragRef.current.pointerId === -1 && gardenCursorRef.current) {
                     gardenCursorRef.current.style.opacity = "0";
                   }
                 }}
-                aria-label="Memory particles. Drag left or right to explore."
+                aria-label="粒子记忆，左右拖动即可浏览"
               >
                 <div
                   className={styles.gardenTrack}
@@ -1730,10 +1526,10 @@ export function HerApp() {
                       }}
                       role="button"
                       tabIndex={0}
-                      aria-label={`Open ${item.title}`}
+                        aria-label={`打开${item.title}`}
                     >
                       {Math.abs(index - gardenIndex) <= 1 ? (
-                        <Suspense fallback={<img className={styles.particleLoading} src={item.imageUrl} alt="" aria-hidden="true" />}>
+                        <Suspense fallback={<div className={styles.particleLoading} aria-hidden="true" />}>
                           <ParticleGarden
                             imageUrl={item.imageUrl}
                             audioLevel={index === gardenIndex ? 0.1 : 0.045}
@@ -1755,9 +1551,11 @@ export function HerApp() {
                           event.stopPropagation();
                           setDeleteTarget({ kind: "garden", item });
                         }}
-                        aria-label={`Delete ${item.title}`}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onPointerUp={(event) => event.stopPropagation()}
+                        aria-label={`删除${item.title}`}
                       >
-                        Delete
+                        删除
                       </button>
                     </article>
                   ))}
@@ -1772,7 +1570,7 @@ export function HerApp() {
                   focusGardenItem(gardenIndex - 1);
                 }}
                 disabled={gardenIndex === 0}
-                aria-label="Previous memory"
+                aria-label="上一段记忆"
               >
                 ‹
               </button>
@@ -1784,7 +1582,7 @@ export function HerApp() {
                   focusGardenItem(gardenIndex + 1);
                 }}
                 disabled={gardenIndex === gardenItems.length - 1}
-                aria-label="Next memory"
+                aria-label="下一段记忆"
               >
                 ›
               </button>
@@ -1794,24 +1592,24 @@ export function HerApp() {
                     key={item.id}
                     className={index === gardenIndex ? styles.gardenDotActive : ""}
                     onClick={() => focusGardenItem(index)}
-                    aria-label={`Show ${item.title}`}
+                    aria-label={`显示${item.title}`}
                     aria-current={index === gardenIndex ? "true" : undefined}
                   />
                 ))}
               </div>
             </>
           ) : (
-            <div className={styles.emptyState}><span>The garden is quiet</span><p>Upload an image when you are ready to let a memory grow here.</p></div>
+            <div className={styles.emptyState}><span>这里还很安静</span><p>准备好时上传一张图片，让一段记忆从这里生长。</p></div>
           )}
-          <button className={styles.uploadMore} onClick={() => fileInputRef.current?.click()}>＋ Upload more</button>
+          <button className={styles.uploadMore} onClick={() => fileInputRef.current?.click()}>＋ 上传更多</button>
         </section>
       )}
 
       {view === "memory" && (
         <section className={styles.memoryPage}>
           <div className={styles.memoryHeader}>
-            <div><span>Day / night chron</span><h1>You and I have memories,<br />longer than the road ahead.</h1></div>
-            <div className={styles.tabSwitch}><button className={memoryTab === "cards" ? styles.tabActive : ""} onClick={() => setMemoryTab("cards")}>Cards</button><button className={memoryTab === "calendar" ? styles.tabActive : ""} onClick={() => setMemoryTab("calendar")}>Calendar</button></div>
+            <div><span>昼夜纪事</span><h1>你和我的记忆，<br />比前方的路更长。</h1></div>
+            <div className={styles.tabSwitch}><button className={memoryTab === "cards" ? styles.tabActive : ""} onClick={() => setMemoryTab("cards")}>卡片</button><button className={memoryTab === "calendar" ? styles.tabActive : ""} onClick={() => setMemoryTab("calendar")}>日历</button></div>
           </div>
           {memoryTab === "cards" ? (
             <>
@@ -1828,21 +1626,21 @@ export function HerApp() {
                             event.stopPropagation();
                             setDeleteTarget({ kind: "memory", card });
                           }}
-                          aria-label={`Delete ${card.title}`}
-                        >
-                          Delete
+                            aria-label={`删除${card.title}`}
+                          >
+                            删除
                         </button>
                       )}
-                      <img src={card.imageUrl} alt="Memory cover" />
+                      <img src={card.imageUrl} alt="记忆封面" />
                       <div className={styles.cardBody}>
                         <h2>{card.title}</h2>
-                        <div className={styles.cardMeta}><span>{card.mode === "salon" ? "@Ai salon" : "@You ∩ companion"} · {card.duration}</span><span>{card.date}<br />{card.time}</span></div>
+                        <div className={styles.cardMeta}><span>@你 ∩ 陪伴者 · {card.duration}</span><span>{card.date}<br />{card.time}</span></div>
                         <p className={styles.cardSummary}>{card.summary}</p>
                         <div className={styles.turnList}>
                           {card.turns.map((turn) => (
                             <div key={turn.id} className={`${styles.turnBubble} ${turn.role === "user" ? styles.userBubble : ""}`}>
                               {turn.speakerName && <b>{turn.speakerName}</b>}<p>{turn.original}</p>{turn.translation && <small>{turn.translation}</small>}
-                              <button onClick={(event) => { event.stopPropagation(); playTurn(turn); }} aria-label={turn.audioBlob ? "Replay saved voice" : "Replay with preview voice"}>▶</button>
+                              <button onClick={(event) => { event.stopPropagation(); playTurn(turn); }} aria-label={turn.audioBlob ? "重播已保存语音" : "使用预览语音重播"}>▶</button>
                             </div>
                           ))}
                         </div>
@@ -1850,7 +1648,7 @@ export function HerApp() {
                     </article>
                   );
                 })}
-              </div> : <div className={styles.emptyState}><span>No saved memories</span><p>Your next saved conversation will appear here.</p></div>}
+              </div> : <div className={styles.emptyState}><span>还没有保存的记忆</span><p>下一段保存的对话会出现在这里。</p></div>}
               {cards.length > 0 && <div className={styles.cardNav}><button onClick={() => setCardIndex((index) => Math.max(0, index - 1))}>‹</button><span>{pad(cardIndex + 1)} / {pad(cards.length)}</span><button onClick={() => setCardIndex((index) => Math.min(cards.length - 1, index + 1))}>›</button></div>}
             </>
           ) : (
@@ -1868,27 +1666,56 @@ export function HerApp() {
       {view === "music" && (
         <section className={styles.musicPage}>
           <div className={styles.musicOrb}><span>{musicPlaying ? "≋" : "○"}</span></div>
-          <div className={styles.musicCopy}><span>Atmosphere</span><h1>Give the memory<br />a room to live in.</h1><p>Import a track from your device. It stays here, and the particles will listen with you.</p></div>
-          <div className={styles.musicPlayer}>
-            <div><small>Now playing</small><strong>{musicName}</strong></div>
-            <button onClick={() => void handleMusicPlay()} disabled={!musicUrl}>{musicPlaying ? "Ⅱ" : "▶"}</button>
-            <button onClick={() => musicInputRef.current?.click()}>Choose music</button>
+          <div className={styles.musicCopy}><span>氛围</span><h1>给记忆一间<br />可以栖居的房间。</h1><p>从设备中导入音乐，文件只会留在当前页面；粒子会跟随旋律与你一起呼吸。</p></div>
+          <div className={styles.musicArea}>
+            <div className={styles.musicPlayer}>
+              <div><small>正在播放</small><strong>{musicName}</strong></div>
+              <button onClick={() => void handleMusicPlay()} disabled={!musicUrl} aria-label={musicPlaying ? "暂停" : "播放"}>{musicPlaying ? "Ⅱ" : "▶"}</button>
+              <button onClick={() => musicInputRef.current?.click()}>添加音乐</button>
+            </div>
+            <div className={styles.musicLibrary}>
+              <button
+                className={styles.musicLibraryToggle}
+                onClick={() => setMusicListOpen((open) => !open)}
+                aria-expanded={musicListOpen}
+              >
+                <span>音乐列表 <small>{musicTracks.length}</small></span>
+                <b>{musicListOpen ? "收起" : "展开"} {musicListOpen ? "⌃" : "⌄"}</b>
+              </button>
+              {musicListOpen && (
+                <div className={styles.musicTrackList}>
+                  {musicTracks.length ? musicTracks.map((track, index) => (
+                    <button
+                      key={track.id}
+                      className={track.url === musicUrl ? styles.musicTrackActive : ""}
+                      onClick={() => chooseMusicTrack(track)}
+                    >
+                      <span>{pad(index + 1)}</span>
+                      <strong>{track.name}</strong>
+                      <i>{track.url === musicUrl && musicPlaying ? "播放中" : track.url === musicUrl ? "已选择" : "播放"}</i>
+                    </button>
+                  )) : (
+                    <p>还没有音乐。你可以添加多个 `.mp3` 或 `.flac` 文件。</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </section>
       )}
 
       {(saving || preview) && (
-        <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-label="Memory preview">
+        <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-label="记忆预览">
           <article className={styles.previewCard}>
             {saving ? (
-              <div className={styles.savingState}><span className={styles.savingOrb} /><p>{providerLabel(provider)} is preserving this memory…</p><small>The original conversation is already safe on this device.</small></div>
+              <div className={styles.savingState}><span className={styles.savingOrb} /><p>{providerLabel(provider)} 正在保存这段记忆…</p><small>原始对话已经安全保存在此设备中。</small></div>
             ) : preview ? (
               <>
-                <div className={styles.previewTop}><div><h2>{preview.title}</h2><span>@YOU ∩ COMPANION · {preview.duration}</span></div><time>{preview.date}<br />{preview.time}</time></div>
+                <div className={styles.previewTop}><div><h2>{preview.title}</h2><span>@你 ∩ 陪伴者 · {preview.duration}</span></div><time>{preview.date}<br />{preview.time}</time></div>
                 <p className={styles.previewSummary}>{preview.summary}</p>
                 {preview.diary && <blockquote className={styles.previewDiary}>{preview.diary}</blockquote>}
-                <div className={styles.previewTurns}>{preview.turns.map((turn) => <div key={turn.id} className={`${styles.turnBubble} ${turn.role === "user" ? styles.userBubble : ""}`}><p>{turn.original}</p>{turn.translation && <small>{turn.translation}</small>}<button onClick={() => playTurn(turn)} aria-label={turn.audioBlob ? "Replay saved voice" : "Replay with preview voice"}>▶</button></div>)}</div>
-                <div className={styles.previewActions}><button onClick={() => void confirmPreview()} disabled={confirming} aria-label="Save to memory">{confirming ? "…" : "✓"}</button><button onClick={() => void navigator.clipboard.writeText(`${preview.title}\n\n${preview.summary}`)} aria-label="Copy summary">▣</button><button onClick={() => setPreview(null)} disabled={confirming} aria-label="Close preview">×</button></div>
+                <div className={styles.previewTurns}>{preview.turns.map((turn) => <div key={turn.id} className={`${styles.turnBubble} ${turn.role === "user" ? styles.userBubble : ""}`}><p>{turn.original}</p>{turn.translation && <small>{turn.translation}</small>}<button onClick={() => playTurn(turn)} aria-label={turn.audioBlob ? "重播已保存语音" : "使用预览语音重播"}>▶</button></div>)}</div>
+                <div className={styles.previewActions}><button onClick={() => void confirmPreview()} disabled={confirming} aria-label="保存到回廊">{confirming ? "…" : "✓"}</button><button onClick={() => void navigator.clipboard.writeText(`${preview.title}\n\n${preview.summary}`)} aria-label="复制摘要">▣</button><button onClick={() => setPreview(null)} disabled={confirming} aria-label="关闭预览">×</button></div>
               </>
             ) : null}
           </article>
@@ -1898,17 +1725,17 @@ export function HerApp() {
       {deleteTarget && (
         <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-labelledby="delete-memory-title">
           <article className={styles.deleteConfirm}>
-            <span>Remove memory</span>
-            <h2 id="delete-memory-title">Let this memory go?</h2>
+            <span>移除记忆</span>
+            <h2 id="delete-memory-title">要让这段记忆离开吗？</h2>
             <p>
               {deleteTarget.kind === "garden"
-                ? "This particle image and its linked conversations will be removed."
-                : "This saved conversation will be removed from Memory."}
+                ? "这张粒子图像及其关联的对话都将被移除。"
+                : "这段已保存的对话将从回廊中移除。"}
             </p>
             <strong>{deleteTarget.kind === "garden" ? deleteTarget.item.title : deleteTarget.card.title}</strong>
             <div>
-              <button onClick={() => setDeleteTarget(null)} disabled={deleting}>Keep it</button>
-              <button onClick={() => void confirmDelete()} disabled={deleting}>{deleting ? "Removing…" : "Delete"}</button>
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting}>保留</button>
+              <button onClick={() => void confirmDelete()} disabled={deleting}>{deleting ? "正在移除…" : "删除"}</button>
             </div>
           </article>
         </div>
@@ -1917,7 +1744,7 @@ export function HerApp() {
       {settingsOpen && (
         <aside className={styles.settingsPanel} aria-label="设置">
           <div className={styles.settingsTitle}>
-            <div><span>Particle field</span><h2>让记忆成为星团。</h2></div>
+            <div><span>粒子场</span></div>
             <button onClick={() => setSettingsOpen(false)} aria-label="关闭设置">×</button>
           </div>
 
@@ -2008,7 +1835,7 @@ export function HerApp() {
       )}
 
       <input ref={fileInputRef} className={styles.hiddenInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void handleImageUpload(file); }} />
-      <input ref={musicInputRef} className={styles.hiddenInput} type="file" accept="audio/*" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) handleMusicUpload(file); }} />
+      <input ref={musicInputRef} className={styles.hiddenInput} type="file" accept=".mp3,.flac,audio/mpeg,audio/flac,audio/x-flac" multiple onChange={(event) => { const files = event.target.files; if (files?.length) handleMusicUpload(files); event.currentTarget.value = ""; }} />
       {musicUrl && (
         <audio
           className={styles.hiddenAudio}
@@ -2018,7 +1845,7 @@ export function HerApp() {
           onPlay={() => { setMusicPlaying(true); startMusicAnalysis(); }}
           onPause={() => { setMusicPlaying(false); stopMusicAnalysis(); }}
           onEnded={() => { setMusicPlaying(false); stopMusicAnalysis(); }}
-          onError={() => { setMusicPlaying(false); stopMusicAnalysis(); flashNotice("This audio file could not be played."); }}
+          onError={() => { setMusicPlaying(false); stopMusicAnalysis(); flashNotice("无法播放这个音乐文件。"); }}
         />
       )}
       {notice && <div className={styles.toast} role="status">{notice}</div>}
@@ -2032,8 +1859,8 @@ function providerLabel(provider: string) {
 
 function storedSessionToCard(session: SessionRecord, imageUrl: string): MemoryCard {
   const date = new Date(session.createdAt);
-  const title = session.summary?.title.original ?? "Saved conversation";
-  const summary = session.summary?.abstract.original ?? "A conversation saved before its summary was ready.";
+  const title = session.summary?.title.original ?? "已保存的对话";
+  const summary = session.summary?.abstract.original ?? "这段对话在摘要生成前就已保存。";
   return {
     id: session.id,
     gardenItemId: session.gardenItemId,
@@ -2041,11 +1868,10 @@ function storedSessionToCard(session: SessionRecord, imageUrl: string): MemoryCa
     title,
     summary,
     diary: session.summary?.diary?.body.original,
-    date: date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-    time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+    date: date.toLocaleDateString("zh-CN", { month: "long", day: "2-digit", year: "numeric" }),
+    time: date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
     duration: formatClock(Math.max(1, Math.round(session.durationMs / 1000))),
     pinnedDate: session.pinnedDate,
-    mode: session.mode,
     turns: session.turns.map((turn) => ({
       id: turn.id,
       role: turn.role === "user" ? "user" : "assistant",
@@ -2053,7 +1879,6 @@ function storedSessionToCard(session: SessionRecord, imageUrl: string): MemoryCa
       translation: turn.text.originalLanguage === "en" ? turn.text.zh : turn.text.en,
       language: turn.text.originalLanguage,
       createdAt: turn.offsetStartMs,
-      speakerName: session.mode === "salon" ? session.participants.find((participant) => participant.id === turn.speakerId)?.name : undefined,
     })),
   };
 }
@@ -2074,7 +1899,7 @@ function blobToBase64(blob: Blob): Promise<string> {
       const value = typeof reader.result === "string" ? reader.result : "";
       resolve(value.includes(",") ? value.slice(value.indexOf(",") + 1) : value);
     };
-    reader.onerror = () => reject(reader.error ?? new Error("Unable to read the image."));
+    reader.onerror = () => reject(reader.error ?? new Error("无法读取图片。"));
     reader.readAsDataURL(blob);
   });
 }
@@ -2106,8 +1931,8 @@ function CalendarPanel({
   }, {});
   return (
     <article className={styles.calendarCard}>
-      <div className={styles.calendarNav}><button onClick={() => onMonth(new Date(year, monthIndex - 1, 1))}>‹</button><h2>{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h2><button onClick={() => onMonth(new Date(year, monthIndex + 1, 1))}>›</button></div>
-      <div className={styles.weekdays}>{["S", "M", "T", "W", "T", "F", "S"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
+      <div className={styles.calendarNav}><button onClick={() => onMonth(new Date(year, monthIndex - 1, 1))}>‹</button><h2>{month.toLocaleDateString("zh-CN", { month: "long", year: "numeric" })}</h2><button onClick={() => onMonth(new Date(year, monthIndex + 1, 1))}>›</button></div>
+      <div className={styles.weekdays}>{["日", "一", "二", "三", "四", "五", "六"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
       <div className={styles.calendarGrid}>
         {cells.map((day, index) => {
           if (!day) return <span key={`blank-${index}`} />;
@@ -2116,7 +1941,7 @@ function CalendarPanel({
           return <button key={key} className={selectedDate === key ? styles.daySelected : ""} onClick={() => onSelect(key)}><span>{day}</span>{count > 0 && <i>{Array.from({ length: Math.min(3, count) }, (_, dot) => <b key={dot} />)}{count > 3 && <small>+</small>}</i>}</button>;
         })}
       </div>
-      <p>{selectedDate ? `${counts[selectedDate] ?? 0} memories pinned · select a day to pin the newest` : "Choose a day"}</p>
+      <p>{selectedDate ? `已固定 ${counts[selectedDate] ?? 0} 段记忆 · 选择日期可固定最新记忆` : "请选择日期"}</p>
     </article>
   );
 }

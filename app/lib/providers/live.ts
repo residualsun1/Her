@@ -17,18 +17,13 @@ import type {
   MemorySummaryInput,
   MemorySummaryProvider,
   ProviderName,
-  SalonLine,
-  SalonRole,
-  SalonSceneInput,
-  SalonSceneResult,
-  SceneDirectorProvider,
   SupportedLanguage,
   TranslationInput,
   TranslationProvider,
   TranslationResult,
 } from "./types";
 
-type TextCapability = "chat" | "translation" | "summary" | "salon";
+type TextCapability = "chat" | "translation" | "summary";
 type ConversationRole = "user" | "assistant";
 
 interface InternalMessage {
@@ -60,8 +55,7 @@ export class LiveTextProvider
   implements
     ChatProvider,
     TranslationProvider,
-    MemorySummaryProvider,
-    SceneDirectorProvider
+    MemorySummaryProvider
 {
   constructor(
     readonly provider: ProviderName,
@@ -177,78 +171,6 @@ Write in ${languageLabel(input.language ?? "en")}. Do not invent events, feeling
       result.diary = requiredString(value.diary, "diary", this.capability, this.provider);
     }
     return result;
-  }
-
-  async directScene(input: SalonSceneInput): Promise<SalonSceneResult> {
-    const roles = normalizeRoles(input.roles);
-    const turns = Math.min(10, Math.max(3, Math.round(input.turns ?? 6)));
-    const language = input.language ?? "en";
-    const completion = await this.complete({
-      system: `You are the scene director for an intimate late-night conversation among distinct AI voices. ${JSON_ONLY}
-Return {"lines":[{"speakerId":string,"textOriginal":string,"textZh"?:string,"emotion":"curious"|"reflective"|"wry"|"warm"|"uncertain","pauseAfterMs":number}]}.
-Create exactly ${turns} turns. Use only the supplied role IDs, rotate voices naturally, and make each persona distinct. The exchange should feel spontaneous but remain safe and non-manipulative. Avoid exposition, branding, and claims that the voices are conscious.
-Write textOriginal in ${languageLabel(language)}.${
-        language.toLowerCase().startsWith("en")
-          ? " Also provide a natural Simplified Chinese textZh translation for every line."
-          : " textZh may be omitted."
-      } Pauses must be 250-1400 milliseconds.`,
-      messages: [
-        {
-          role: "user",
-          text: JSON.stringify({
-            topic: input.topic,
-            mood: input.mood ?? "late-night intimate",
-            roles,
-            imageContext: input.imageContext,
-          }),
-        },
-      ],
-      json: true,
-      maxTokens: 2_400,
-    });
-    const value = parseJsonObject(completion.text, this.capability, this.provider);
-    const rawLines = Array.isArray(value.lines) ? value.lines : [];
-    if (rawLines.length === 0) {
-      throw invalidProviderResponse(this.capability, this.provider, "lines must be a non-empty array");
-    }
-    const roleIds = new Set(roles.map((role) => role.id));
-    const emotions = new Set(["curious", "reflective", "wry", "warm", "uncertain"]);
-    const lines: SalonLine[] = rawLines.slice(0, turns).map((raw, index) => {
-      const line = isRecord(raw) ? raw : {};
-      const proposedSpeaker = optionalString(line.speakerId);
-      const speakerId =
-        proposedSpeaker && roleIds.has(proposedSpeaker)
-          ? proposedSpeaker
-          : roles[index % roles.length].id;
-      const emotion = optionalString(line.emotion);
-      const pause = typeof line.pauseAfterMs === "number" ? line.pauseAfterMs : 650;
-      return {
-        speakerId,
-        textOriginal: requiredString(
-          line.textOriginal,
-          `lines[${index}].textOriginal`,
-          this.capability,
-          this.provider,
-        ),
-        textZh: optionalString(line.textZh),
-        emotion: emotions.has(emotion ?? "")
-          ? (emotion as SalonLine["emotion"])
-          : "reflective",
-        pauseAfterMs: Math.round(Math.min(1_400, Math.max(250, pause))),
-      };
-    });
-    return {
-      provider: this.provider,
-      model: completion.model,
-      mock: false,
-      scene: {
-        topic: input.topic,
-        mood: input.mood?.trim() || "late-night intimate",
-        language,
-        roles,
-        lines,
-      },
-    };
   }
 
   private complete(input: TextCompletionRequest): Promise<CompletionResult> {
@@ -642,33 +564,6 @@ function upstreamErrorHint(payload: unknown): string {
   return code
     ? `Provider error code: ${code}. Check the key, model, quota, and region/base URL.`
     : "Check the key, model, quota, region/base URL, and provider status.";
-}
-
-function normalizeRoles(input: SalonSceneInput["roles"]): SalonRole[] {
-  const fallback: SalonRole[] = [
-    { id: "lumen", name: "Lumen", persona: "quietly curious", voiceId: "intimate" },
-    { id: "morrow", name: "Morrow", persona: "reflective and precise", voiceId: "reflective" },
-    { id: "sol", name: "Sol", persona: "warm with dry humor", voiceId: "bright" },
-    { id: "vale", name: "Vale", persona: "skeptical but gentle", voiceId: "neutral" },
-  ];
-  if (!input?.length) return fallback;
-  return input.slice(0, 5).map((role, index) => {
-    if (typeof role === "string") {
-      const name = role.trim().slice(0, 40) || `Voice ${index + 1}`;
-      return {
-        id: `role-${index + 1}`,
-        name,
-        persona: "reflective",
-        voiceId: ["intimate", "reflective", "bright"][index % 3],
-      };
-    }
-    return {
-      id: role.id.trim().slice(0, 40) || `role-${index + 1}`,
-      name: role.name.trim().slice(0, 40) || `Voice ${index + 1}`,
-      persona: role.persona?.trim().slice(0, 160) || "reflective",
-      voiceId: role.voiceId?.trim().slice(0, 80),
-    };
-  });
 }
 
 function languageLabel(language: SupportedLanguage): string {

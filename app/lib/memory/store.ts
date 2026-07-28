@@ -385,10 +385,7 @@ export class MemoryStore {
       createdAt: input.createdAt ?? now,
       updatedAt: now,
     };
-    const session: SessionRecord =
-      input.mode === "salon"
-        ? { ...base, mode: "salon", salon: input.salon }
-        : { ...base, mode: "conversation" };
+    const session: SessionRecord = { ...base, mode: "conversation" };
     await this.putSessionRecord(session);
     return clone(session);
   }

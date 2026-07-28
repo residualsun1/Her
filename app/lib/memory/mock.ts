@@ -73,7 +73,6 @@ function turn(
   offsetStartMs: number,
   offsetEndMs: number,
   speakerId?: string,
-  pauseAfterMs?: number,
 ): Turn {
   return {
     id,
@@ -82,7 +81,6 @@ function turn(
     text,
     offsetStartMs,
     offsetEndMs,
-    pauseAfterMs,
   };
 }
 
@@ -104,7 +102,6 @@ const userAndSamantha: SessionParticipant[] = [
 export function createDemoMemoryData(now = new Date()): MemorySeedData {
   const winterCreated = shiftDate(now, -3, -35);
   const coastCreated = shiftDate(now, -1, -18);
-  const salonCreated = shiftDate(now, 0, -8);
 
   const winterGarden: GardenItem = {
     id: "demo-garden-winter-light",
@@ -146,7 +143,7 @@ export function createDemoMemoryData(now = new Date()): MemorySeedData {
   const coastGarden: GardenItem = {
     id: "demo-garden-after-rain",
     createdAt: coastCreated.toISOString(),
-    updatedAt: salonCreated.toISOString(),
+    updatedAt: coastCreated.toISOString(),
     title: zh("雨停之后", "After the rain"),
     image: {
       blob: imageBlob("AFTER THE RAIN", ["#203a35", "#17110d", "#d3a455"]),
@@ -212,104 +209,6 @@ export function createDemoMemoryData(now = new Date()): MemorySeedData {
       26_400,
       34_900,
       "samantha",
-    ),
-  ];
-
-  const salonParticipants: SessionParticipant[] = [
-    {
-      id: "mara",
-      name: "Mara",
-      kind: "salon_speaker",
-      voiceId: "velvet-alto",
-      accent: "London",
-    },
-    {
-      id: "eli",
-      name: "Eli",
-      kind: "salon_speaker",
-      voiceId: "gentle-tenor",
-      accent: "American",
-    },
-    {
-      id: "june",
-      name: "June",
-      kind: "salon_speaker",
-      voiceId: "clear-mezzo",
-      accent: "Australian",
-    },
-  ];
-
-  const salonTurns: Turn[] = [
-    turn(
-      "demo-turn-salon-1",
-      "salon_speaker",
-      en(
-        "Do you think a memory changes when somebody else begins to remember it with you?",
-        "当另一个人开始和你一起记得某段往事时，你觉得记忆会改变吗？",
-      ),
-      800,
-      6_500,
-      "mara",
-      620,
-    ),
-    turn(
-      "demo-turn-salon-2",
-      "salon_speaker",
-      en(
-        "It becomes less accurate, perhaps, but more alive.",
-        "也许它会变得不那么准确，却更鲜活。",
-      ),
-      7_120,
-      10_900,
-      "eli",
-      420,
-    ),
-    turn(
-      "demo-turn-salon-3",
-      "salon_speaker",
-      en(
-        "I like that. As if being witnessed is another kind of weather.",
-        "我喜欢这个说法，仿佛被见证是另一种天气。",
-      ),
-      11_320,
-      16_100,
-      "june",
-      760,
-    ),
-    turn(
-      "demo-turn-salon-4",
-      "salon_speaker",
-      en(
-        "And the story bends toward whoever is listening.",
-        "而故事会朝着倾听它的人轻轻弯曲。",
-      ),
-      16_860,
-      20_700,
-      "mara",
-      520,
-    ),
-    turn(
-      "demo-turn-salon-5",
-      "salon_speaker",
-      en(
-        "Then loneliness may be a memory with nowhere to land.",
-        "那么，孤独或许就是一段无处落脚的记忆。",
-      ),
-      21_220,
-      25_600,
-      "eli",
-      900,
-    ),
-    turn(
-      "demo-turn-salon-6",
-      "salon_speaker",
-      en(
-        "For tonight, it can land here.",
-        "至少今晚，它可以落在这里。",
-      ),
-      26_500,
-      29_200,
-      "june",
     ),
   ];
 
@@ -384,38 +283,6 @@ export function createDemoMemoryData(now = new Date()): MemorySeedData {
         ),
         moodTags: ["quiet", "after-rain"],
         generatedAt: shiftDate(coastCreated, 0, 1).toISOString(),
-      },
-    },
-    {
-      id: "demo-session-salon-witnessed-memory",
-      gardenItemId: coastGarden.id,
-      mode: "salon",
-      createdAt: salonCreated.toISOString(),
-      updatedAt: shiftDate(salonCreated, 0, 1).toISOString(),
-      pinnedDate: calendarDate(now),
-      participants: salonParticipants,
-      turns: salonTurns,
-      durationMs: 31_600,
-      primaryLanguage: "en",
-      saveStatus: "ready",
-      salon: {
-        topic: en(
-          "Does a memory change when it is shared?",
-          "一段记忆在被分享之后会改变吗？",
-        ),
-        mood: "late-night intimate",
-        language: "en",
-        plannedTurnCount: 6,
-      },
-      summary: {
-        title: en("A place for memory to land", "记忆落脚的地方"),
-        abstract: en(
-          "Mara, Eli, and June wonder whether shared memories become less precise but more alive—and whether listening gives loneliness somewhere to land.",
-          "Mara、Eli 与 June 谈论共享的记忆是否会变得不够准确却更加鲜活，以及倾听能否给孤独一个落脚之处。",
-        ),
-        moodTags: ["intimate", "reflective", "salon"],
-        generatedAt: shiftDate(salonCreated, 0, 1).toISOString(),
-        model: { provider: "deepseek", model: "demo-salon-director" },
       },
     },
   ];

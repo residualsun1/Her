@@ -2,14 +2,14 @@
  * Device-local memory model for the Her demo.
  *
  * Garden items own the visual source and particle configuration. A garden item
- * can have any number of conversation or salon session records. Audio remains
+ * can have any number of conversation session records. Audio remains
  * in its own object store so large blobs are not copied whenever a session is
  * updated.
  */
 
 export type SupportedLanguage = "en" | "zh";
 export type CalendarDate = `${number}-${number}-${number}`;
-export type SessionMode = "conversation" | "salon";
+export type SessionMode = "conversation";
 export type SaveStatus = "draft" | "summarizing" | "ready" | "failed";
 export type ProviderId =
   | "deepseek"
@@ -83,12 +83,11 @@ export interface GardenItem {
   musicAssetId?: string;
 }
 
-export type TurnRole = "user" | "assistant" | "salon_speaker";
+export type TurnRole = "user" | "assistant";
 
 export interface Turn {
   id: string;
   role: TurnRole;
-  /** Required for salon speakers; optional display identity for other roles. */
   speakerId?: string;
   text: BilingualText;
   model?: ModelReference;
@@ -97,14 +96,12 @@ export interface Turn {
   offsetEndMs?: number;
   audioAssetId?: string;
   interrupted?: boolean;
-  /** Director-controlled silence after a salon line. */
-  pauseAfterMs?: number;
 }
 
 export interface SessionParticipant {
   id: string;
   name: string;
-  kind: "user" | "assistant" | "salon_speaker";
+  kind: "user" | "assistant";
   voiceId?: string;
   accent?: string;
 }
@@ -122,13 +119,6 @@ export interface SessionSummary {
   generatedAt: string;
   model?: ModelReference;
   diary?: GeneratedDiary;
-}
-
-export interface SalonSettings {
-  topic: BilingualText;
-  mood: string;
-  language: SupportedLanguage;
-  plannedTurnCount: number;
 }
 
 interface SessionRecordBase {
@@ -150,17 +140,11 @@ export interface ConversationSessionRecord extends SessionRecordBase {
   mode: "conversation";
 }
 
-export interface SalonSessionRecord extends SessionRecordBase {
-  mode: "salon";
-  salon: SalonSettings;
-}
-
-export type SessionRecord = ConversationSessionRecord | SalonSessionRecord;
+export type SessionRecord = ConversationSessionRecord;
 
 export type AudioOwnerType =
   | "user_turn"
   | "assistant_turn"
-  | "salon_turn"
   | "music";
 
 export interface AudioAsset {
@@ -196,17 +180,7 @@ export type CreateConversationSessionInput = Omit<
   createdAt?: string;
 };
 
-export type CreateSalonSessionInput = Omit<
-  SalonSessionRecord,
-  "id" | "createdAt" | "updatedAt"
-> & {
-  id?: string;
-  createdAt?: string;
-};
-
-export type CreateSessionRecordInput =
-  | CreateConversationSessionInput
-  | CreateSalonSessionInput;
+export type CreateSessionRecordInput = CreateConversationSessionInput;
 
 export type UpdateSessionRecordInput = Partial<
   Pick<
@@ -263,10 +237,4 @@ export function getLocalizedText(
 ): string {
   if (language === value.originalLanguage) return value.original;
   return value[language] ?? value.original;
-}
-
-export function isSalonSession(
-  session: SessionRecord,
-): session is SalonSessionRecord {
-  return session.mode === "salon";
 }

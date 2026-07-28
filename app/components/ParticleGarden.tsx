@@ -54,7 +54,6 @@ export function ParticleGarden({
   );
   const [debouncedCount, setDebouncedCount] = useState(mergedTuning.particleCount);
   const [particleCap, setParticleCap] = useState(262_144);
-  const [readyKey, setReadyKey] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -83,12 +82,10 @@ export function ParticleGarden({
     ? Math.min(debouncedCount, 65_536)
     : Math.min(debouncedCount, particleCap);
   const renderKey = `${imageUrl ?? "empty"}-${adaptiveCount}-${preview ? "preview" : "hero"}`;
-  const ready = readyKey === renderKey;
 
   const rootClassName = [
     styles.root,
     precomposed ? styles.precomposed : "",
-    ready ? styles.ready : "",
     className ?? "",
   ].filter(Boolean).join(" ");
 
@@ -103,7 +100,6 @@ export function ParticleGarden({
       aria-label="由上传图片生成、可随鼠标与声音流动的星团记忆"
       style={{ "--image-clarity": imageClarity } as CSSProperties}
     >
-      <img className={styles.imageBase} src={imageUrl} alt="" aria-hidden="true" />
       <Canvas
         key={renderKey}
         className={styles.canvas}
@@ -133,7 +129,6 @@ export function ParticleGarden({
             zoom={zoom}
             preview={preview}
             onReady={(pointCount) => {
-              setReadyKey(renderKey);
               onReady?.({
                 pointCount,
                 reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,

@@ -21,7 +21,6 @@ import type {
   ImageContextProvider,
   MemorySummaryProvider,
   ProviderAvailability,
-  SceneDirectorProvider,
   TranslationProvider,
   TtsProvider,
 } from "./types";
@@ -33,8 +32,7 @@ type CapabilityAdapter =
   | AsrProvider
   | TranslationProvider
   | TtsProvider
-  | MemorySummaryProvider
-  | SceneDirectorProvider;
+  | MemorySummaryProvider;
 
 function getAdapter(
   capability: Capability,
@@ -57,8 +55,7 @@ function getAdapter(
     if (
       capability === "chat" ||
       capability === "translation" ||
-      capability === "summary" ||
-      capability === "salon"
+      capability === "summary"
     ) {
       return new LiveTextProvider(provider, capability);
     }
@@ -96,12 +93,6 @@ export function getMemorySummaryProvider(
   return getAdapter("summary", provider) as MemorySummaryProvider;
 }
 
-export function getSceneDirectorProvider(
-  provider?: unknown,
-): SceneDirectorProvider {
-  return getAdapter("salon", provider) as SceneDirectorProvider;
-}
-
 export function listCapabilityStatus(): CapabilityStatus[] {
   const capabilities: Capability[] = [
     "chat",
@@ -110,7 +101,6 @@ export function listCapabilityStatus(): CapabilityStatus[] {
     "translation",
     "tts",
     "summary",
-    "salon",
   ];
   return capabilities.map((capability) => getCapabilityStatus(capability));
 }

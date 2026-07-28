@@ -20,18 +20,12 @@
   display: block;
   width: 100% !important;
   height: 100% !important;
-  opacity: 0;
+  opacity: 1;
   filter: saturate(1.08) contrast(1.04);
-  transition: opacity 1600ms cubic-bezier(0.22, 1, 0.36, 1);
   cursor: crosshair;
   touch-action: none;
 }
 
-.ready .canvas {
-  opacity: 1;
-}
-
-.imageBase,
 .imageBaseFallback {
   position: absolute;
   z-index: 1;
@@ -63,11 +57,6 @@
     filter 2200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.ready .imageBase {
-  opacity: 0;
-  filter: saturate(0.72) contrast(1.12) brightness(0.64) blur(0.25px);
-}
-
 .imageBaseFallback {
   inset: 6%;
   width: 88%;
@@ -86,8 +75,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .canvas,
-  .imageBase {
+  .canvas {
     transition-duration: 200ms;
   }
 }

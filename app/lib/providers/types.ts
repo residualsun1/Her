@@ -14,8 +14,7 @@ export type Capability =
   | "asr"
   | "translation"
   | "tts"
-  | "summary"
-  | "salon";
+  | "summary";
 
 export type SupportedLanguage = "en" | "zh" | "auto" | (string & {});
 
@@ -160,7 +159,7 @@ export interface TtsProvider {
 }
 
 export interface MemoryTurn {
-  role: "user" | "assistant" | "salon_speaker";
+  role: "user" | "assistant";
   text: string;
   speakerId?: string;
   language?: SupportedLanguage;
@@ -182,46 +181,6 @@ export interface MemorySummary extends ProviderMeta {
 
 export interface MemorySummaryProvider {
   summarizeMemory(input: MemorySummaryInput): Promise<MemorySummary>;
-}
-
-export interface SalonRole {
-  id: string;
-  name: string;
-  persona?: string;
-  voiceId?: string;
-}
-
-export interface SalonLine {
-  speakerId: string;
-  textOriginal: string;
-  textZh?: string;
-  emotion?: "curious" | "reflective" | "wry" | "warm" | "uncertain";
-  pauseAfterMs: number;
-}
-
-export interface SalonScene {
-  topic: string;
-  mood: string;
-  language: SupportedLanguage;
-  roles: SalonRole[];
-  lines: SalonLine[];
-}
-
-export interface SalonSceneInput {
-  topic: string;
-  roles?: Array<SalonRole | string>;
-  turns?: number;
-  language?: SupportedLanguage;
-  mood?: string;
-  imageContext?: Pick<ImageContext, "description" | "possibleTopics">;
-}
-
-export interface SalonSceneResult extends ProviderMeta {
-  scene: SalonScene;
-}
-
-export interface SceneDirectorProvider {
-  directScene(input: SalonSceneInput): Promise<SalonSceneResult>;
 }
 
 export interface CapabilityStatus {

@@ -13,11 +13,6 @@ import type {
   MemorySummaryInput,
   MemorySummaryProvider,
   ProviderName,
-  SalonLine,
-  SalonRole,
-  SalonSceneInput,
-  SalonSceneResult,
-  SceneDirectorProvider,
   TranslationInput,
   TranslationProvider,
   TranslationResult,
@@ -85,8 +80,7 @@ export class MockProvider
     ChatProvider,
     TranslationProvider,
     TtsProvider,
-    MemorySummaryProvider,
-    SceneDirectorProvider
+    MemorySummaryProvider
 {
   constructor(readonly provider: ProviderName) {}
 
@@ -242,85 +236,4 @@ export class MockProvider
     };
   }
 
-  async directScene(input: SalonSceneInput): Promise<SalonSceneResult> {
-    const roles = normalizeRoles(input.roles);
-    const turnCount = Math.min(8, Math.max(3, Math.round(input.turns ?? 6)));
-    const topic = compactText(input.topic, 160);
-    const englishLines = [
-      `I've been thinking about ${topic}. It feels different after midnight.`,
-      "Maybe the dark removes everything we use to pretend certainty.",
-      "Or maybe silence gives the question enough room to answer us.",
-      "Questions don't answer. People do.",
-      "Are you sure? Some questions stay with us longer than people can.",
-      "Then perhaps memory is only a question that learned the sound of your voice.",
-      "I like that. It makes forgetting feel less like an ending.",
-      "Not an ending. Just a room whose light we can no longer switch on.",
-    ];
-    const chineseLines = [
-      `我一直在想“${topic}”。它在午夜之后听起来不太一样。`,
-      "也许黑暗拿走了那些让我们假装确定的东西。",
-      "或者，是沉默终于给了问题足够的空间来回答。",
-      "问题不会回答，人才会。",
-      "你确定吗？有些问题陪伴我们的时间，比任何人都更久。",
-      "那么，也许记忆只是一个学会了你声音的问题。",
-      "我喜欢这种说法。它让遗忘不再像一种结束。",
-      "不是结束，只是一间我们再也无法开灯的房间。",
-    ];
-    const emotions: NonNullable<SalonLine["emotion"]>[] = [
-      "curious",
-      "reflective",
-      "uncertain",
-      "wry",
-      "warm",
-      "reflective",
-    ];
-    const lines: SalonLine[] = Array.from({ length: turnCount }, (_, index) => {
-      const useChinese = isChineseLanguage(input.language);
-      return {
-        speakerId: roles[index % roles.length].id,
-        textOriginal: useChinese ? chineseLines[index] : englishLines[index],
-        textZh: useChinese ? undefined : chineseLines[index],
-        emotion: emotions[index % emotions.length],
-        pauseAfterMs: 500 + (hashText(`${topic}:${index}`) % 350),
-      };
-    });
-    return {
-      ...mockMeta(this.provider),
-      scene: {
-        topic,
-        mood: input.mood?.trim() || "late-night intimate",
-        language: input.language ?? "en",
-        roles,
-        lines,
-      },
-    };
-  }
-}
-
-function normalizeRoles(input: SalonSceneInput["roles"]): SalonRole[] {
-  const fallback: SalonRole[] = [
-    { id: "lumen", name: "Lumen", persona: "quietly curious", voiceId: "intimate" },
-    { id: "morrow", name: "Morrow", persona: "reflective and precise", voiceId: "reflective" },
-    { id: "sol", name: "Sol", persona: "warm with dry humor", voiceId: "bright" },
-    { id: "vale", name: "Vale", persona: "skeptical but gentle", voiceId: "neutral" },
-  ];
-  if (!input?.length) return fallback;
-  const normalized = input.slice(0, 5).map((role, index) => {
-    if (typeof role === "string") {
-      const name = compactText(role, 40) || `Voice ${index + 1}`;
-      return {
-        id: `role-${index + 1}`,
-        name,
-        persona: "reflective",
-        voiceId: ["intimate", "reflective", "bright"][index % 3],
-      };
-    }
-    return {
-      id: compactText(role.id, 40) || `role-${index + 1}`,
-      name: compactText(role.name, 40) || `Voice ${index + 1}`,
-      persona: role.persona ? compactText(role.persona, 120) : undefined,
-      voiceId: role.voiceId ? compactText(role.voiceId, 80) : undefined,
-    };
-  });
-  return normalized.length >= 2 ? normalized : [...normalized, fallback[1]];
 }

@@ -14,7 +14,6 @@ const DEFAULT_PROVIDERS: Record<Capability, ProviderName> = {
   translation: "qwen",
   tts: "qwen",
   summary: "deepseek",
-  salon: "deepseek",
 };
 
 const PROVIDER_ENV: Record<Capability, string> = {
@@ -24,7 +23,6 @@ const PROVIDER_ENV: Record<Capability, string> = {
   translation: "HER_TRANSLATION_PROVIDER",
   tts: "HER_TTS_PROVIDER",
   summary: "HER_SUMMARY_PROVIDER",
-  salon: "HER_SALON_PROVIDER",
 };
 
 const MODEL_ENV: Record<Capability, string> = {
@@ -34,7 +32,6 @@ const MODEL_ENV: Record<Capability, string> = {
   translation: "HER_TRANSLATION_MODEL",
   tts: "HER_TTS_MODEL",
   summary: "HER_SUMMARY_MODEL",
-  salon: "HER_SALON_MODEL",
 };
 
 const CREDENTIAL_ENV: Record<ProviderName, string[]> = {
@@ -81,7 +78,6 @@ const TEXT_CAPABILITIES = new Set<Capability>([
   "chat",
   "translation",
   "summary",
-  "salon",
 ]);
 
 export function envValue(name: string): string | undefined {
@@ -179,7 +175,6 @@ export function listLiveCapabilities(provider: ProviderName): Capability[] {
     "translation",
     "tts",
     "summary",
-    "salon",
   ];
   return capabilities.filter((capability) =>
     isLiveCapabilityImplemented(capability, provider),

@@ -21,10 +21,11 @@ test("server-renders the Her memory garden shell", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
 
-  assert.match(html, /<title>Her — AI Memory Garden<\/title>/i);
-  assert.match(html, /The Garden/);
-  assert.match(html, /Save Memory/);
-  assert.match(html, /There’s something gentle in this portrait/);
+  assert.match(html, /<title>Her — AI 记忆花园<\/title>/i);
+  assert.match(html, />记忆</);
+  assert.match(html, /保存记忆/);
+  assert.match(html, /这张照片里有一种温柔/);
+  assert.doesNotMatch(html, /AI Salon/i);
   assert.doesNotMatch(html, /Images keep breathing/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
@@ -67,7 +68,7 @@ test("starter preview is removed and project modules are present", async () => {
   ]);
 
   assert.match(page, /<HerApp \/>/);
-  assert.match(layout, /AI Memory Garden/);
+  assert.match(layout, /AI 记忆花园/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.match(packageJson, /@react-three\/fiber/);
   assert.match(packageJson, /"three"/);
@@ -102,9 +103,12 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /smoothingTimeConstant = 0\.76/);
   assert.match(herApp, /average \* 1\.15 \+ bass \* 0\.62/);
   assert.match(herApp, /主体音乐律动/);
+  assert.match(herApp, /音乐列表/);
+  assert.match(herApp, /\.mp3,.flac/);
+  assert.doesNotMatch(herApp, /salon/i);
   assert.match(herApp, /immersiveMode/);
-  assert.match(herApp, /Hide interface/);
-  assert.match(herApp, /Show interface \(Esc\)/);
+  assert.match(herApp, /隐藏界面/);
+  assert.match(herApp, /显示界面（Esc）/);
   assert.match(appStyles, /\.immersiveStage \.providerPill,[\s\S]*?animation: none !important/);
   assert.match(appStyles, /\.immersiveStage \.uploadAnother \{[\s\S]*?display: none !important/);
   assert.match(appStyles, /\.immersiveStage \.immersiveToggle > span:not\(\.immersiveIcon\)/);
@@ -123,7 +127,7 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(particle, /r3f-fbo/);
   assert.match(particle, /debouncedCount/);
   assert.match(particle, /imageClarity/);
-  assert.match(particle, /imageBase/);
+  assert.doesNotMatch(particle, /className=\{styles\.imageBase\}/);
   assert.match(particle, /preserveDrawingBuffer/);
   assert.match(particle, /precomposed/);
   assert.match(gpu, /WebGLRenderTarget/);
@@ -165,9 +169,9 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(particleConfig, /audioAttack: 0\.045/);
   assert.match(particleConfig, /audioRelease: 0\.28/);
   assert.match(particleConfig, /reactTarget: "peel"/);
-  assert.match(particleStyles, /\.ready \.imageBase/);
+  assert.doesNotMatch(particleStyles, /\.ready \.imageBase/);
   assert.match(appStyles, /\.parameterNote/);
-  assert.match(particleStyles, /transition:[\s\S]*opacity 2200ms/);
+  assert.match(particleStyles, /\.canvas[\s\S]*opacity: 1/);
   assert.match(store, /indexedDB/);
   await assert.rejects(access(new URL("app/_sites-preview/SkeletonPreview.tsx", root)));
 });
