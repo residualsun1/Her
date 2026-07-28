@@ -20,10 +20,11 @@ import type {
 import styles from "./HerApp.module.css";
 
 const ParticleGarden = lazy(() => import("./ParticleGarden"));
+const USER_WORDS_HOLD_MS = 2_400;
 
 type View = "conversation" | "garden" | "memory" | "music";
 type MemoryTab = "cards" | "calendar";
-type ReplyState = "idle" | "listening" | "thinking" | "speaking" | "ready";
+type ReplyState = "idle" | "listening" | "holding" | "thinking" | "speaking" | "ready";
 type ProviderOption = { provider: string; configured: boolean; liveAdapterImplemented: boolean };
 
 type ChatTurn = {
@@ -258,6 +259,7 @@ export function HerApp() {
   const [turns, setTurns] = useState<ChatTurn[]>(DEFAULT_TURNS);
   const [replyState, setReplyState] = useState<ReplyState>("ready");
   const [input, setInput] = useState("");
+  const [sentEcho, setSentEcho] = useState<string | null>(null);
   const [liveTranscript, setLiveTranscript] = useState("");
   const [elapsed, setElapsed] = useState(3);
   const [recordingElapsed, setRecordingElapsed] = useState(0);
@@ -313,6 +315,7 @@ export function HerApp() {
   const speechPulseRef = useRef<number | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const transcriptRef = useRef("");
+  const replyDelayRunRef = useRef(0);
   const recordingStartedRef = useRef(0);
   const startedOnPointerRef = useRef(false);
   const persistedUrlsRef = useRef<string[]>([]);
@@ -452,6 +455,7 @@ export function HerApp() {
   useEffect(() => {
     return () => {
       captureRunRef.current += 1;
+      replyDelayRunRef.current += 1;
       try { recognitionRef.current?.stop(); } catch { /* browser already stopped it */ }
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       if (analyserFrameRef.current) cancelAnimationFrame(analyserFrameRef.current);
@@ -462,6 +466,12 @@ export function HerApp() {
       void musicAudioContextRef.current?.close();
       if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
     };
+  }, []);
+
+  const cancelPendingReply = useCallback(() => {
+    replyDelayRunRef.current += 1;
+    setSentEcho(null);
+    setReplyState((current) => current === "holding" ? "ready" : current);
   }, []);
 
   useEffect(() => {
@@ -535,7 +545,7 @@ export function HerApp() {
   const submitMessage = useCallback(
     async (raw: string, audioBlob?: Blob) => {
       const message = raw.trim();
-      if (!message || replyState === "thinking") return;
+      if (!message || replyState === "holding" || replyState === "thinking") return;
       stopSpeechPlayback();
       const userTurn: ChatTurn = {
         id: crypto.randomUUID(),
@@ -550,6 +560,12 @@ export function HerApp() {
       setInput("");
       setLiveTranscript("");
       transcriptRef.current = "";
+      const replyRun = ++replyDelayRunRef.current;
+      setSentEcho(message);
+      setReplyState("holding");
+      await new Promise<void>((resolve) => window.setTimeout(resolve, USER_WORDS_HOLD_MS));
+      if (replyRun !== replyDelayRunRef.current) return;
+      setSentEcho(null);
       setReplyState("thinking");
       try {
         const response = await fetch("/api/chat", {
@@ -747,6 +763,7 @@ export function HerApp() {
     }
     if (replyState === "listening" || captureStartingRef.current) await stopListening(false);
     stopSpeechPlayback();
+    cancelPendingReply();
     const objectUrl = URL.createObjectURL(file);
     uploadUrlsRef.current.push(objectUrl);
     setImageUrl(objectUrl);
@@ -813,7 +830,7 @@ export function HerApp() {
     };
     setTurns([assistantTurn]);
     speak(welcome);
-  }, [flashNotice, replyState, speak, stopListening, stopSpeechPlayback, visionEnabled]);
+  }, [cancelPendingReply, flashNotice, replyState, speak, stopListening, stopSpeechPlayback, visionEnabled]);
 
   const ensureCurrentGarden = useCallback(async () => {
     if (currentGardenIdRef.current) {
@@ -1253,6 +1270,7 @@ export function HerApp() {
 
   const openGardenConversation = (item = gardenItems[gardenIndex]) => {
     if (!item) return;
+    cancelPendingReply();
     setImageUrl(item.imageUrl);
     setImagePrecomposed(Boolean(item.precomposed));
     setImageTitle(item.title);
@@ -1303,6 +1321,7 @@ export function HerApp() {
   }, [deleteTarget, deleting, flashNotice, refreshSavedCards]);
 
   const navigateTo = (nextView: View) => {
+    cancelPendingReply();
     setImmersiveMode(false);
     if (nextView !== "conversation" && (replyState === "listening" || captureStartingRef.current)) {
       void stopListening(false);
@@ -1372,16 +1391,15 @@ export function HerApp() {
             </button>
           )}
           {(!conversationFromGarden || conversationChromeVisible) && (
-            <div className={`${styles.providerPill} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
-              <span className={replyState === "speaking" ? styles.liveWave : styles.providerGlyph}>{replyState === "speaking" ? "≋" : "×"}</span>
-              <span className={styles.statusDot} />
-              <span>{providerMode === "mock" ? "预览 AI" : providerLabel(provider)}</span>
-            </div>
+            <time className={`${styles.conversationTimer} ${conversationFromGarden ? styles.delayedChrome : ""}`} dateTime={`PT${elapsed}S`}>
+              {formatClock(elapsed)}
+            </time>
           )}
 
           {(!conversationFromGarden || conversationChromeVisible) && <div className={`${styles.conversationUi} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
               {replyState === "thinking" && <div className={styles.thinking}>对方正在思考 <span>·</span><span>·</span><span>·</span></div>}
-              {currentAssistant && (
+              {sentEcho && <div className={styles.sentEcho} aria-live="polite"><p>{sentEcho}</p></div>}
+              {!sentEcho && currentAssistant && (
                 <article className={`${styles.replyCard} ${conversationFromGarden ? styles.gardenQuestion : ""} ${replyState === "speaking" ? styles.replySpeaking : ""}`}>
                   <div className={styles.miniWave} aria-hidden="true">{Array.from({ length: 11 }, (_, index) => <i key={index} />)}</div>
                   <p>{currentAssistant.original}</p>
@@ -1393,6 +1411,7 @@ export function HerApp() {
                 <div className={`${styles.inputBar} ${replyState === "listening" ? styles.inputListening : ""}`}>
                   <input
                     value={input}
+                    disabled={replyState === "holding" || replyState === "thinking"}
                     onChange={(event) => setInput(event.target.value)}
                     onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && void submitMessage(input)}
                     placeholder={replyState === "listening" ? "正在聆听…" : "在这里输入…"}
@@ -1400,6 +1419,7 @@ export function HerApp() {
                   />
                   <button
                     className={styles.micButton}
+                    disabled={replyState === "holding" || replyState === "thinking"}
                     onPointerDown={handleMicPointerDown}
                     onPointerUp={handleMicPointerUp}
                     onPointerCancel={() => void stopListening(false)}
@@ -1424,11 +1444,12 @@ export function HerApp() {
                   </div>
                 )}
                 <div className={styles.sessionBar}>
-                  <span className={styles.timer}>{formatClock(elapsed)}</span>
-                  <button className={styles.saveButton} onClick={() => void saveMemory()}>保存记忆 <span>›</span></button>
-                  <button className={styles.closeButton} onClick={() => { void stopListening(false); setTurns([]); setElapsed(0); draftSessionIdRef.current = undefined; }} aria-label="结束对话">×</button>
+                  <button className={styles.uploadMemoryButton} onClick={() => fileInputRef.current?.click()} aria-label="上传图片">
+                    <span className={styles.imageUploadIcon} aria-hidden="true"><i /></span>
+                  </button>
+                  <button className={styles.saveButton} onClick={() => void saveMemory()}>留住记忆 <span>›</span></button>
+                  <button className={styles.closeButton} onClick={() => { cancelPendingReply(); void stopListening(false); setTurns([]); setElapsed(0); draftSessionIdRef.current = undefined; }} aria-label="结束对话">×</button>
                 </div>
-                <button className={styles.uploadAnother} onClick={() => fileInputRef.current?.click()}>← 上传另一张图片</button>
               </div>
             </div>
           }

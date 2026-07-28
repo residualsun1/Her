@@ -23,7 +23,7 @@ test("server-renders the Her memory garden shell", async () => {
 
   assert.match(html, /<title>Her — AI 记忆花园<\/title>/i);
   assert.match(html, />记忆</);
-  assert.match(html, /保存记忆/);
+  assert.match(html, /留住记忆/);
   assert.match(html, /这张照片里有一种温柔/);
   assert.doesNotMatch(html, /AI Salon/i);
   assert.doesNotMatch(html, /Images keep breathing/);
@@ -120,8 +120,15 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /immersiveMode/);
   assert.match(herApp, /隐藏界面/);
   assert.match(herApp, /显示界面（Esc）/);
-  assert.match(appStyles, /\.immersiveStage \.providerPill,[\s\S]*?animation: none !important/);
-  assert.match(appStyles, /\.immersiveStage \.uploadAnother \{[\s\S]*?display: none !important/);
+  assert.match(appStyles, /\.immersiveStage \.conversationTimer,[\s\S]*?animation: none !important/);
+  assert.match(herApp, /USER_WORDS_HOLD_MS = 2_400/);
+  assert.match(herApp, /setSentEcho\(message\)[\s\S]*?setReplyState\("holding"\)[\s\S]*?USER_WORDS_HOLD_MS[\s\S]*?fetch\("\/api\/chat"/);
+  assert.match(herApp, /className=\{styles\.sentEcho\}/);
+  assert.match(appStyles, /@keyframes userWordsIn/);
+  assert.doesNotMatch(herApp, /预览 AI|上传另一张图片|保存记忆/);
+  assert.match(herApp, /conversationTimer[\s\S]*?formatClock\(elapsed\)/);
+  assert.match(herApp, /uploadMemoryButton[\s\S]*?aria-label="上传图片"/);
+  assert.match(herApp, /留住记忆/);
   assert.match(herApp, /immersiveIcon[\s\S]*?<i \/><i \/><i \/><i \/>/);
   assert.doesNotMatch(herApp, /<span>\{immersiveMode \? "显示界面" : "隐藏界面"\}<\/span>/);
   assert.doesNotMatch(appStyles, /\.immersiveStage \.immersiveToggle small \{[\s\S]*?display: none/);
