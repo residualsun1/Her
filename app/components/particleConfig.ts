@@ -14,10 +14,6 @@ export type ParticleTuning = {
   haloDensity: number;
   edgeFeather: number;
   clusterIrregularity: number;
-  dreamRimWidth: number;
-  webReach: number;
-  webTension: number;
-  webFrequency: number;
   densityGamma: number;
   sparkleAmount: number;
   homeSpring: number;
@@ -31,6 +27,7 @@ export type ParticleTuning = {
   pointerSmoothing: number;
   colorShiftSpeed: number;
   danceStrength: number;
+  subjectRhythmStrength: number;
   audioBrightnessStrength: number;
   audioBloomStrength: number;
   bassGain: number;
@@ -65,21 +62,17 @@ export type ParticleTuning = {
 export const DEFAULT_PARTICLE_TUNING: ParticleTuning = {
   particleCount: 262_144,
   particleSize: 2.8,
-  trailLength: 0.76,
+  trailLength: 0.68,
   contrast: 1.3,
   flowSpeed: 1,
-  flowAmplitude: 1.15,
+  flowAmplitude: 1,
   depthStrength: 50,
   depthWave: 5,
-  coreRetention: 0.93,
-  haloWidth: 0.34,
-  haloDensity: 0.52,
-  edgeFeather: 0.27,
-  clusterIrregularity: 0.42,
-  dreamRimWidth: 0.2,
-  webReach: 1.15,
-  webTension: 0.62,
-  webFrequency: 5.2,
+  coreRetention: 0.91,
+  haloWidth: 0.25,
+  haloDensity: 0.4,
+  edgeFeather: 0.24,
+  clusterIrregularity: 0.36,
   densityGamma: 0.75,
   sparkleAmount: 0.12,
   homeSpring: 0.068,
@@ -92,34 +85,35 @@ export const DEFAULT_PARTICLE_TUNING: ParticleTuning = {
   mouseDepthPull: 0.95,
   pointerSmoothing: 0.16,
   colorShiftSpeed: 2,
-  danceStrength: 8.4,
-  audioBrightnessStrength: 0.7,
-  audioBloomStrength: 0.68,
-  bassGain: 1.7,
-  flowReactStrength: 0.9,
-  depthReactStrength: 0.85,
-  sparkleReactStrength: 0.46,
+  danceStrength: 7.5,
+  subjectRhythmStrength: 0.55,
+  audioBrightnessStrength: 0.55,
+  audioBloomStrength: 0.5,
+  bassGain: 1.35,
+  flowReactStrength: 0.52,
+  depthReactStrength: 0.65,
+  sparkleReactStrength: 0.32,
   audioNoiseGate: 0.06,
   audioDynamicCurve: 0.72,
-  audioAttack: 0.025,
-  audioRelease: 0.2,
+  audioAttack: 0.045,
+  audioRelease: 0.28,
   highlightGain: 1.8,
   bloomStrength: 1.15,
   bloomRadius: 0.55,
   bloomThreshold: 0.58,
-  diffusion: 1.6,
-  noiseStrength: 1.25,
+  diffusion: 1.5,
+  noiseStrength: 1,
   noiseFrequency: 1.1,
-  peelThreshold: 0.6,
-  erosionRate: 0.12,
+  peelThreshold: 0.68,
+  erosionRate: 0.09,
   windX: 0.05,
-  windY: 0.075,
+  windY: 0.03,
   emberLifespan: 6.5,
-  edgePerturbation: 1.1,
-  edgeScatter: 6.8,
+  edgePerturbation: 0.8,
+  edgeScatter: 4.2,
   hueDrift: 16,
   luminanceMultiplier: 1.8,
-  rhythmIntensity: 2.8,
+  rhythmIntensity: 1.8,
   reactTarget: "peel",
-  audioSmoothing: 0.78,
+  audioSmoothing: 0.86,
 };
