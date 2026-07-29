@@ -19,6 +19,9 @@ test("server-renders the Her memory garden shell", async () => {
   const response = await request();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
   const html = await response.text();
 
   assert.match(html, /<title>Her — AI 记忆花园<\/title>/i);
@@ -73,14 +76,26 @@ test("mock provider routes keep the demo runnable without API keys", async () =>
   assert.ok(Array.isArray(imageContext.atmosphereHypotheses));
   assert.ok(imageContext.atmosphereHypotheses.length > 0);
   assert.equal(imageContext.mood, undefined);
+
+  const rejectedImage = await request("/api/image-context", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      consent: true,
+      image: { mimeType: "image/svg+xml", sizeBytes: 100 },
+    }),
+  });
+  assert.equal(rejectedImage.status, 400);
 });
 
-test("starter preview is removed and project modules are present", async () => {
-  const [page, layout, packageJson, herApp, particle, gpu, particleConfig, particleStyles, appStyles, store, providerEnv, liveProvider, ttsRoute] = await Promise.all([
+test("product modules and critical interaction contracts are present", async () => {
+  const [page, layout, packageJson, herApp, herUtils, calendarPanel, particle, gpu, particleConfig, particleStyles, appStyles, store, providerEnv, liveProvider, ttsRoute, worker] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
     readFile(new URL("app/components/HerApp.tsx", root), "utf8"),
+    readFile(new URL("app/components/her-app/utils.ts", root), "utf8"),
+    readFile(new URL("app/components/her-app/CalendarPanel.tsx", root), "utf8"),
     readFile(new URL("app/components/ParticleGarden.tsx", root), "utf8"),
     readFile(new URL("app/components/GpuParticleField.tsx", root), "utf8"),
     readFile(new URL("app/components/particleConfig.ts", root), "utf8"),
@@ -90,6 +105,7 @@ test("starter preview is removed and project modules are present", async () => {
     readFile(new URL("app/lib/providers/env.ts", root), "utf8"),
     readFile(new URL("app/lib/providers/live.ts", root), "utf8"),
     readFile(new URL("app/api/tts/synthesize/route.ts", root), "utf8"),
+    readFile(new URL("worker/index.ts", root), "utf8"),
   ]);
 
   assert.match(page, /<HerApp \/>/);
@@ -97,6 +113,8 @@ test("starter preview is removed and project modules are present", async () => {
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.match(packageJson, /@react-three\/fiber/);
   assert.match(packageJson, /"three"/);
+  assert.doesNotMatch(packageJson, /drizzle|tailwindcss|eslint-config-next|"next"/);
+  assert.match(calendarPanel, /aria-label="上个月"/);
   assert.match(herApp, /粒子数量/);
   assert.match(herApp, /粒子基础大小/);
   assert.match(herApp, /画面保真/);
@@ -166,8 +184,8 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /speak\(welcome, undefined, 0, "zh", undefined, \(\) => \{[\s\S]*?setConversationChromeVisible\(true\)/);
   assert.match(herApp, /speak\(text, undefined, 0, "zh", preparedAudio\)/);
   assert.match(appStyles, /@keyframes userWordsIn/);
-  assert.match(herApp, /const formatSpeechRecognitionResults[\s\S]*?result\.isFinal[\s\S]*?"，"/);
-  assert.match(herApp, /const finishSpeechTranscript[\s\S]*?replace\(\S+[\s\S]*?"。"/);
+  assert.match(herUtils, /formatSpeechRecognitionResults[\s\S]*?result\.isFinal[\s\S]*?"，"/);
+  assert.match(herUtils, /finishSpeechTranscript[\s\S]*?replace\([\s\S]*?"。"/);
   assert.match(herApp, /recognition\.onresult[\s\S]*?formatSpeechRecognitionResults\(event\.results\)/);
   assert.match(herApp, /history: turns\.slice\(-10\)/);
   assert.doesNotMatch(herApp, /history: nextTurns\.slice/);
@@ -182,6 +200,8 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(liveProvider, /maxTokens: 240/);
   assert.match(ttsRoute, /format: streaming \? "pcm16" : "wav"/);
   assert.match(ttsRoute, /X-Her-TTS-Sample-Rate/);
+  assert.match(worker, /API_RATE_LIMITS/);
+  assert.match(worker, /RATE_LIMITED/);
   assert.doesNotMatch(herApp, /预览 AI|上传另一张图片|保存记忆/);
   assert.match(herApp, /conversationTimer[\s\S]*?formatClock\(elapsed\)/);
   assert.match(herApp, /uploadMemoryButton[\s\S]*?aria-label="上传图片"/);
@@ -202,8 +222,8 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /if \(gardenDragRef\.current\.moved\)/);
   assert.doesNotMatch(herApp, /suppressGardenOpenUntilRef/);
   assert.doesNotMatch(herApp, /openGardenConversation\(item,\s*event\.timeStamp\)/);
-  const gardenPointerDown = herApp.match(/const handleGardenPointerDown[\s\S]*?(?=\n  const handleGardenPointerMove)/)?.[0] ?? "";
-  const gardenPointerMove = herApp.match(/const handleGardenPointerMove[\s\S]*?(?=\n  const settleGardenSelection)/)?.[0] ?? "";
+  const gardenPointerDown = herApp.match(/const handleGardenPointerDown[\s\S]*?(?=\n {2}const handleGardenPointerMove)/)?.[0] ?? "";
+  const gardenPointerMove = herApp.match(/const handleGardenPointerMove[\s\S]*?(?=\n {2}const settleGardenSelection)/)?.[0] ?? "";
   assert.doesNotMatch(gardenPointerDown, /setPointerCapture/);
   assert.match(gardenPointerMove, /setPointerCapture/);
   assert.match(herApp, /if \(!moved && mode === "artwork"\) return/);

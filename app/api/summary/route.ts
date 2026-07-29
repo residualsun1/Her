@@ -14,7 +14,7 @@ export const runtime = "edge";
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const body = await readJsonObject(request);
+    const body = await readJsonObject(request, 2_000_000);
     const provider = getMemorySummaryProvider(body.provider);
     const result = await provider.summarizeMemory({
       turns: normalizeTurns(body.turns),

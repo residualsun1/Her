@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- fallback and uploaded object URLs need native images */
 
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useState } from "react";

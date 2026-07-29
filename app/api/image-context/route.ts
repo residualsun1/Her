@@ -1,4 +1,8 @@
-import { getImageContextProvider, type ImageDescriptor } from "@/app/lib/providers";
+import {
+  getImageContextProvider,
+  invalidRequest,
+  type ImageDescriptor,
+} from "@/app/lib/providers";
 import {
   errorResponse,
   optionalString,
@@ -6,10 +10,17 @@ import {
 } from "../_shared/route-utils";
 
 export const runtime = "edge";
+const MAX_IMAGE_REQUEST_BYTES = 10_000_000;
+const MAX_IMAGE_BYTES = 6_000_000;
+const ACCEPTED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const body = await readJsonObject(request);
+    const body = await readJsonObject(request, MAX_IMAGE_REQUEST_BYTES);
     if (body.consent !== true) {
       return Response.json(
         {
@@ -28,10 +39,20 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     const image = body.image as Record<string, unknown>;
+    const mimeType = optionalString(image.mimeType, "image.mimeType", 100);
+    const sizeBytes = finiteNumber(image.sizeBytes);
+    if (!mimeType || !ACCEPTED_IMAGE_TYPES.has(mimeType.toLowerCase())) {
+      throw invalidRequest("image.mimeType must be JPEG, PNG, or WebP.");
+    }
+    if (sizeBytes !== undefined && sizeBytes > MAX_IMAGE_BYTES) {
+      throw invalidRequest(
+        `image.sizeBytes exceeds the ${MAX_IMAGE_BYTES} byte limit.`,
+      );
+    }
     const descriptor: ImageDescriptor = {
       name: optionalString(image.name, "image.name", 255),
-      mimeType: optionalString(image.mimeType, "image.mimeType", 100),
-      sizeBytes: finiteNumber(image.sizeBytes),
+      mimeType,
+      sizeBytes,
       width: finiteNumber(image.width),
       height: finiteNumber(image.height),
       contentBase64: optionalString(image.contentBase64, "image.contentBase64", 8_000_000),

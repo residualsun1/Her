@@ -122,10 +122,23 @@ export function createDemoMemoryData(now = new Date()): MemorySeedData {
         "A small illuminated tree stands against a deep blue winter landscape.",
         "一棵亮着微光的小树立在深蓝色的冬日风景中。",
       ),
+      observedDetails: ["微光小树", "深蓝冬景"],
+      atmosphereHypotheses: [
+        {
+          label: "安静",
+          evidence: "画面使用深蓝色调，主体周围留有较多空白。",
+          confidence: "low",
+        },
+      ],
+      dominantColors: ["#020304", "#0b3358", "#7bdfff"],
       possibleTopics: [
         en("What makes a place feel like home?", "什么让一个地方有了家的感觉？"),
         en("A winter memory you still carry", "一段你仍然带在身上的冬日记忆"),
       ],
+      openingQuestion: en(
+        "What does this quiet winter light bring back for you?",
+        "这束安静的冬日微光，让你想起了什么？",
+      ),
       model: { provider: "gemini", model: "demo-vision" },
       userConsented: true,
     },

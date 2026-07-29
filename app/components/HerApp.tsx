@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- object URLs and canvas fallbacks cannot use Next image optimization */
 
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -14,139 +13,49 @@ import {
 import { memoryStore } from "@/app/lib/memory/store";
 import type {
   CalendarDate,
-  ImageContext as StoredImageContext,
-  SessionRecord,
   Turn as StoredTurn,
+  UpdateSessionRecordInput,
 } from "@/app/lib/memory/types";
+import { CalendarPanel } from "./her-app/CalendarPanel";
+import type {
+  ChatTurn,
+  ClientImageContext,
+  DeleteTarget,
+  GardenVisualItem,
+  MemoryCard,
+  MemoryTab,
+  MusicTrack,
+  PreparedSpeechAudio,
+  ProviderCapability,
+  ProviderOption,
+  ReplyState,
+  SpeechRecognitionLike,
+  View,
+} from "./her-app/types";
+import {
+  averageFrequencyBand,
+  blobToBase64,
+  finishSpeechTranscript,
+  formatClock,
+  formatSpeechRecognitionResults,
+  hideSampleId,
+  localDateKey,
+  pad,
+  providerLabel,
+  readHiddenSampleIds,
+  readImageDimensions,
+  resumeAudioContext,
+  storedImageContextToClient,
+  storedSessionToCard,
+} from "./her-app/utils";
 import styles from "./HerApp.module.css";
 
 const ParticleGarden = lazy(() => import("./ParticleGarden"));
 const USER_WORDS_HOLD_MS = 2_000;
 
-type View = "conversation" | "garden" | "memory" | "music";
-type MemoryTab = "cards" | "calendar";
-type ReplyState = "idle" | "listening" | "holding" | "thinking" | "speaking" | "ready";
-type ProviderOption = { provider: string; configured: boolean; liveAdapterImplemented: boolean };
-type ProviderCapability = {
-  capability: string;
-  provider: string;
-  mode: "mock" | "live";
-  configured: boolean;
-  model: string | null;
-};
-
-type AtmosphereHypothesis = {
-  label: string;
-  evidence: string;
-  confidence: "low" | "medium" | "high";
-};
-
-type ClientImageContext = {
-  description: string;
-  objects: string[];
-  atmosphereHypotheses: AtmosphereHypothesis[];
-  dominantColors: string[];
-  possibleTopics: string[];
-  openingQuestion: string;
-  provider?: string;
-  model?: string;
-};
-
-type ChatTurn = {
-  id: string;
-  role: "user" | "assistant";
-  original: string;
-  language: "en" | "zh";
-  createdAt: number;
-  audioBlob?: Blob;
-  speakerName?: string;
-};
-
-type MemoryCard = {
-  id: string;
-  gardenItemId?: string;
-  imageUrl: string;
-  title: string;
-  summary: string;
-  diary?: string;
-  date: string;
-  time: string;
-  duration: string;
-  pinnedDate?: string;
-  turns: ChatTurn[];
-};
-
-type MusicTrack = {
-  id: string;
-  name: string;
-  url: string;
-};
-
-type PreparedSpeechAudio =
-  | { kind: "buffered"; blob: Blob }
-  | { kind: "pcm-stream"; stream: ReadableStream<Uint8Array>; sampleRate: number };
-
-type SpeechRecognitionResultLike = {
-  0: { transcript: string };
-  isFinal: boolean;
-};
-
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((event: { results: ArrayLike<SpeechRecognitionResultLike> }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-type GardenVisualItem = {
-  id: string;
-  title: string;
-  imageUrl: string;
-  precomposed?: boolean;
-  imageContext?: ClientImageContext;
-};
-
-type DeleteTarget =
-  | { kind: "garden"; item: GardenVisualItem }
-  | { kind: "memory"; card: MemoryCard };
-
 const HIDDEN_SAMPLE_GARDEN_KEY = "her-hidden-sample-garden";
 const HIDDEN_SAMPLE_CARDS_KEY = "her-hidden-sample-cards";
 const VOICE_WAVE_PROFILE = [0.72, 1.05, 1.42, 0.94, 1.68, 1.18, 1.52, 0.88, 1.34, 1.02, 0.76];
-
-const averageFrequencyBand = (data: Uint8Array, start: number, end: number) => {
-  const from = Math.max(0, Math.min(start, data.length));
-  const to = Math.max(from + 1, Math.min(end, data.length));
-  let total = 0;
-  for (let index = from; index < to; index += 1) total += data[index];
-  return total / (to - from) / 255;
-};
-
-const resumeAudioContext = async (
-  context: AudioContext,
-  timeoutMs = 1_800,
-) => {
-  if (context.state === "running") return true;
-  if (context.state === "closed") return false;
-  let timeout: number | undefined;
-  try {
-    await Promise.race([
-      context.resume(),
-      new Promise<void>((resolve) => {
-        timeout = window.setTimeout(resolve, timeoutMs);
-      }),
-    ]);
-    return (context.state as string) === "running";
-  } catch {
-    return false;
-  } finally {
-    if (timeout !== undefined) window.clearTimeout(timeout);
-  }
-};
 
 const PARAMETER_NOTES = {
   particleCount: "调高会让图像更细腻，也更消耗 GPU；出现卡顿时优先降低。",
@@ -285,74 +194,6 @@ const DEFAULT_TURNS: ChatTurn[] = [
     createdAt: 0,
   },
 ];
-
-const pad = (value: number) => String(value).padStart(2, "0");
-const formatClock = (seconds: number) => `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}`;
-const localDateKey = (date = new Date()) =>
-  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` as CalendarDate;
-
-const SPOKEN_CLAUSE_END = /[，。！？；：、,.!?;:]$/u;
-const SPOKEN_SENTENCE_END = /[。！？.!?]$/u;
-const CHINESE_CHARACTER = /[\u3400-\u9fff]/u;
-
-const formatSpeechRecognitionResults = (
-  results: ArrayLike<SpeechRecognitionResultLike>,
-) => {
-  let transcript = "";
-  for (let index = 0; index < results.length; index += 1) {
-    const result = results[index];
-    const segment = result?.[0]?.transcript.trim();
-    if (!segment) continue;
-    transcript += segment;
-    if (result.isFinal && !SPOKEN_CLAUSE_END.test(segment)) {
-      transcript += CHINESE_CHARACTER.test(segment) ? "，" : ", ";
-    }
-  }
-  return transcript.trim();
-};
-
-const finishSpeechTranscript = (value: string) => {
-  const transcript = value.trim();
-  if (!transcript) return "";
-  if (/[，,]\s*$/u.test(transcript)) {
-    return transcript.replace(/[，,]\s*$/u, CHINESE_CHARACTER.test(transcript) ? "。" : ".");
-  }
-  if (SPOKEN_SENTENCE_END.test(transcript)) return transcript;
-  return `${transcript}${CHINESE_CHARACTER.test(transcript) ? "。" : "."}`;
-};
-
-const storedImageContextToClient = (
-  context: StoredImageContext | undefined,
-): ClientImageContext | undefined => {
-  if (!context) return undefined;
-  return {
-    description: context.description.original,
-    objects: context.observedDetails ?? [],
-    atmosphereHypotheses: context.atmosphereHypotheses ?? [],
-    dominantColors: context.dominantColors ?? [],
-    possibleTopics: (context.possibleTopics ?? []).map((topic) => topic.original),
-    openingQuestion:
-      context.openingQuestion?.original ??
-      "这幅画面也许留着某种情绪，但我不想替你决定。重新看见它时，你有什么感觉？",
-    provider: context.model?.provider,
-    model: context.model?.model,
-  };
-};
-
-const readHiddenSampleIds = (key: string) => {
-  try {
-    const value = JSON.parse(window.localStorage.getItem(key) ?? "[]");
-    return new Set(Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []);
-  } catch {
-    return new Set<string>();
-  }
-};
-
-const hideSampleId = (key: string, id: string) => {
-  const hidden = readHiddenSampleIds(key);
-  hidden.add(id);
-  window.localStorage.setItem(key, JSON.stringify([...hidden]));
-};
 
 export function HerApp() {
   const [view, setView] = useState<View>("conversation");
@@ -1556,27 +1397,34 @@ export function HerApp() {
       }
       const now = new Date().toISOString();
       const recordUpdate = {
-      participants: [
-        { id: "you", name: "You", kind: "user" as const },
-        { id: "companion", name: "Companion", kind: "assistant" as const, voiceId: voiceStyle },
-      ],
-      turns: storedTurns,
-      durationMs: elapsed * 1000,
-      primaryLanguage: "zh",
-      saveStatus: "ready" as const,
-      summary: {
-        title: { original: preview.title, originalLanguage: "zh" },
-        abstract: { original: preview.summary, originalLanguage: "zh" },
-        moodTags: ["reflective", "tender"],
-        generatedAt: now,
-        ...(preview.diary ? {
-          diary: {
-            body: { original: preview.diary, originalLanguage: "zh" },
-            generatedAt: now,
+        participants: [
+          { id: "you", name: "You", kind: "user" as const },
+          {
+            id: "companion",
+            name: "Companion",
+            kind: "assistant" as const,
+            voiceId: voiceStyle,
           },
-        } : {}),
-      },
-      };
+        ],
+        turns: storedTurns,
+        durationMs: elapsed * 1000,
+        primaryLanguage: "zh",
+        saveStatus: "ready" as const,
+        summary: {
+          title: { original: preview.title, originalLanguage: "zh" },
+          abstract: { original: preview.summary, originalLanguage: "zh" },
+          moodTags: ["reflective", "tender"],
+          generatedAt: now,
+          ...(preview.diary
+            ? {
+                diary: {
+                  body: { original: preview.diary, originalLanguage: "zh" },
+                  generatedAt: now,
+                },
+              }
+            : {}),
+        },
+      } satisfies UpdateSessionRecordInput;
       const draft = draftSessionIdRef.current
       ? await memoryStore.getSessionRecord(draftSessionIdRef.current)
       : undefined;
@@ -2520,97 +2368,5 @@ export function HerApp() {
       )}
       {notice && <div className={styles.toast} role="status">{notice}</div>}
     </main>
-  );
-}
-
-function providerLabel(provider: string) {
-  return provider === "deepseek" ? "DeepSeek" : provider === "qwen" ? "Qwen" : provider === "openai" ? "OpenAI" : provider === "anthropic" ? "Claude" : "Gemini";
-}
-
-function storedSessionToCard(session: SessionRecord, imageUrl: string): MemoryCard {
-  const date = new Date(session.createdAt);
-  const title = session.summary?.title.original ?? "已保存的对话";
-  const summary = session.summary?.abstract.original ?? "这段对话在摘要生成前就已保存。";
-  return {
-    id: session.id,
-    gardenItemId: session.gardenItemId,
-    imageUrl,
-    title,
-    summary,
-    diary: session.summary?.diary?.body.original,
-    date: date.toLocaleDateString("zh-CN", { month: "long", day: "2-digit", year: "numeric" }),
-    time: date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-    duration: formatClock(Math.max(1, Math.round(session.durationMs / 1000))),
-    pinnedDate: session.pinnedDate,
-    turns: session.turns.map((turn) => ({
-      id: turn.id,
-      role: turn.role === "user" ? "user" : "assistant",
-      original: turn.text.original,
-      language: turn.text.originalLanguage,
-      createdAt: turn.offsetStartMs,
-    })),
-  };
-}
-
-function readImageDimensions(url: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-    image.onerror = () => resolve({ width: 720, height: 900 });
-    image.src = url;
-  });
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const value = typeof reader.result === "string" ? reader.result : "";
-      resolve(value.includes(",") ? value.slice(value.indexOf(",") + 1) : value);
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("无法读取图片。"));
-    reader.readAsDataURL(blob);
-  });
-}
-
-function CalendarPanel({
-  month,
-  cards,
-  selectedDate,
-  onSelect,
-  onMonth,
-}: {
-  month: Date;
-  cards: MemoryCard[];
-  selectedDate: string;
-  onSelect: (date: string) => void;
-  onMonth: (date: Date) => void;
-}) {
-  const year = month.getFullYear();
-  const monthIndex = month.getMonth();
-  const firstDay = new Date(year, monthIndex, 1).getDay();
-  const days = new Date(year, monthIndex + 1, 0).getDate();
-  const cells = Array.from({ length: 42 }, (_, index) => {
-    const day = index - firstDay + 1;
-    return day >= 1 && day <= days ? day : null;
-  });
-  const counts = cards.reduce<Record<string, number>>((map, card) => {
-    if (card.pinnedDate) map[card.pinnedDate] = (map[card.pinnedDate] ?? 0) + 1;
-    return map;
-  }, {});
-  return (
-    <article className={styles.calendarCard}>
-      <div className={styles.calendarNav}><button onClick={() => onMonth(new Date(year, monthIndex - 1, 1))}>‹</button><h2>{month.toLocaleDateString("zh-CN", { month: "long", year: "numeric" })}</h2><button onClick={() => onMonth(new Date(year, monthIndex + 1, 1))}>›</button></div>
-      <div className={styles.weekdays}>{["日", "一", "二", "三", "四", "五", "六"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
-      <div className={styles.calendarGrid}>
-        {cells.map((day, index) => {
-          if (!day) return <span key={`blank-${index}`} />;
-          const key = `${year}-${pad(monthIndex + 1)}-${pad(day)}`;
-          const count = counts[key] ?? 0;
-          return <button key={key} className={selectedDate === key ? styles.daySelected : ""} onClick={() => onSelect(key)}><span>{day}</span>{count > 0 && <i>{Array.from({ length: Math.min(3, count) }, (_, dot) => <b key={dot} />)}{count > 3 && <small>+</small>}</i>}</button>;
-        })}
-      </div>
-      <p>{selectedDate ? `已固定 ${counts[selectedDate] ?? 0} 段记忆 · 选择日期可固定最新记忆` : "请选择日期"}</p>
-    </article>
   );
 }

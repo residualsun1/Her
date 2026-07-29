@@ -29,7 +29,7 @@ export interface ImageDescriptor {
   sizeBytes?: number;
   width?: number;
   height?: number;
-  /** Reserved for a future live vision adapter. Never echoed in a response. */
+  /** Consent-gated image copy for the live vision adapter. Never echoed. */
   contentBase64?: string;
 }
 

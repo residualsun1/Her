@@ -646,8 +646,8 @@ function GpuParticleScene({
     };
     const multipleOptions: THREE.RenderTargetOptions = { ...options, count: 2 };
     return [
-      new THREE.WebGLRenderTarget<THREE.Texture[]>(side, side, multipleOptions),
-      new THREE.WebGLRenderTarget<THREE.Texture[]>(side, side, multipleOptions),
+      new THREE.WebGLRenderTarget<THREE.Texture>(side, side, multipleOptions),
+      new THREE.WebGLRenderTarget<THREE.Texture>(side, side, multipleOptions),
     ] as const;
   }, [side]);
   const positionTextureRef = useRef<THREE.Texture>(initialPositionTexture);

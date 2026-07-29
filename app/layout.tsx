@@ -1,7 +1,6 @@
-import type { Metadata } from "next";
 import "./globals.css";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Her — AI 记忆花园",
   description:
     "让图片化作流动的粒子记忆，在声音与对话中再次相遇。",

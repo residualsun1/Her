@@ -4,11 +4,36 @@ export const edgeRuntime = "edge";
 
 export async function readJsonObject(
   request: Request,
+  maxBytes = 1_000_000,
 ): Promise<Record<string, unknown>> {
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw invalidRequest(`Request body exceeds the ${maxBytes} byte limit.`);
+  }
+
   let value: unknown;
   try {
-    value = await request.json();
-  } catch {
+    const reader = request.body?.getReader();
+    if (!reader) throw new Error("missing body");
+    const decoder = new TextDecoder();
+    let receivedBytes = 0;
+    let text = "";
+    while (true) {
+      const { done, value: chunk } = await reader.read();
+      if (done) break;
+      receivedBytes += chunk.byteLength;
+      if (receivedBytes > maxBytes) {
+        await reader.cancel();
+        throw invalidRequest(
+          `Request body exceeds the ${maxBytes} byte limit.`,
+        );
+      }
+      text += decoder.decode(chunk, { stream: true });
+    }
+    text += decoder.decode();
+    value = JSON.parse(text);
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
     throw invalidRequest("Request body must be valid JSON.");
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) {

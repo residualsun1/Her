@@ -38,6 +38,7 @@ yarn-error.log*
 
 # typescript
 next-env.d.ts
+*.tsbuildinfo
 /dist/
 /.wrangler/
 /outputs/
@@ -46,3 +47,7 @@ next-env.d.ts
 # Local research references are intentionally kept outside the deployable source.
 /image/
 /video/
+/music/
+/design_skill/
+/PARTICLE_SUBJECT_CLARITY_ANALYSIS.md
+/.codex-tmp/
