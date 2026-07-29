@@ -76,7 +76,7 @@ test("mock provider routes keep the demo runnable without API keys", async () =>
 });
 
 test("starter preview is removed and project modules are present", async () => {
-  const [page, layout, packageJson, herApp, particle, gpu, particleConfig, particleStyles, appStyles, store, providerEnv, liveProvider] = await Promise.all([
+  const [page, layout, packageJson, herApp, particle, gpu, particleConfig, particleStyles, appStyles, store, providerEnv, liveProvider, ttsRoute] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
@@ -89,6 +89,7 @@ test("starter preview is removed and project modules are present", async () => {
     readFile(new URL("app/lib/memory/store.ts", root), "utf8"),
     readFile(new URL("app/lib/providers/env.ts", root), "utf8"),
     readFile(new URL("app/lib/providers/live.ts", root), "utf8"),
+    readFile(new URL("app/api/tts/synthesize/route.ts", root), "utf8"),
   ]);
 
   assert.match(page, /<HerApp \/>/);
@@ -155,10 +156,12 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /隐藏界面/);
   assert.match(herApp, /显示界面（Esc）/);
   assert.match(appStyles, /\.immersiveStage \.conversationTimer,[\s\S]*?animation: none !important/);
-  assert.match(herApp, /USER_WORDS_HOLD_MS = 2_400/);
-  assert.match(herApp, /const replyPromise = \(async \(\) => \{[\s\S]*?fetch\("\/api\/chat"[\s\S]*?prepareSynthesizedSpeech\(text, "zh"\)[\s\S]*?setSentEcho\(message\)[\s\S]*?USER_WORDS_HOLD_MS/);
+  assert.match(herApp, /USER_WORDS_HOLD_MS = 2_000/);
+  assert.match(herApp, /const replyPromise = \(async \(\) => \{[\s\S]*?fetch\("\/api\/chat"[\s\S]*?prepareSynthesizedSpeech\(text, "zh", true\)[\s\S]*?setSentEcho\(message\)[\s\S]*?USER_WORDS_HOLD_MS/);
   assert.match(herApp, /className=\{styles\.sentEcho\}/);
   assert.match(herApp, /const speak = useCallback[\s\S]*?setReplyState\("thinking"\)[\s\S]*?source\.start\(context\.currentTime \+ 0\.06\)/);
+  assert.match(herApp, /const playStreamingPcm[\s\S]*?getInt16\(index \* 2, true\)[\s\S]*?reader\.read\(\)/);
+  assert.match(herApp, /preferStreaming && response\.body[\s\S]*?kind: "pcm-stream"/);
   assert.match(herApp, /!sentEcho && replyState !== "holding" && replyState !== "thinking" && currentAssistant/);
   assert.match(herApp, /speak\(welcome, undefined, 0, "zh", undefined, \(\) => \{[\s\S]*?setConversationChromeVisible\(true\)/);
   assert.match(herApp, /speak\(text, undefined, 0, "zh", preparedAudio\)/);
@@ -173,6 +176,12 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(appStyles, /\.memoryReaderBackdrop \{[\s\S]*?position: fixed;[\s\S]*?z-index: 70/);
   assert.match(liveProvider, /Never repeat, quote, paraphrase, or restate an earlier assistant reply/);
   assert.match(liveProvider, /removeRepeatedAssistantLead\(completion\.text, previousAssistant\)/);
+  assert.match(liveProvider, /"X-DashScope-SSE": "enable"/);
+  assert.match(liveProvider, /format: "pcm"/);
+  assert.match(liveProvider, /decodeQwenSseAudio/);
+  assert.match(liveProvider, /maxTokens: 240/);
+  assert.match(ttsRoute, /format: streaming \? "pcm16" : "wav"/);
+  assert.match(ttsRoute, /X-Her-TTS-Sample-Rate/);
   assert.doesNotMatch(herApp, /预览 AI|上传另一张图片|保存记忆/);
   assert.match(herApp, /conversationTimer[\s\S]*?formatClock\(elapsed\)/);
   assert.match(herApp, /uploadMemoryButton[\s\S]*?aria-label="上传图片"/);

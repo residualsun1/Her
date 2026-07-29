@@ -21,7 +21,7 @@ import type {
 import styles from "./HerApp.module.css";
 
 const ParticleGarden = lazy(() => import("./ParticleGarden"));
-const USER_WORDS_HOLD_MS = 2_400;
+const USER_WORDS_HOLD_MS = 2_000;
 
 type View = "conversation" | "garden" | "memory" | "music";
 type MemoryTab = "cards" | "calendar";
@@ -81,6 +81,10 @@ type MusicTrack = {
   name: string;
   url: string;
 };
+
+type PreparedSpeechAudio =
+  | { kind: "buffered"; blob: Blob }
+  | { kind: "pcm-stream"; stream: ReadableStream<Uint8Array>; sampleRate: number };
 
 type SpeechRecognitionResultLike = {
   0: { transcript: string };
@@ -426,6 +430,8 @@ export function HerApp() {
   const analyserFrameRef = useRef<number | null>(null);
   const speechPulseRef = useRef<number | null>(null);
   const speechSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const speechStreamSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const speechStreamReaderRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const speechAnalyserRef = useRef<AnalyserNode | null>(null);
   const speechAudioContextRef = useRef<AudioContext | null>(null);
   const speechAnalyserFrameRef = useRef<number | null>(null);
@@ -496,6 +502,18 @@ export function HerApp() {
       activeSource.disconnect();
       speechSourceRef.current = null;
     }
+    speechStreamSourcesRef.current.forEach((source) => {
+      source.onended = null;
+      try {
+        source.stop();
+      } catch {
+        // A queued PCM source may already have ended.
+      }
+      source.disconnect();
+    });
+    speechStreamSourcesRef.current.clear();
+    void speechStreamReaderRef.current?.cancel().catch(() => undefined);
+    speechStreamReaderRef.current = null;
     speechAnalyserRef.current?.disconnect();
     speechAnalyserRef.current = null;
     window.speechSynthesis?.cancel();
@@ -521,10 +539,14 @@ export function HerApp() {
   }, [getSpeechAudioContext]);
 
   const prepareSynthesizedSpeech = useCallback(
-    async (text: string, spokenLanguage: "en" | "zh") => {
+    async (
+      text: string,
+      spokenLanguage: "en" | "zh",
+      preferStreaming = false,
+    ): Promise<PreparedSpeechAudio> => {
       const cacheKey = `${voiceStyle}:${spokenLanguage}:${text}`;
       const cached = speechCacheRef.current.get(cacheKey);
-      if (cached) return cached;
+      if (cached) return { kind: "buffered", blob: cached };
       const response = await fetch("/api/tts/synthesize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -532,9 +554,18 @@ export function HerApp() {
           text,
           voiceId: voiceStyle,
           language: spokenLanguage,
+          stream: preferStreaming,
         }),
       });
       if (!response.ok) throw new Error("TTS provider unavailable");
+      if (preferStreaming && response.body) {
+        const sampleRate = Number(response.headers.get("X-Her-TTS-Sample-Rate"));
+        return {
+          kind: "pcm-stream",
+          stream: response.body,
+          sampleRate: Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : 24_000,
+        };
+      }
       const blob = await response.blob();
       if (!blob.size || !blob.type.startsWith("audio/")) {
         throw new Error("TTS provider returned invalid audio");
@@ -544,7 +575,7 @@ export function HerApp() {
         const oldest = speechCacheRef.current.keys().next().value;
         if (oldest) speechCacheRef.current.delete(oldest);
       }
-      return blob;
+      return { kind: "buffered", blob };
     },
     [voiceStyle],
   );
@@ -646,6 +677,7 @@ export function HerApp() {
   }, [refreshSavedCards]);
 
   useEffect(() => {
+    const speechStreamSources = speechStreamSourcesRef.current;
     return () => {
       captureRunRef.current += 1;
       replyDelayRunRef.current += 1;
@@ -656,6 +688,15 @@ export function HerApp() {
       if (speechAnalyserFrameRef.current) cancelAnimationFrame(speechAnalyserFrameRef.current);
       if (speechPulseRef.current) window.clearInterval(speechPulseRef.current);
       speechSourceRef.current?.stop();
+      speechStreamSources.forEach((source) => {
+        source.onended = null;
+        try {
+          source.stop();
+        } catch {
+          // A queued PCM source may already have ended.
+        }
+      });
+      void speechStreamReaderRef.current?.cancel().catch(() => undefined);
       window.speechSynthesis?.cancel();
       void audioContextRef.current?.close();
       void musicAudioContextRef.current?.close();
@@ -699,7 +740,7 @@ export function HerApp() {
       onEnd?: () => void,
       voiceOffset = 0,
       languageOverride?: "en" | "zh",
-      preparedAudio?: Blob | null,
+      preparedAudio?: PreparedSpeechAudio | null,
       onStart?: () => void,
     ) => {
       stopSpeechPlayback();
@@ -813,9 +854,145 @@ export function HerApp() {
         source.start(context.currentTime + 0.06);
       };
 
+      const playStreamingPcm = async (
+        stream: ReadableStream<Uint8Array>,
+        sampleRate: number,
+      ) => {
+        if (speechRun !== speechRequestRef.current) return;
+        const context = getSpeechAudioContext();
+        if (!(await resumeAudioContext(context))) {
+          throw new Error("Audio output has not been unlocked");
+        }
+        const reader = stream.getReader();
+        speechStreamReaderRef.current = reader;
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.72;
+        analyser.connect(context.destination);
+        speechAnalyserRef.current = analyser;
+        const frequencies = new Uint8Array(analyser.frequencyBinCount);
+        let carry = new Uint8Array(0);
+        let nextStartTime = context.currentTime + 0.06;
+        let playbackStarted = false;
+        let streamFinished = false;
+
+        const releaseStreamingAudio = () => {
+          if (speechAnalyserRef.current !== analyser) return;
+          if (speechAnalyserFrameRef.current) {
+            window.cancelAnimationFrame(speechAnalyserFrameRef.current);
+            speechAnalyserFrameRef.current = null;
+          }
+          analyser.disconnect();
+          speechAnalyserRef.current = null;
+          finish();
+        };
+
+        const finishWhenDrained = () => {
+          if (streamFinished && speechStreamSourcesRef.current.size === 0) {
+            releaseStreamingAudio();
+          }
+        };
+
+        const updateWaveform = () => {
+          if (
+            speechRun !== speechRequestRef.current ||
+            speechAnalyserRef.current !== analyser
+          ) return;
+          analyser.getByteFrequencyData(frequencies);
+          const bass = averageFrequencyBand(frequencies, 1, 10);
+          const mid = averageFrequencyBand(frequencies, 10, 38);
+          const treble = averageFrequencyBand(frequencies, 38, 90);
+          setAudioBands({ bass, mid, treble });
+          setAudioLevel(
+            Math.min(1, 0.04 + bass * 0.7 + mid * 0.88 + treble * 0.36),
+          );
+          speechAnalyserFrameRef.current =
+            window.requestAnimationFrame(updateWaveform);
+        };
+
+        const schedulePcm = (chunk: Uint8Array) => {
+          const combined = new Uint8Array(carry.length + chunk.length);
+          combined.set(carry);
+          combined.set(chunk, carry.length);
+          const usableLength = combined.length - (combined.length % 2);
+          carry = combined.slice(usableLength);
+          if (!usableLength) return;
+          const frameCount = usableLength / 2;
+          const audioBuffer = context.createBuffer(1, frameCount, sampleRate);
+          const channel = audioBuffer.getChannelData(0);
+          const view = new DataView(
+            combined.buffer,
+            combined.byteOffset,
+            usableLength,
+          );
+          for (let index = 0; index < frameCount; index += 1) {
+            channel[index] = view.getInt16(index * 2, true) / 32_768;
+          }
+          const source = context.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(analyser);
+          speechStreamSourcesRef.current.add(source);
+          source.onended = () => {
+            source.disconnect();
+            speechStreamSourcesRef.current.delete(source);
+            finishWhenDrained();
+          };
+          if (!playbackStarted) {
+            if (!beginPlayback()) {
+              source.onended = null;
+              source.disconnect();
+              speechStreamSourcesRef.current.delete(source);
+              void reader.cancel();
+              return;
+            }
+            playbackStarted = true;
+            setAudioLevel(0.2);
+            updateWaveform();
+          }
+          const startAt = Math.max(
+            nextStartTime,
+            context.currentTime + (playbackStarted ? 0.025 : 0.06),
+          );
+          source.start(startAt);
+          nextStartTime = startAt + audioBuffer.duration;
+        };
+
+        try {
+          while (speechRun === speechRequestRef.current) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value?.length) schedulePcm(value);
+          }
+          streamFinished = true;
+          if (speechStreamReaderRef.current === reader) {
+            speechStreamReaderRef.current = null;
+          }
+          if (!playbackStarted) throw new Error("TTS stream contained no audio");
+          finishWhenDrained();
+        } catch (error) {
+          streamFinished = true;
+          if (speechStreamReaderRef.current === reader) {
+            speechStreamReaderRef.current = null;
+          }
+          if (playbackStarted) {
+            finishWhenDrained();
+            return;
+          }
+          analyser.disconnect();
+          if (speechAnalyserRef.current === analyser) speechAnalyserRef.current = null;
+          throw error;
+        }
+      };
+
       const synthesize = async () => {
-        const blob = preparedAudio ?? await prepareSynthesizedSpeech(text, spokenLanguage);
-        await playSynthesizedAudio(blob);
+        const audio =
+          preparedAudio ??
+          await prepareSynthesizedSpeech(text, spokenLanguage, true);
+        if (audio.kind === "pcm-stream") {
+          await playStreamingPcm(audio.stream, audio.sampleRate);
+        } else {
+          await playSynthesizedAudio(audio.blob);
+        }
       };
 
       if (preparedAudio === null) fallbackToBrowserVoice();
@@ -883,7 +1060,7 @@ export function HerApp() {
         const text = result.text;
         return {
           text,
-          audio: prepareSynthesizedSpeech(text, "zh").catch(() => null),
+          audio: prepareSynthesizedSpeech(text, "zh", true).catch(() => null),
         };
       })()
         .then((value) => ({ value, error: null as Error | null }))

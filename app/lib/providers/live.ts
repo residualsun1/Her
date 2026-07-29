@@ -49,7 +49,7 @@ interface CompletionResult {
 
 const COMPANION_SYSTEM_PROMPT = `You are Her, an emotionally attentive AI companion in a reflective memory journal.
 Listen closely, respond with warmth and curiosity, and avoid sounding like customer support.
-Keep ordinary replies concise (usually 2-4 sentences). Never encourage dependency or claim to replace human care.
+Keep ordinary replies brief and speakable: usually 1-3 short sentences and no more than about 90 Chinese characters. Put the direct, caring response in the first sentence. Never encourage dependency or claim to replace human care.
 Respond directly to the latest user message. Never repeat, quote, paraphrase, or restate an earlier assistant reply unless the user explicitly asks you to.
 When image context is present, treat every atmosphere hypothesis as a tentative impression of the image, never as the user's actual emotional state.
 Refer to at most one or two visible details, acknowledge uncertainty naturally, and invite the user to confirm, reject, or reinterpret the impression.
@@ -111,7 +111,7 @@ export class LiveTextProvider
           : ""
       }${imageContext}`,
       messages: [...history, { role: "user", text: input.message }],
-      maxTokens: 700,
+      maxTokens: 240,
     });
     const previousAssistant = [...history]
       .reverse()
@@ -331,7 +331,7 @@ export class LiveQwenTtsProvider implements TtsProvider {
         "qwen-audio-3.0-tts-plus",
       mock: false,
       ready: true,
-      streaming: false,
+      streaming: true,
       syntheticVoiceDisclosureRequired: true,
       voices: Object.entries(QWEN_TTS_STYLES).map(
         ([id, profile]) => ({
@@ -352,6 +352,17 @@ export class LiveQwenTtsProvider implements TtsProvider {
       getConfiguredModel("tts", "live", this.provider) ??
       "qwen-audio-3.0-tts-plus";
     const style = isQwenTtsStyle(input.voiceId) ? input.voiceId : "intimate";
+    if (input.format === "pcm16") {
+      return synthesizeQwenStreamingPcm({
+        endpoint: getQwenTtsEndpoint(),
+        credential: requiredCredential(this.provider, "tts"),
+        model,
+        text: input.text,
+        voice: envValue("QWEN_TTS_VOICE") ?? "longanlingxin",
+        instruction: QWEN_TTS_STYLES[style].instruction,
+        provider: this.provider,
+      });
+    }
     const format =
       input.format === "mp3" || input.format === "opus"
         ? input.format
@@ -388,6 +399,168 @@ export class LiveQwenTtsProvider implements TtsProvider {
       mimeType: normalizeAudioMimeType(audio.contentType, format),
       sampleRateHz: 24_000,
     };
+  }
+}
+
+async function synthesizeQwenStreamingPcm(options: {
+  endpoint: string;
+  credential: string;
+  model: string;
+  text: string;
+  voice: string;
+  instruction: string;
+  provider: "qwen";
+}): Promise<TtsSynthesisResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), providerTimeoutMs());
+  try {
+    const response = await fetch(options.endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${options.credential}`,
+        "Content-Type": "application/json",
+        "X-DashScope-SSE": "enable",
+      },
+      body: JSON.stringify({
+        model: options.model,
+        input: {
+          text: options.text,
+          voice: options.voice,
+          format: "pcm",
+          sample_rate: 24_000,
+          instruction: options.instruction,
+        },
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) {
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        // A stable provider error is returned below.
+      }
+      clearTimeout(timer);
+      throw upstreamProviderError({
+        capability: "tts",
+        provider: options.provider,
+        status: response.status,
+        detail: upstreamErrorHint(payload),
+      });
+    }
+    return {
+      provider: options.provider,
+      model: options.model,
+      mock: false,
+      audio: decodeQwenSseAudio(response.body, () => clearTimeout(timer)),
+      mimeType: "audio/L16",
+      sampleRateHz: 24_000,
+    };
+  } catch (error) {
+    clearTimeout(timer);
+    if (error instanceof ProviderError) throw error;
+    throw upstreamProviderError({
+      capability: "tts",
+      provider: options.provider,
+      detail:
+        error instanceof Error && error.name === "AbortError"
+          ? "The streaming speech request timed out."
+          : "The server could not reach the streaming speech endpoint.",
+    });
+  }
+}
+
+function decodeQwenSseAudio(
+  body: ReadableStream<Uint8Array>,
+  onClose: () => void,
+): ReadableStream<Uint8Array> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let closed = false;
+
+  const closeOnce = () => {
+    if (closed) return;
+    closed = true;
+    onClose();
+  };
+
+  const decodeEvent = (eventText: string): Uint8Array[] => {
+    const payloadText = eventText
+      .split(/\r?\n/u)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n")
+      .trim();
+    if (!payloadText || payloadText === "[DONE]") return [];
+    let payload: unknown;
+    try {
+      payload = JSON.parse(payloadText);
+    } catch {
+      throw invalidProviderResponse("tts", "qwen", "streaming event was not valid JSON");
+    }
+    const root = isRecord(payload) ? payload : {};
+    const output = isRecord(root.output) ? root.output : {};
+    const audio = isRecord(output.audio) ? output.audio : {};
+    const data = typeof audio.data === "string" ? audio.data.trim() : "";
+    return data ? [decodeBase64Audio(data)] : [];
+  };
+
+  const takeEvent = () => {
+    const boundary = /\r?\n\r?\n/u.exec(buffer);
+    if (!boundary || boundary.index === undefined) return null;
+    const eventText = buffer.slice(0, boundary.index);
+    buffer = buffer.slice(boundary.index + boundary[0].length);
+    return eventText;
+  };
+
+  return new ReadableStream<Uint8Array>({
+    async pull(streamController) {
+      try {
+        while (true) {
+          const eventText = takeEvent();
+          if (eventText !== null) {
+            const chunks = decodeEvent(eventText);
+            if (chunks.length) {
+              chunks.forEach((chunk) => streamController.enqueue(chunk));
+              return;
+            }
+            continue;
+          }
+          const { done, value } = await reader.read();
+          if (done) {
+            buffer += decoder.decode();
+            if (buffer.trim()) {
+              decodeEvent(buffer).forEach((chunk) => streamController.enqueue(chunk));
+            }
+            closeOnce();
+            streamController.close();
+            return;
+          }
+          buffer += decoder.decode(value, { stream: true });
+        }
+      } catch (error) {
+        closeOnce();
+        streamController.error(error);
+      }
+    },
+    async cancel(reason) {
+      closeOnce();
+      await reader.cancel(reason);
+    },
+  });
+}
+
+function decodeBase64Audio(value: string): Uint8Array {
+  try {
+    const binary = atob(value);
+    const result = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      result[index] = binary.charCodeAt(index);
+    }
+    return result;
+  } catch {
+    throw invalidProviderResponse("tts", "qwen", "streaming audio data was not valid Base64");
   }
 }
 
