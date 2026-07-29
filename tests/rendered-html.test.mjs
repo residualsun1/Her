@@ -136,7 +136,10 @@ test("starter preview is removed and project modules are present", async () => {
   assert.doesNotMatch(herApp, /salon/i);
   assert.doesNotMatch(herApp, /api\/translate|点击翻译/);
   assert.doesNotMatch(herApp, /replyActions/);
-  assert.match(appStyles, /\.replySpeaking \.miniWave i[\s\S]*?animation: wave/);
+  assert.match(appStyles, /\.replySpeaking \.miniWave i[\s\S]*?--voice-amplitude/);
+  assert.match(herApp, /\/api\/tts\/synthesize/);
+  assert.match(herApp, /decodeAudioData/);
+  assert.match(herApp, /getByteFrequencyData/);
   assert.match(appStyles, /\.replyCard \{[\s\S]*?background: transparent/);
   assert.match(appStyles, /--silver: #e7e8ea/);
   assert.doesNotMatch(appStyles, /#89f5cf|137,\s*245,\s*207/);

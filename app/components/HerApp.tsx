@@ -107,6 +107,7 @@ type DeleteTarget =
 
 const HIDDEN_SAMPLE_GARDEN_KEY = "her-hidden-sample-garden";
 const HIDDEN_SAMPLE_CARDS_KEY = "her-hidden-sample-cards";
+const VOICE_WAVE_PROFILE = [0.72, 1.05, 1.42, 0.94, 1.68, 1.18, 1.52, 0.88, 1.34, 1.02, 0.76];
 
 const averageFrequencyBand = (data: Uint8Array, start: number, end: number) => {
   const from = Math.max(0, Math.min(start, data.length));
@@ -365,6 +366,12 @@ export function HerApp() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserFrameRef = useRef<number | null>(null);
   const speechPulseRef = useRef<number | null>(null);
+  const speechSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const speechAnalyserRef = useRef<AnalyserNode | null>(null);
+  const speechAudioContextRef = useRef<AudioContext | null>(null);
+  const speechAnalyserFrameRef = useRef<number | null>(null);
+  const speechRequestRef = useRef(0);
+  const speechCacheRef = useRef<Map<string, Blob>>(new Map());
   const chunksRef = useRef<Blob[]>([]);
   const transcriptRef = useRef("");
   const replyDelayRunRef = useRef(0);
@@ -410,12 +417,43 @@ export function HerApp() {
   }, []);
 
   const stopSpeechPlayback = useCallback(() => {
+    speechRequestRef.current += 1;
     if (speechPulseRef.current) {
       window.clearInterval(speechPulseRef.current);
       speechPulseRef.current = null;
     }
+    if (speechAnalyserFrameRef.current) {
+      window.cancelAnimationFrame(speechAnalyserFrameRef.current);
+      speechAnalyserFrameRef.current = null;
+    }
+    const activeSource = speechSourceRef.current;
+    if (activeSource) {
+      activeSource.onended = null;
+      try {
+        activeSource.stop();
+      } catch {
+        // The source may already have reached its natural end.
+      }
+      activeSource.disconnect();
+      speechSourceRef.current = null;
+    }
+    speechAnalyserRef.current?.disconnect();
+    speechAnalyserRef.current = null;
     window.speechSynthesis?.cancel();
     setAudioLevel(0.05);
+    setAudioBands({ bass: 0.02, mid: 0.015, treble: 0.01 });
+  }, []);
+
+  const primeSpeechPlayback = useCallback(() => {
+    try {
+      const context =
+        speechAudioContextRef.current ??
+        new AudioContext({ latencyHint: "interactive" });
+      speechAudioContextRef.current = context;
+      if (context.state === "suspended") void context.resume();
+    } catch {
+      // Browser speech remains available as a clearly labeled fallback.
+    }
   }, []);
 
   useEffect(() => {
@@ -522,10 +560,13 @@ export function HerApp() {
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       if (analyserFrameRef.current) cancelAnimationFrame(analyserFrameRef.current);
       if (musicAnalyserFrameRef.current) cancelAnimationFrame(musicAnalyserFrameRef.current);
+      if (speechAnalyserFrameRef.current) cancelAnimationFrame(speechAnalyserFrameRef.current);
       if (speechPulseRef.current) window.clearInterval(speechPulseRef.current);
+      speechSourceRef.current?.stop();
       window.speechSynthesis?.cancel();
       void audioContextRef.current?.close();
       void musicAudioContextRef.current?.close();
+      void speechAudioContextRef.current?.close();
       if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
     };
   }, []);
@@ -547,45 +588,152 @@ export function HerApp() {
 
   const speak = useCallback(
     (text: string, onEnd?: () => void, voiceOffset = 0, languageOverride?: "en" | "zh") => {
-      if (!("speechSynthesis" in window)) {
-        onEnd?.();
-        return;
-      }
       stopSpeechPlayback();
+      const speechRun = speechRequestRef.current;
       const spokenLanguage = languageOverride ?? "zh";
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voices = window.speechSynthesis
-        .getVoices()
-        .filter((voice) => voice.lang.toLowerCase().startsWith(spokenLanguage === "en" ? "en" : "zh"));
-      if (voices.length) utterance.voice = voices[(voiceOffset + (voiceStyle === "reflective" ? 1 : 0)) % voices.length];
-      utterance.lang = spokenLanguage === "en" ? "en-US" : "zh-CN";
-      utterance.rate = voiceStyle === "intimate" ? 0.9 : voiceStyle === "bright" ? 1.03 : 0.95;
-      utterance.pitch = voiceStyle === "reflective" ? 0.9 : 1;
-      utterance.onstart = () => {
+      setReplyState("ready");
+
+      const finish = () => {
+        if (speechRun !== speechRequestRef.current) return;
+        if (speechPulseRef.current) {
+          window.clearInterval(speechPulseRef.current);
+          speechPulseRef.current = null;
+        }
+        setAudioLevel(0.05);
+        setAudioBands({ bass: 0.02, mid: 0.015, treble: 0.01 });
+        setReplyState("ready");
+        onEnd?.();
+      };
+
+      const fallbackToBrowserVoice = () => {
+        if (speechRun !== speechRequestRef.current) return;
+        if (!("speechSynthesis" in window)) {
+          finish();
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(text);
+        const voices = window.speechSynthesis
+          .getVoices()
+          .filter((voice) => voice.lang.toLowerCase().startsWith(spokenLanguage === "en" ? "en" : "zh"));
+        if (voices.length) {
+          utterance.voice = voices[
+            (voiceOffset + (voiceStyle === "reflective" ? 1 : 0)) %
+              voices.length
+          ];
+        }
+        utterance.lang = spokenLanguage === "en" ? "en-US" : "zh-CN";
+        utterance.rate = voiceStyle === "intimate" ? 0.9 : voiceStyle === "bright" ? 1.03 : 0.95;
+        utterance.pitch = voiceStyle === "reflective" ? 0.9 : 1;
+        utterance.onstart = () => {
+          if (speechRun !== speechRequestRef.current) return;
+          setReplyState("speaking");
+          speechPulseRef.current = window.setInterval(
+            () => setAudioLevel(0.28 + Math.random() * 0.58),
+            90,
+          );
+        };
+        utterance.onend = finish;
+        utterance.onerror = finish;
+        window.speechSynthesis.speak(utterance);
+      };
+
+      const playSynthesizedAudio = async (blob: Blob) => {
+        if (speechRun !== speechRequestRef.current) return;
+        const context =
+          speechAudioContextRef.current ??
+          new AudioContext({ latencyHint: "interactive" });
+        speechAudioContextRef.current = context;
+        if (context.state === "suspended") {
+          void context.resume();
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        }
+        if (context.state !== "running") {
+          throw new Error("Audio output has not been unlocked");
+        }
+        const buffer = await context.decodeAudioData(await blob.arrayBuffer());
+        if (speechRun !== speechRequestRef.current) return;
+        const source = context.createBufferSource();
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.72;
+        source.buffer = buffer;
+        source.connect(analyser);
+        analyser.connect(context.destination);
+        speechSourceRef.current = source;
+        speechAnalyserRef.current = analyser;
+
+        const releaseAudio = () => {
+          if (speechSourceRef.current !== source) return;
+          if (speechAnalyserFrameRef.current) {
+            window.cancelAnimationFrame(speechAnalyserFrameRef.current);
+            speechAnalyserFrameRef.current = null;
+          }
+          source.onended = null;
+          source.disconnect();
+          analyser.disconnect();
+          speechSourceRef.current = null;
+          speechAnalyserRef.current = null;
+          finish();
+        };
+
         setReplyState("speaking");
-        const pulse = window.setInterval(() => setAudioLevel(0.28 + Math.random() * 0.58), 90);
-        speechPulseRef.current = pulse;
+        setAudioLevel(0.2);
+        const frequencies = new Uint8Array(analyser.frequencyBinCount);
+        const updateWaveform = () => {
+          if (
+            speechRun !== speechRequestRef.current ||
+            speechSourceRef.current !== source
+          ) return;
+          analyser.getByteFrequencyData(frequencies);
+          const bass = averageFrequencyBand(frequencies, 1, 10);
+          const mid = averageFrequencyBand(frequencies, 10, 38);
+          const treble = averageFrequencyBand(frequencies, 38, 90);
+          setAudioBands({ bass, mid, treble });
+          setAudioLevel(
+            Math.min(1, 0.04 + bass * 0.7 + mid * 0.88 + treble * 0.36),
+          );
+          speechAnalyserFrameRef.current =
+            window.requestAnimationFrame(updateWaveform);
+        };
+        source.onended = releaseAudio;
+        updateWaveform();
+        source.start();
       };
-      utterance.onend = () => {
-        if (speechPulseRef.current) window.clearInterval(speechPulseRef.current);
-        speechPulseRef.current = null;
-        setAudioLevel(0.05);
-        setReplyState("ready");
-        onEnd?.();
+
+      const synthesize = async () => {
+        const cacheKey = `${voiceStyle}:${spokenLanguage}:${text}`;
+        let blob = speechCacheRef.current.get(cacheKey);
+        if (!blob) {
+          const response = await fetch("/api/tts/synthesize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text,
+              voiceId: voiceStyle,
+              language: spokenLanguage,
+            }),
+          });
+          if (!response.ok) throw new Error("TTS provider unavailable");
+          blob = await response.blob();
+          if (!blob.size || !blob.type.startsWith("audio/")) {
+            throw new Error("TTS provider returned invalid audio");
+          }
+          speechCacheRef.current.set(cacheKey, blob);
+          if (speechCacheRef.current.size > 18) {
+            const oldest = speechCacheRef.current.keys().next().value;
+            if (oldest) speechCacheRef.current.delete(oldest);
+          }
+        }
+        await playSynthesizedAudio(blob);
       };
-      utterance.onerror = () => {
-        if (speechPulseRef.current) window.clearInterval(speechPulseRef.current);
-        speechPulseRef.current = null;
-        setAudioLevel(0.05);
-        setReplyState("ready");
-        onEnd?.();
-      };
-      window.speechSynthesis.speak(utterance);
+
+      void synthesize().catch(fallbackToBrowserVoice);
     },
     [stopSpeechPlayback, voiceStyle],
   );
 
   const playTurn = useCallback((turn: ChatTurn) => {
+    primeSpeechPlayback();
     if (!turn.audioBlob) {
       speak(turn.original, undefined, 0, turn.language);
       return;
@@ -602,13 +750,14 @@ export function HerApp() {
     audio.onended = finish;
     audio.onerror = finish;
     void audio.play().catch(finish);
-  }, [speak, stopSpeechPlayback]);
+  }, [primeSpeechPlayback, speak, stopSpeechPlayback]);
 
   const submitMessage = useCallback(
     async (raw: string, audioBlob?: Blob) => {
       const message = raw.trim();
       if (!message || replyState === "holding" || replyState === "thinking") return;
       stopSpeechPlayback();
+      primeSpeechPlayback();
       const userTurn: ChatTurn = {
         id: crypto.randomUUID(),
         role: "user",
@@ -664,7 +813,7 @@ export function HerApp() {
         speak(fallback);
       }
     },
-    [elapsed, flashNotice, imageContext, provider, replyState, saveVoice, speak, stopSpeechPlayback, turns],
+    [elapsed, flashNotice, imageContext, primeSpeechPlayback, provider, replyState, saveVoice, speak, stopSpeechPlayback, turns],
   );
 
   const stopRecorder = useCallback(async () => {
@@ -829,6 +978,7 @@ export function HerApp() {
     }
     if (replyState === "listening" || captureStartingRef.current) await stopListening(false);
     stopSpeechPlayback();
+    primeSpeechPlayback();
     cancelPendingReply();
     const objectUrl = URL.createObjectURL(file);
     uploadUrlsRef.current.push(objectUrl);
@@ -940,7 +1090,7 @@ export function HerApp() {
     };
     setTurns([assistantTurn]);
     speak(welcome);
-  }, [cancelPendingReply, flashNotice, replyState, speak, stopListening, stopSpeechPlayback, visionEnabled]);
+  }, [cancelPendingReply, flashNotice, primeSpeechPlayback, replyState, speak, stopListening, stopSpeechPlayback, visionEnabled]);
 
   const ensureCurrentGarden = useCallback(async () => {
     if (currentGardenIdRef.current) {
@@ -1514,7 +1664,7 @@ export function HerApp() {
               {sentEcho && <div className={styles.sentEcho} aria-live="polite"><p>{sentEcho}</p></div>}
               {!sentEcho && currentAssistant && (
                 <article className={`${styles.replyCard} ${conversationFromGarden ? styles.gardenQuestion : ""} ${replyState === "speaking" ? styles.replySpeaking : ""}`}>
-                  <div className={styles.miniWave} aria-hidden="true">{Array.from({ length: 11 }, (_, index) => <i key={index} />)}</div>
+                  <div className={styles.miniWave} aria-hidden="true">{VOICE_WAVE_PROFILE.map((shape, index) => <i key={index} style={{ "--voice-amplitude": Math.max(0.4, 0.3 + visualAudioLevel * shape) } as CSSProperties} />)}</div>
                   <p>{currentAssistant.original}</p>
                 </article>
               )}
@@ -1939,7 +2089,7 @@ export function HerApp() {
 
           <div className={styles.settingsSectionLabel}><span>会话</span></div>
           <label>AI 模型<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providerOptions.map((option) => <option key={option.provider} value={option.provider} disabled={providerMode === "live" && !option.configured}>{providerLabel(option.provider)}{providerMode === "live" && !option.configured ? " · 未配置密钥" : ""}</option>)}</select></label>
-          <label>语音音色<select value={voiceStyle} onChange={(event) => setVoiceStyle(event.target.value)}><option value="intimate">亲密中文</option><option value="reflective">沉思中文</option><option value="bright">明亮中文</option></select></label>
+          <label>语音风格<select value={voiceStyle} onChange={(event) => setVoiceStyle(event.target.value)}><option value="intimate">温柔陪伴</option><option value="reflective">安静沉思</option><option value="bright">轻盈温暖</option></select></label>
           <label className={styles.toggleRow}><span><b>允许 AI 理解图片</b><small>仅在你同意后发送压缩副本。</small></span><input type="checkbox" checked={visionEnabled} onChange={(event) => setVisionEnabled(event.target.checked)} /></label>
           <label className={styles.toggleRow}><span><b>在本设备保存我的语音</b><small>每轮语音不会上传到云端存储。</small></span><input type="checkbox" checked={saveVoice} onChange={(event) => setSaveVoice(event.target.checked)} /></label>
         </aside>

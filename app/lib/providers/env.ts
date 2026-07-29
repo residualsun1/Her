@@ -165,12 +165,17 @@ export function getProviderBaseUrl(provider: ProviderName): string {
   return parsed.toString().replace(/\/+$/, "");
 }
 
+export function getQwenTtsEndpoint(): string {
+  const origin = new URL(getProviderBaseUrl("qwen")).origin;
+  return `${origin}/api/v1/services/audio/tts/SpeechSynthesizer`;
+}
+
 export function isLiveCapabilityImplemented(
   capability: Capability,
   provider: ProviderName,
 ): boolean {
   if (TEXT_CAPABILITIES.has(capability)) return true;
-  return capability === "image" && provider === "qwen";
+  return (capability === "image" || capability === "tts") && provider === "qwen";
 }
 
 export function listLiveCapabilities(provider: ProviderName): Capability[] {
@@ -196,6 +201,9 @@ export function getConfiguredModel(
   if (capabilityOverride) return capabilityOverride;
   if (capability === "image" && provider === "qwen") {
     return envValue("QWEN_IMAGE_MODEL") ?? "qwen3.7-plus";
+  }
+  if (capability === "tts" && provider === "qwen") {
+    return envValue("QWEN_TTS_MODEL") ?? "qwen-audio-3.0-tts-plus";
   }
   if (!isLiveCapabilityImplemented(capability, provider)) return null;
   return envValue(PROVIDER_MODEL_ENV[provider]) ?? DEFAULT_LIVE_MODELS[provider];

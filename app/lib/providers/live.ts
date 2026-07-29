@@ -3,6 +3,7 @@ import {
   getConfiguredModel,
   getProviderBaseUrl,
   getProviderCredential,
+  getQwenTtsEndpoint,
 } from "./env";
 import { ProviderError, upstreamProviderError } from "./errors";
 import type {
@@ -19,9 +20,14 @@ import type {
   MemorySummaryProvider,
   ProviderName,
   SupportedLanguage,
+  TtsProvider,
+  TtsSynthesisInput,
+  TtsSynthesisResult,
+  TtsStatus,
 } from "./types";
 
 type TextCapability = "chat" | "summary";
+type LiveCapability = TextCapability | "image" | "tts";
 type ConversationRole = "user" | "assistant";
 
 interface InternalMessage {
@@ -272,6 +278,97 @@ Rules:
   }
 }
 
+const QWEN_TTS_STYLES = {
+  intimate: {
+    label: "温柔陪伴",
+    instruction:
+      "温柔、克制、亲近的成年女性中文声音，语速稍慢，停顿自然，带轻微气声和陪伴感；不撒娇，不像客服或播音。",
+  },
+  reflective: {
+    label: "安静沉思",
+    instruction:
+      "安静、沉思、平和的成年女性中文声音，语速偏慢，句间自然停顿；克制而有余韵，不表演悲伤。",
+  },
+  bright: {
+    label: "轻盈温暖",
+    instruction:
+      "自然、轻盈、温暖的成年女性中文声音，语速适中，语气稍明亮但不过分兴奋；像熟悉的人在轻声回应。",
+  },
+} as const;
+
+type QwenTtsStyle = keyof typeof QWEN_TTS_STYLES;
+
+export class LiveQwenTtsProvider implements TtsProvider {
+  readonly provider = "qwen" as const;
+
+  async getTtsStatus(): Promise<TtsStatus> {
+    return {
+      provider: this.provider,
+      model:
+        getConfiguredModel("tts", "live", this.provider) ??
+        "qwen-audio-3.0-tts-plus",
+      mock: false,
+      ready: true,
+      streaming: false,
+      syntheticVoiceDisclosureRequired: true,
+      voices: Object.entries(QWEN_TTS_STYLES).map(
+        ([id, profile]) => ({
+          id,
+          label: profile.label,
+          languages: ["zh", "en"],
+          style: id as QwenTtsStyle,
+          previewAvailable: true,
+        }),
+      ),
+    };
+  }
+
+  async synthesizeSpeech(
+    input: TtsSynthesisInput,
+  ): Promise<TtsSynthesisResult> {
+    const model =
+      getConfiguredModel("tts", "live", this.provider) ??
+      "qwen-audio-3.0-tts-plus";
+    const style = isQwenTtsStyle(input.voiceId) ? input.voiceId : "intimate";
+    const format =
+      input.format === "mp3" || input.format === "opus"
+        ? input.format
+        : "wav";
+    const payload = await postJson(
+      getQwenTtsEndpoint(),
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${requiredCredential(this.provider, "tts")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          input: {
+            text: input.text,
+            voice: envValue("QWEN_TTS_VOICE") ?? "longanlingxin",
+            format,
+            sample_rate: 24_000,
+            instruction: QWEN_TTS_STYLES[style].instruction,
+          },
+        }),
+      },
+      "tts",
+      this.provider,
+    );
+    const audioUrl = extractQwenTtsAudioUrl(payload, this.provider);
+    const audio = await fetchTrustedQwenAudio(audioUrl, this.provider);
+    return {
+      provider: this.provider,
+      model,
+      mock: false,
+      audio: audio.body,
+      mimeType: normalizeAudioMimeType(audio.contentType, format),
+      sampleRateHz: 24_000,
+    };
+  }
+}
+
 async function completeText(
   provider: ProviderName,
   capability: TextCapability,
@@ -440,7 +537,7 @@ async function completeGemini(
 async function postJson(
   url: string,
   init: RequestInit,
-  capability: TextCapability | "image",
+  capability: LiveCapability,
   provider: ProviderName,
 ): Promise<unknown> {
   const controller = new AbortController();
@@ -486,7 +583,7 @@ async function postJson(
 
 function requiredCredential(
   provider: ProviderName,
-  capability: TextCapability | "image",
+  capability: LiveCapability,
 ): string {
   const value = getProviderCredential(provider);
   if (value) return value;
@@ -544,7 +641,7 @@ function parseJsonObject(
 }
 
 function invalidProviderResponse(
-  capability: TextCapability | "image",
+  capability: LiveCapability,
   provider: ProviderName,
   detail: string,
 ): ProviderError {
@@ -556,6 +653,112 @@ function invalidProviderResponse(
     provider,
     hint: detail,
   });
+}
+
+function isQwenTtsStyle(value: string): value is QwenTtsStyle {
+  return value in QWEN_TTS_STYLES;
+}
+
+function extractQwenTtsAudioUrl(
+  payload: unknown,
+  provider: ProviderName,
+): string {
+  const root = isRecord(payload) ? payload : {};
+  const output = isRecord(root.output) ? root.output : {};
+  const audio = isRecord(output.audio) ? output.audio : {};
+  const candidates = [
+    audio.url,
+    output.audio_url,
+    output.url,
+    root.audio_url,
+    root.url,
+  ];
+  const url = candidates.find(
+    (value): value is string =>
+      typeof value === "string" && value.trim().length > 0,
+  );
+  if (!url) {
+    throw invalidProviderResponse(
+      "tts",
+      provider,
+      "missing the synthesized audio URL",
+    );
+  }
+  return url.trim();
+}
+
+async function fetchTrustedQwenAudio(
+  value: string,
+  provider: ProviderName,
+): Promise<{ body: ReadableStream<Uint8Array>; contentType: string | null }> {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw invalidProviderResponse("tts", provider, "audio URL was invalid");
+  }
+  const trustedHost =
+    url.hostname === "aliyuncs.com" || url.hostname.endsWith(".aliyuncs.com");
+  if (!trustedHost || (url.protocol !== "https:" && url.protocol !== "http:")) {
+    throw invalidProviderResponse(
+      "tts",
+      provider,
+      "audio URL did not use a trusted Aliyun host",
+    );
+  }
+  // The current Qwen response can contain a signed HTTP OSS URL even though
+  // the same official object endpoint supports TLS. Upgrade it before fetching
+  // so synthesized speech never traverses the network in plaintext.
+  url.protocol = "https:";
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), providerTimeoutMs());
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok || !response.body) {
+      throw upstreamProviderError({
+        capability: "tts",
+        provider,
+        status: response.status,
+        detail: "The generated audio file could not be downloaded.",
+      });
+    }
+    return {
+      body: response.body as ReadableStream<Uint8Array>,
+      contentType: response.headers.get("content-type"),
+    };
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw upstreamProviderError({
+      capability: "tts",
+      provider,
+      detail:
+        error instanceof Error && error.name === "AbortError"
+          ? "Downloading the generated audio timed out."
+          : "The generated audio file could not be downloaded.",
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function normalizeAudioMimeType(
+  contentType: string | null,
+  format: "mp3" | "wav" | "opus",
+): string {
+  if (contentType?.toLowerCase().startsWith("audio/")) {
+    return contentType.split(";")[0];
+  }
+  if (format === "mp3") return "audio/mpeg";
+  if (format === "opus") return "audio/ogg";
+  return "audio/wav";
+}
+
+function providerTimeoutMs(): number {
+  const configuredTimeout = Number(envValue("HER_PROVIDER_TIMEOUT_MS"));
+  return Number.isFinite(configuredTimeout)
+    ? Math.min(120_000, Math.max(5_000, configuredTimeout))
+    : 45_000;
 }
 
 function upstreamErrorHint(payload: unknown): string {

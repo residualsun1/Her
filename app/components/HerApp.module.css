@@ -385,7 +385,9 @@
 
 .replySpeaking .miniWave i {
   background: rgba(225, 233, 231, 0.62);
-  animation: wave 1.1s ease-in-out infinite alternate;
+  transform: scaleY(var(--voice-amplitude, 0.45));
+  transition: transform 70ms linear, opacity 90ms linear;
+  opacity: min(0.92, var(--voice-amplitude, 0.45));
 }
 
 .transcriptCard {
@@ -984,7 +986,6 @@
 @keyframes floatIn { from { opacity: 0; transform: translate(-50%, calc(-50% + 18px)) scale(0.98); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes userWordsIn { from { opacity: 0; filter: blur(8px); transform: translateY(13px); } to { opacity: 1; filter: blur(0); transform: translateY(0); } }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes wave { from { transform: scaleY(0.45); opacity: 0.35; } to { transform: scaleY(1.6); opacity: 0.9; } }
 @keyframes blink { 50% { opacity: 0.18; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes breathe { 50% { transform: scale(1.1); opacity: 0.65; } }

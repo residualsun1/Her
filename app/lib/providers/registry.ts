@@ -12,7 +12,11 @@ import {
   providerNotConfigured,
 } from "./errors";
 import { MockProvider } from "./mock";
-import { LiveQwenImageProvider, LiveTextProvider } from "./live";
+import {
+  LiveQwenImageProvider,
+  LiveQwenTtsProvider,
+  LiveTextProvider,
+} from "./live";
 import type {
   AsrProvider,
   Capability,
@@ -49,6 +53,9 @@ function getAdapter(
   if (isLiveCapabilityImplemented(capability, provider)) {
     if (capability === "image" && provider === "qwen") {
       return new LiveQwenImageProvider();
+    }
+    if (capability === "tts" && provider === "qwen") {
+      return new LiveQwenTtsProvider();
     }
     if (capability === "chat" || capability === "summary") {
       return new LiveTextProvider(provider, capability);
