@@ -132,6 +132,11 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /aria-label="上传更多图片"[\s\S]*?aria-hidden="true">↥/);
   assert.match(herApp, /deleteMemoryButton[\s\S]*?aria-hidden="true">×/);
   assert.match(herApp, /cardDeleteButton[\s\S]*?aria-hidden="true">×/);
+  assert.match(herApp, /className=\{styles\.openGardenButton\}[\s\S]*?openGardenConversation\(item\)/);
+  assert.doesNotMatch(herApp, /deleteMemoryButton[\s\S]{0,500}?onPointerUp/);
+  assert.match(herApp, /const openGardenConversation[\s\S]*?primeSpeechPlayback\(\);[\s\S]*?speak\(welcome\)/);
+  assert.match(herApp, /setDeleteTarget\(\{ kind: "garden"[\s\S]*?删除当前记忆/);
+  assert.match(appStyles, /\.openGardenButton \{[\s\S]*?z-index: 10/);
   assert.doesNotMatch(herApp, /＋ 上传更多/);
   assert.doesNotMatch(herApp, /salon/i);
   assert.doesNotMatch(herApp, /api\/translate|点击翻译/);
@@ -179,8 +184,8 @@ test("starter preview is removed and project modules are present", async () => {
   assert.doesNotMatch(gardenPointerDown, /setPointerCapture/);
   assert.match(gardenPointerMove, /setPointerCapture/);
   assert.match(herApp, /if \(!moved && mode === "artwork"\) return/);
-  assert.match(herApp, /closest\("button"\)\) return/);
-  assert.match(herApp, /onPointerUp=\{\(event\) => \{[\s\S]*?setDeleteTarget\(\{ kind: "garden", item \}\)/);
+  assert.match(herApp, /closest\(`\.\$\{styles\.deleteMemoryButton\}`\)\) return/);
+  assert.match(herApp, /className=\{styles\.deleteMemoryButton\}[\s\S]*?onClick=\{\(event\) => \{[\s\S]*?setDeleteTarget\(\{ kind: "garden", item \}\)/);
   assert.match(appStyles, /\.deleteMemoryButton,[\s\S]*?width: 44px;[\s\S]*?height: 44px/);
   assert.doesNotMatch(herApp, /onScroll=\{\(event\) => settleGardenSelection/);
   assert.doesNotMatch(herApp, /Dispersion <|Particle Size <|Flow Speed <|Subject Detail <|Mouse Force </);

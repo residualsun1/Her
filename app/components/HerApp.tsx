@@ -363,6 +363,7 @@ export function HerApp() {
   const [cardIndex, setCardIndex] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [activeGardenItem, setActiveGardenItem] = useState<GardenVisualItem | null>(null);
   const [conversationFromGarden, setConversationFromGarden] = useState(false);
   const [conversationChromeVisible, setConversationChromeVisible] = useState(true);
   const [immersiveMode, setImmersiveMode] = useState(false);
@@ -1036,7 +1037,13 @@ export function HerApp() {
       },
     });
     currentGardenIdRef.current = garden.id;
-    setGardenItems((items) => [{ id: garden.id, title: file.name, imageUrl: objectUrl }, ...items]);
+    const uploadedItem: GardenVisualItem = {
+      id: garden.id,
+      title: file.name,
+      imageUrl: objectUrl,
+    };
+    setActiveGardenItem(uploadedItem);
+    setGardenItems((items) => [uploadedItem, ...items]);
 
     let context: ClientImageContext | null = null;
     if (visionEnabled) {
@@ -1102,6 +1109,11 @@ export function HerApp() {
           items.map((item) =>
             item.id === garden.id ? { ...item, imageContext: context ?? undefined } : item,
           ),
+        );
+        setActiveGardenItem((item) =>
+          item?.id === garden.id
+            ? { ...item, imageContext: context ?? undefined }
+            : item,
         );
       } catch {
         context = null;
@@ -1440,7 +1452,7 @@ export function HerApp() {
   };
 
   const handleGardenPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("button")) return;
+    if ((event.target as HTMLElement).closest(`.${styles.deleteMemoryButton}`)) return;
     const strip = event.currentTarget;
     const interactingWithArtwork = Boolean((event.target as HTMLElement).closest("[data-garden-index]"));
     gardenDragRef.current = {
@@ -1558,18 +1570,21 @@ export function HerApp() {
   const openGardenConversation = (item = gardenItems[gardenIndex]) => {
     if (!item) return;
     cancelPendingReply();
+    primeSpeechPlayback();
     setImageUrl(item.imageUrl);
     setImagePrecomposed(Boolean(item.precomposed));
     setImageTitle(item.title);
     setImageContext(item.imageContext ?? null);
+    setActiveGardenItem(item);
     currentGardenIdRef.current = SAMPLE_GARDEN.some((sample) => sample.id === item.id) ? undefined : item.id;
     draftSessionIdRef.current = undefined;
+    const welcome =
+      item.imageContext?.openingQuestion ??
+      "我记得这张图片。现在重新回到这里，什么感觉变得不一样了？";
     setTurns([{
       id: crypto.randomUUID(),
       role: "assistant",
-      original:
-        item.imageContext?.openingQuestion ??
-        "我记得这张图片。现在重新回到这里，什么感觉变得不一样了？",
+      original: welcome,
       language: "zh",
       createdAt: 0,
     }]);
@@ -1585,30 +1600,44 @@ export function HerApp() {
       revealTimerRef.current = null;
     }, 1700);
     setView("conversation");
+    speak(welcome);
   };
 
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget || deleting) return;
+    const target = deleteTarget;
+    const deletingActiveGarden =
+      target.kind === "garden" && activeGardenItem?.id === target.item.id;
     setDeleting(true);
     try {
-      if (deleteTarget.kind === "garden") {
-        const isSample = SAMPLE_GARDEN.some((item) => item.id === deleteTarget.item.id);
-        if (isSample) hideSampleId(HIDDEN_SAMPLE_GARDEN_KEY, deleteTarget.item.id);
-        else await memoryStore.deleteGardenItem(deleteTarget.item.id, { cascadeSessions: true });
+      if (target.kind === "garden") {
+        const isSample = SAMPLE_GARDEN.some((item) => item.id === target.item.id);
+        if (isSample) hideSampleId(HIDDEN_SAMPLE_GARDEN_KEY, target.item.id);
+        else await memoryStore.deleteGardenItem(target.item.id, { cascadeSessions: true });
       } else {
-        const isSample = SAMPLE_CARDS.some((card) => card.id === deleteTarget.card.id);
-        if (isSample) hideSampleId(HIDDEN_SAMPLE_CARDS_KEY, deleteTarget.card.id);
-        else await memoryStore.deleteSessionRecord(deleteTarget.card.id);
+        const isSample = SAMPLE_CARDS.some((card) => card.id === target.card.id);
+        if (isSample) hideSampleId(HIDDEN_SAMPLE_CARDS_KEY, target.card.id);
+        else await memoryStore.deleteSessionRecord(target.card.id);
+      }
+      if (deletingActiveGarden) {
+        stopSpeechPlayback();
+        currentGardenIdRef.current = undefined;
+        draftSessionIdRef.current = undefined;
+        setActiveGardenItem(null);
+        setSettingsOpen(false);
+        setConversationFromGarden(false);
+        setConversationChromeVisible(true);
+        setView("garden");
       }
       setDeleteTarget(null);
       await refreshSavedCards();
-      flashNotice(deleteTarget.kind === "garden" ? "已从记忆中移除。" : "记忆已删除。");
+      flashNotice(target.kind === "garden" ? "已从记忆中移除。" : "记忆已删除。");
     } catch {
       flashNotice("暂时无法删除这段记忆。");
     } finally {
       setDeleting(false);
     }
-  }, [deleteTarget, deleting, flashNotice, refreshSavedCards]);
+  }, [activeGardenItem, deleteTarget, deleting, flashNotice, refreshSavedCards, stopSpeechPlayback]);
 
   const navigateTo = (nextView: View) => {
     cancelPendingReply();
@@ -1783,28 +1812,6 @@ export function HerApp() {
                         "--garden-mobile-left": `${2 + index * 72}vw`,
                         "--garden-top": `${index % 4 === 0 ? 1 : index % 4 === 1 ? 7 : index % 4 === 2 ? 3 : 10}%`,
                       } as CSSProperties}
-                      onClick={(event) => {
-                        if ((event.target as HTMLElement).closest("button")) return;
-                        if (gardenDragRef.current.moved) {
-                          gardenDragRef.current.moved = false;
-                          return;
-                        }
-                        if (index !== gardenIndex) {
-                          focusGardenItem(index);
-                          return;
-                        }
-                        openGardenConversation(item);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          if (index !== gardenIndex) focusGardenItem(index);
-                          else openGardenConversation(item);
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                        aria-label={`打开${item.title}`}
                     >
                       {Math.abs(index - gardenIndex) <= 1 ? (
                         <Suspense fallback={<div className={styles.particleLoading} aria-hidden="true" />}>
@@ -1824,22 +1831,29 @@ export function HerApp() {
                         <img className={styles.gardenDistantImage} src={item.imageUrl} alt="" aria-hidden="true" />
                       )}
                       <button
+                        type="button"
+                        className={styles.openGardenButton}
+                        onClick={() => {
+                          if (gardenDragRef.current.moved) {
+                            gardenDragRef.current.moved = false;
+                            return;
+                          }
+                          if (index !== gardenIndex) {
+                            focusGardenItem(index);
+                            return;
+                          }
+                          openGardenConversation(item);
+                        }}
+                        aria-label={`打开${item.title}`}
+                      />
+                      <button
+                        type="button"
                         className={styles.deleteMemoryButton}
                         onClick={(event) => {
-                          event.preventDefault();
                           event.stopPropagation();
                           setDeleteTarget({ kind: "garden", item });
                         }}
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                        }}
-                        onPointerMove={(event) => event.stopPropagation()}
-                        onPointerUp={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setDeleteTarget({ kind: "garden", item });
-                        }}
+                        onPointerDown={(event) => event.stopPropagation()}
                         aria-label={`删除${item.title}`}
                       >
                         <span aria-hidden="true">×</span>
@@ -2119,6 +2133,24 @@ export function HerApp() {
           <label>语音风格<select value={voiceStyle} onChange={(event) => setVoiceStyle(event.target.value)}><option value="intimate">温柔陪伴</option><option value="reflective">安静沉思</option><option value="bright">轻盈温暖</option></select></label>
           <label className={styles.toggleRow}><span><b>允许 AI 理解图片</b><small>仅在你同意后发送压缩副本。</small></span><input type="checkbox" checked={visionEnabled} onChange={(event) => setVisionEnabled(event.target.checked)} /></label>
           <label className={styles.toggleRow}><span><b>在本设备保存我的语音</b><small>每轮语音不会上传到云端存储。</small></span><input type="checkbox" checked={saveVoice} onChange={(event) => setSaveVoice(event.target.checked)} /></label>
+
+          {view === "conversation" && activeGardenItem && (
+            <>
+              <div className={styles.settingsSectionLabel}><span>当前记忆</span></div>
+              <div className={styles.settingsDanger}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    setDeleteTarget({ kind: "garden", item: activeGardenItem });
+                  }}
+                >
+                  删除当前记忆
+                </button>
+                <small>粒子图像及其关联的已保存对话会一并移除。</small>
+              </div>
+            </>
+          )}
         </aside>
       )}
 
