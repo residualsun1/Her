@@ -520,6 +520,35 @@ export function HerApp() {
     }
   }, [getSpeechAudioContext]);
 
+  const prepareSynthesizedSpeech = useCallback(
+    async (text: string, spokenLanguage: "en" | "zh") => {
+      const cacheKey = `${voiceStyle}:${spokenLanguage}:${text}`;
+      const cached = speechCacheRef.current.get(cacheKey);
+      if (cached) return cached;
+      const response = await fetch("/api/tts/synthesize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          voiceId: voiceStyle,
+          language: spokenLanguage,
+        }),
+      });
+      if (!response.ok) throw new Error("TTS provider unavailable");
+      const blob = await response.blob();
+      if (!blob.size || !blob.type.startsWith("audio/")) {
+        throw new Error("TTS provider returned invalid audio");
+      }
+      speechCacheRef.current.set(cacheKey, blob);
+      if (speechCacheRef.current.size > 18) {
+        const oldest = speechCacheRef.current.keys().next().value;
+        if (oldest) speechCacheRef.current.delete(oldest);
+      }
+      return blob;
+    },
+    [voiceStyle],
+  );
+
   useEffect(() => {
     const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
@@ -665,11 +694,25 @@ export function HerApp() {
   }, [readingCard]);
 
   const speak = useCallback(
-    (text: string, onEnd?: () => void, voiceOffset = 0, languageOverride?: "en" | "zh") => {
+    (
+      text: string,
+      onEnd?: () => void,
+      voiceOffset = 0,
+      languageOverride?: "en" | "zh",
+      preparedAudio?: Blob | null,
+      onStart?: () => void,
+    ) => {
       stopSpeechPlayback();
       const speechRun = speechRequestRef.current;
       const spokenLanguage = languageOverride ?? "zh";
-      setReplyState("ready");
+      setReplyState("thinking");
+
+      const beginPlayback = () => {
+        if (speechRun !== speechRequestRef.current) return false;
+        setReplyState("speaking");
+        onStart?.();
+        return true;
+      };
 
       const finish = () => {
         if (speechRun !== speechRequestRef.current) return;
@@ -703,8 +746,7 @@ export function HerApp() {
         utterance.rate = voiceStyle === "intimate" ? 0.9 : voiceStyle === "bright" ? 1.03 : 0.95;
         utterance.pitch = voiceStyle === "reflective" ? 0.9 : 1;
         utterance.onstart = () => {
-          if (speechRun !== speechRequestRef.current) return;
-          setReplyState("speaking");
+          if (!beginPlayback()) return;
           speechPulseRef.current = window.setInterval(
             () => setAudioLevel(0.28 + Math.random() * 0.58),
             90,
@@ -747,7 +789,7 @@ export function HerApp() {
           finish();
         };
 
-        setReplyState("speaking");
+        if (!beginPlayback()) return;
         setAudioLevel(0.2);
         const frequencies = new Uint8Array(analyser.frequencyBinCount);
         const updateWaveform = () => {
@@ -768,39 +810,18 @@ export function HerApp() {
         };
         source.onended = releaseAudio;
         updateWaveform();
-        source.start();
+        source.start(context.currentTime + 0.06);
       };
 
       const synthesize = async () => {
-        const cacheKey = `${voiceStyle}:${spokenLanguage}:${text}`;
-        let blob = speechCacheRef.current.get(cacheKey);
-        if (!blob) {
-          const response = await fetch("/api/tts/synthesize", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text,
-              voiceId: voiceStyle,
-              language: spokenLanguage,
-            }),
-          });
-          if (!response.ok) throw new Error("TTS provider unavailable");
-          blob = await response.blob();
-          if (!blob.size || !blob.type.startsWith("audio/")) {
-            throw new Error("TTS provider returned invalid audio");
-          }
-          speechCacheRef.current.set(cacheKey, blob);
-          if (speechCacheRef.current.size > 18) {
-            const oldest = speechCacheRef.current.keys().next().value;
-            if (oldest) speechCacheRef.current.delete(oldest);
-          }
-        }
+        const blob = preparedAudio ?? await prepareSynthesizedSpeech(text, spokenLanguage);
         await playSynthesizedAudio(blob);
       };
 
-      void synthesize().catch(fallbackToBrowserVoice);
+      if (preparedAudio === null) fallbackToBrowserVoice();
+      else void synthesize().catch(fallbackToBrowserVoice);
     },
-    [getSpeechAudioContext, stopSpeechPlayback, voiceStyle],
+    [getSpeechAudioContext, prepareSynthesizedSpeech, stopSpeechPlayback, voiceStyle],
   );
 
   const playTurn = useCallback((turn: ChatTurn) => {
@@ -843,13 +864,7 @@ export function HerApp() {
       setLiveTranscript("");
       transcriptRef.current = "";
       const replyRun = ++replyDelayRunRef.current;
-      setSentEcho(message);
-      setReplyState("holding");
-      await new Promise<void>((resolve) => window.setTimeout(resolve, USER_WORDS_HOLD_MS));
-      if (replyRun !== replyDelayRunRef.current) return;
-      setSentEcho(null);
-      setReplyState("thinking");
-      try {
+      const replyPromise = (async () => {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -865,7 +880,32 @@ export function HerApp() {
         if (!response.ok || !result.text) {
           throw new Error(result.error?.message ?? "chat provider unavailable");
         }
-        const text = result.text ?? "我在。告诉我，这张图片里什么最像是仍然活着的？";
+        const text = result.text;
+        return {
+          text,
+          audio: prepareSynthesizedSpeech(text, "zh").catch(() => null),
+        };
+      })()
+        .then((value) => ({ value, error: null as Error | null }))
+        .catch((error: unknown) => ({
+          value: null,
+          error: error instanceof Error ? error : new Error("chat provider unavailable"),
+        }));
+      setSentEcho(message);
+      setReplyState("holding");
+      await new Promise<void>((resolve) => window.setTimeout(resolve, USER_WORDS_HOLD_MS));
+      if (replyRun !== replyDelayRunRef.current) return;
+      setSentEcho(null);
+      setReplyState("thinking");
+      try {
+        const preparedReply = await replyPromise;
+        if (replyRun !== replyDelayRunRef.current) return;
+        if (!preparedReply.value) {
+          throw preparedReply.error ?? new Error("chat provider unavailable");
+        }
+        const { text } = preparedReply.value;
+        const preparedAudio = await preparedReply.value.audio;
+        if (replyRun !== replyDelayRunRef.current) return;
         const assistantTurn: ChatTurn = {
           id: crypto.randomUUID(),
           role: "assistant",
@@ -874,7 +914,7 @@ export function HerApp() {
           createdAt: (elapsed + 1) * 1000,
         };
         setTurns((items) => [...items, assistantTurn]);
-        speak(text);
+        speak(text, undefined, 0, "zh", preparedAudio);
       } catch {
         const fallback = "也许图像只是入口，真正的记忆就藏在它身后。";
         setTurns((items) => [...items, {
@@ -884,7 +924,7 @@ export function HerApp() {
         speak(fallback);
       }
     },
-    [elapsed, flashNotice, imageContext, primeSpeechPlayback, provider, replyState, saveVoice, speak, stopSpeechPlayback, turns],
+    [elapsed, flashNotice, imageContext, prepareSynthesizedSpeech, primeSpeechPlayback, provider, replyState, saveVoice, speak, stopSpeechPlayback, turns],
   );
 
   const stopRecorder = useCallback(async () => {
@@ -1649,7 +1689,13 @@ export function HerApp() {
       revealTimerRef.current = null;
     }, 1700);
     setView("conversation");
-    speak(welcome);
+    speak(welcome, undefined, 0, "zh", undefined, () => {
+      if (revealTimerRef.current) {
+        window.clearTimeout(revealTimerRef.current);
+        revealTimerRef.current = null;
+      }
+      setConversationChromeVisible(true);
+    });
   };
 
   const confirmDelete = useCallback(async () => {
@@ -1767,7 +1813,7 @@ export function HerApp() {
           {(!conversationFromGarden || conversationChromeVisible) && <div className={`${styles.conversationUi} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
               {replyState === "thinking" && <div className={styles.thinking}>对方正在思考 <span>·</span><span>·</span><span>·</span></div>}
               {sentEcho && <div className={styles.sentEcho} aria-live="polite"><p>{sentEcho}</p></div>}
-              {!sentEcho && currentAssistant && (
+              {!sentEcho && replyState !== "holding" && replyState !== "thinking" && currentAssistant && (
                 <article className={`${styles.replyCard} ${conversationFromGarden ? styles.gardenQuestion : ""} ${replyState === "speaking" ? styles.replySpeaking : ""}`}>
                   <div className={styles.miniWave} aria-hidden="true">{VOICE_WAVE_PROFILE.map((shape, index) => <i key={index} style={{ "--voice-amplitude": Math.max(0.4, 0.3 + visualAudioLevel * shape) } as CSSProperties} />)}</div>
                   <p>{currentAssistant.original}</p>

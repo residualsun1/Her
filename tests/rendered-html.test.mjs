@@ -134,7 +134,7 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /cardDeleteButton[\s\S]*?aria-hidden="true">×/);
   assert.match(herApp, /className=\{styles\.openGardenButton\}[\s\S]*?openGardenConversation\(item\)/);
   assert.doesNotMatch(herApp, /deleteMemoryButton[\s\S]{0,500}?onPointerUp/);
-  assert.match(herApp, /const openGardenConversation[\s\S]*?primeSpeechPlayback\(\);[\s\S]*?speak\(welcome\)/);
+  assert.match(herApp, /const openGardenConversation[\s\S]*?primeSpeechPlayback\(\);[\s\S]*?speak\(welcome,/);
   assert.match(herApp, /setDeleteTarget\(\{ kind: "garden"[\s\S]*?删除当前记忆/);
   assert.match(appStyles, /\.openGardenButton \{[\s\S]*?z-index: 10/);
   assert.doesNotMatch(herApp, /＋ 上传更多/);
@@ -156,8 +156,12 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /显示界面（Esc）/);
   assert.match(appStyles, /\.immersiveStage \.conversationTimer,[\s\S]*?animation: none !important/);
   assert.match(herApp, /USER_WORDS_HOLD_MS = 2_400/);
-  assert.match(herApp, /setSentEcho\(message\)[\s\S]*?setReplyState\("holding"\)[\s\S]*?USER_WORDS_HOLD_MS[\s\S]*?fetch\("\/api\/chat"/);
+  assert.match(herApp, /const replyPromise = \(async \(\) => \{[\s\S]*?fetch\("\/api\/chat"[\s\S]*?prepareSynthesizedSpeech\(text, "zh"\)[\s\S]*?setSentEcho\(message\)[\s\S]*?USER_WORDS_HOLD_MS/);
   assert.match(herApp, /className=\{styles\.sentEcho\}/);
+  assert.match(herApp, /const speak = useCallback[\s\S]*?setReplyState\("thinking"\)[\s\S]*?source\.start\(context\.currentTime \+ 0\.06\)/);
+  assert.match(herApp, /!sentEcho && replyState !== "holding" && replyState !== "thinking" && currentAssistant/);
+  assert.match(herApp, /speak\(welcome, undefined, 0, "zh", undefined, \(\) => \{[\s\S]*?setConversationChromeVisible\(true\)/);
+  assert.match(herApp, /speak\(text, undefined, 0, "zh", preparedAudio\)/);
   assert.match(appStyles, /@keyframes userWordsIn/);
   assert.match(herApp, /const formatSpeechRecognitionResults[\s\S]*?result\.isFinal[\s\S]*?"，"/);
   assert.match(herApp, /const finishSpeechTranscript[\s\S]*?replace\(\S+[\s\S]*?"。"/);
