@@ -140,6 +140,8 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /\/api\/tts\/synthesize/);
   assert.match(herApp, /decodeAudioData/);
   assert.match(herApp, /getByteFrequencyData/);
+  assert.match(herApp, /const stopListening[\s\S]*?const blobPromise = stopRecorder\(\);[\s\S]*?getTracks\(\)\.forEach[\s\S]*?primeSpeechPlayback\(\);[\s\S]*?await blobPromise/);
+  assert.match(herApp, /await resumeAudioContext\(context\)/);
   assert.match(appStyles, /\.replyCard \{[\s\S]*?background: transparent/);
   assert.match(appStyles, /--silver: #e7e8ea/);
   assert.doesNotMatch(appStyles, /#89f5cf|137,\s*245,\s*207/);

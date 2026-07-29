@@ -117,6 +117,28 @@ const averageFrequencyBand = (data: Uint8Array, start: number, end: number) => {
   return total / (to - from) / 255;
 };
 
+const resumeAudioContext = async (
+  context: AudioContext,
+  timeoutMs = 1_800,
+) => {
+  if (context.state === "running") return true;
+  if (context.state === "closed") return false;
+  let timeout: number | undefined;
+  try {
+    await Promise.race([
+      context.resume(),
+      new Promise<void>((resolve) => {
+        timeout = window.setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+    return (context.state as string) === "running";
+  } catch {
+    return false;
+  } finally {
+    if (timeout !== undefined) window.clearTimeout(timeout);
+  }
+};
+
 const PARAMETER_NOTES = {
   particleCount: "调高会让图像更细腻，也更消耗 GPU；出现卡顿时优先降低。",
   particleSize: "调高后颗粒更醒目，调低后画面更细密、主体更清晰。",
@@ -444,17 +466,22 @@ export function HerApp() {
     setAudioBands({ bass: 0.02, mid: 0.015, treble: 0.01 });
   }, []);
 
+  const getSpeechAudioContext = useCallback(() => {
+    const existing = speechAudioContextRef.current;
+    if (existing && existing.state !== "closed") return existing;
+    const context = new AudioContext({ latencyHint: "interactive" });
+    speechAudioContextRef.current = context;
+    return context;
+  }, []);
+
   const primeSpeechPlayback = useCallback(() => {
     try {
-      const context =
-        speechAudioContextRef.current ??
-        new AudioContext({ latencyHint: "interactive" });
-      speechAudioContextRef.current = context;
-      if (context.state === "suspended") void context.resume();
+      const context = getSpeechAudioContext();
+      if (context.state !== "running") void context.resume().catch(() => undefined);
     } catch {
       // Browser speech remains available as a clearly labeled fallback.
     }
-  }, []);
+  }, [getSpeechAudioContext]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
@@ -639,15 +666,8 @@ export function HerApp() {
 
       const playSynthesizedAudio = async (blob: Blob) => {
         if (speechRun !== speechRequestRef.current) return;
-        const context =
-          speechAudioContextRef.current ??
-          new AudioContext({ latencyHint: "interactive" });
-        speechAudioContextRef.current = context;
-        if (context.state === "suspended") {
-          void context.resume();
-          await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-        }
-        if (context.state !== "running") {
+        const context = getSpeechAudioContext();
+        if (!(await resumeAudioContext(context))) {
           throw new Error("Audio output has not been unlocked");
         }
         const buffer = await context.decodeAudioData(await blob.arrayBuffer());
@@ -729,7 +749,7 @@ export function HerApp() {
 
       void synthesize().catch(fallbackToBrowserVoice);
     },
-    [stopSpeechPlayback, voiceStyle],
+    [getSpeechAudioContext, stopSpeechPlayback, voiceStyle],
   );
 
   const playTurn = useCallback((turn: ChatTurn) => {
@@ -835,10 +855,16 @@ export function HerApp() {
     pendingCaptureStopRef.current = null;
     try { recognitionRef.current?.stop(); } catch { /* browser already ended recognition */ }
     recognitionRef.current = null;
-    const blob = await stopRecorder();
+    // recorder.stop() is issued synchronously. Release the microphone tracks
+    // and resume output before the first await, while this pointer-up/click is
+    // still a trusted user gesture. This avoids mobile browsers leaving the
+    // output AudioContext interrupted after the first recorded turn.
+    const blobPromise = stopRecorder();
     mediaRecorderRef.current = null;
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     mediaStreamRef.current = null;
+    primeSpeechPlayback();
+    const blob = await blobPromise;
     if (analyserFrameRef.current) cancelAnimationFrame(analyserFrameRef.current);
     analyserFrameRef.current = null;
     const context = audioContextRef.current;
@@ -852,7 +878,7 @@ export function HerApp() {
       setLiveTranscript("");
       transcriptRef.current = "";
     }
-  }, [input, stopRecorder, submitMessage]);
+  }, [input, primeSpeechPlayback, stopRecorder, submitMessage]);
 
   const beginListening = useCallback(async () => {
     if (replyState === "listening" || captureStartingRef.current || mediaRecorderRef.current?.state === "recording") return;
@@ -860,6 +886,7 @@ export function HerApp() {
     captureStartingRef.current = true;
     pendingCaptureStopRef.current = null;
     stopSpeechPlayback();
+    primeSpeechPlayback();
     setReplyState("listening");
     setRecordingElapsed(0);
     setLiveTranscript("");
@@ -947,7 +974,7 @@ export function HerApp() {
         flashNotice("语音对话需要麦克风权限。");
       }
     }
-  }, [flashNotice, replyState, stopListening, stopSpeechPlayback]);
+  }, [flashNotice, primeSpeechPlayback, replyState, stopListening, stopSpeechPlayback]);
 
   const handleMicPointerDown = () => {
     recordingStartedRef.current = performance.now();
