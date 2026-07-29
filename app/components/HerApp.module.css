@@ -810,6 +810,10 @@
 }
 
 .memoryCardActive { z-index: 3; border-color: rgba(255, 255, 255, 0.24); }
+.memoryCardActive:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.52);
+  outline-offset: 6px;
+}
 .memoryCard > img { width: 100%; height: 100%; object-fit: cover; mask-image: linear-gradient(#000 74%, transparent); }
 
 .cardBody {
@@ -940,6 +944,185 @@
 .previewActions button { width: 44px; height: 44px; border: 1px solid rgba(255, 255, 255, 0.12) !important; border-radius: 50%; background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.64); }
 .previewActions button:first-child { border-color: rgba(232, 234, 237, 0.3) !important; color: var(--silver); }
 
+.memoryReaderBackdrop {
+  position: fixed;
+  z-index: 70;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background:
+    linear-gradient(to bottom, rgba(3, 4, 5, 0.7), #030405 48%, #030405),
+    #030405;
+  animation: readerIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.memoryReaderAmbient {
+  position: fixed;
+  top: -8vh;
+  left: -4vw;
+  width: 108vw;
+  height: 66svh;
+  object-fit: cover;
+  opacity: 0.18;
+  filter: blur(32px) saturate(0.72);
+  mask-image: linear-gradient(#000 20%, transparent 92%);
+  pointer-events: none;
+  transform: scale(1.08);
+}
+
+.memoryReaderClose {
+  position: fixed;
+  z-index: 2;
+  top: max(24px, env(safe-area-inset-top));
+  right: max(28px, env(safe-area-inset-right));
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 50%;
+  background: rgba(8, 9, 10, 0.48);
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 21px;
+  backdrop-filter: blur(18px);
+}
+
+.memoryReader {
+  position: relative;
+  width: min(920px, 100%);
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: clamp(90px, 12vh, 140px) clamp(28px, 7vw, 78px) 120px;
+}
+
+.memoryReaderHero {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.72fr) minmax(300px, 1fr);
+  align-items: end;
+  gap: clamp(34px, 6vw, 74px);
+  padding-bottom: 70px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.memoryReaderHero > img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 2px;
+  box-shadow: 0 38px 100px rgba(0, 0, 0, 0.62);
+  filter: saturate(0.82) contrast(1.02);
+}
+
+.memoryReaderHero span,
+.memoryReaderDiary > span,
+.memoryReaderSectionTitle > span {
+  color: rgba(255, 255, 255, 0.34);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+}
+
+.memoryReaderHero h2 {
+  margin: 18px 0 22px;
+  font-family: var(--font-display), "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: clamp(42px, 7vw, 78px);
+  font-weight: 300;
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+}
+
+.memoryReaderHero p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: clamp(16px, 2vw, 20px);
+  font-weight: 300;
+  line-height: 1.85;
+}
+
+.memoryReaderHero time {
+  display: block;
+  margin-top: 25px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.memoryReaderDiary {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 28px;
+  padding: 72px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.memoryReaderDiary blockquote {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: clamp(17px, 2vw, 21px);
+  font-weight: 300;
+  line-height: 2;
+  white-space: pre-wrap;
+}
+
+.memoryReaderConversation {
+  padding-top: 72px;
+}
+
+.memoryReaderSectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 30px;
+}
+
+.memoryReaderSectionTitle small {
+  color: rgba(255, 255, 255, 0.26);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.memoryReaderTurns {
+  display: grid;
+}
+
+.memoryReaderTurn {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) 34px;
+  gap: 22px;
+  align-items: start;
+  padding: 30px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.memoryReaderTurn > span {
+  padding-top: 5px;
+  color: rgba(255, 255, 255, 0.32);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.memoryReaderTurn > p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: clamp(15px, 1.65vw, 18px);
+  font-weight: 300;
+  line-height: 1.9;
+}
+
+.memoryReaderTurnUser > p {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.memoryReaderTurn > button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 8px;
+}
+
 .savingState { display: grid; place-items: center; min-height: 320px; text-align: center; }
 .savingState p { margin: 24px 0 6px; font-family: var(--font-display), Georgia, serif; font-size: 21px; }
 .savingState small { color: rgba(255, 255, 255, 0.35); }
@@ -985,6 +1168,7 @@
 
 @keyframes floatIn { from { opacity: 0; transform: translate(-50%, calc(-50% + 18px)) scale(0.98); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes userWordsIn { from { opacity: 0; filter: blur(8px); transform: translateY(13px); } to { opacity: 1; filter: blur(0); transform: translateY(0); } }
+@keyframes readerIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 @keyframes blink { 50% { opacity: 0.18; } }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1015,6 +1199,41 @@
   .tabSwitch { width: max-content; }
   .cardCarousel { height: 590px; min-height: 590px; }
   .memoryCard { --x: calc(var(--card-offset) * 70vw); }
+  .memoryReaderClose {
+    top: max(16px, env(safe-area-inset-top));
+    right: 16px;
+  }
+  .memoryReader {
+    padding: 82px 20px calc(84px + env(safe-area-inset-bottom));
+  }
+  .memoryReaderHero {
+    grid-template-columns: 1fr;
+    gap: 34px;
+    padding-bottom: 48px;
+  }
+  .memoryReaderHero > img {
+    width: min(72vw, 340px);
+  }
+  .memoryReaderHero h2 {
+    margin-top: 14px;
+  }
+  .memoryReaderDiary {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 48px 0;
+  }
+  .memoryReaderConversation {
+    padding-top: 48px;
+  }
+  .memoryReaderTurn {
+    grid-template-columns: 48px minmax(0, 1fr) 30px;
+    gap: 12px;
+    padding: 24px 0;
+  }
+  .memoryReaderTurn > button {
+    width: 30px;
+    height: 30px;
+  }
   .calendarCard { padding: 18px 12px; }
   .calendarGrid > span,
   .calendarGrid > button { min-height: 44px; }

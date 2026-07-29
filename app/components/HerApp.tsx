@@ -82,11 +82,16 @@ type MusicTrack = {
   url: string;
 };
 
+type SpeechRecognitionResultLike = {
+  0: { transcript: string };
+  isFinal: boolean;
+};
+
 type SpeechRecognitionLike = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null;
+  onresult: ((event: { results: ArrayLike<SpeechRecognitionResultLike> }) => void) | null;
   onerror: (() => void) | null;
   onend: (() => void) | null;
   start: () => void;
@@ -282,6 +287,36 @@ const formatClock = (seconds: number) => `${pad(Math.floor(seconds / 60))}:${pad
 const localDateKey = (date = new Date()) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` as CalendarDate;
 
+const SPOKEN_CLAUSE_END = /[，。！？；：、,.!?;:]$/u;
+const SPOKEN_SENTENCE_END = /[。！？.!?]$/u;
+const CHINESE_CHARACTER = /[\u3400-\u9fff]/u;
+
+const formatSpeechRecognitionResults = (
+  results: ArrayLike<SpeechRecognitionResultLike>,
+) => {
+  let transcript = "";
+  for (let index = 0; index < results.length; index += 1) {
+    const result = results[index];
+    const segment = result?.[0]?.transcript.trim();
+    if (!segment) continue;
+    transcript += segment;
+    if (result.isFinal && !SPOKEN_CLAUSE_END.test(segment)) {
+      transcript += CHINESE_CHARACTER.test(segment) ? "，" : ", ";
+    }
+  }
+  return transcript.trim();
+};
+
+const finishSpeechTranscript = (value: string) => {
+  const transcript = value.trim();
+  if (!transcript) return "";
+  if (/[，,]\s*$/u.test(transcript)) {
+    return transcript.replace(/[，,]\s*$/u, CHINESE_CHARACTER.test(transcript) ? "。" : ".");
+  }
+  if (SPOKEN_SENTENCE_END.test(transcript)) return transcript;
+  return `${transcript}${CHINESE_CHARACTER.test(transcript) ? "。" : "."}`;
+};
+
 const storedImageContextToClient = (
   context: StoredImageContext | undefined,
 ): ClientImageContext | undefined => {
@@ -359,6 +394,7 @@ export function HerApp() {
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [preview, setPreview] = useState<MemoryCard | null>(null);
+  const [readingCard, setReadingCard] = useState<MemoryCard | null>(null);
   const [cards, setCards] = useState<MemoryCard[]>(SAMPLE_CARDS);
   const [cardIndex, setCardIndex] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -614,6 +650,20 @@ export function HerApp() {
     return () => window.removeEventListener("keydown", exitImmersive);
   }, [immersiveMode]);
 
+  useEffect(() => {
+    if (!readingCard) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeReader = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setReadingCard(null);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeReader);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeReader);
+    };
+  }, [readingCard]);
+
   const speak = useCallback(
     (text: string, onEnd?: () => void, voiceOffset = 0, languageOverride?: "en" | "zh") => {
       stopSpeechPlayback();
@@ -808,7 +858,7 @@ export function HerApp() {
             provider,
             replyLanguage: "zh",
             imageContext: imageContext ?? undefined,
-            history: nextTurns.slice(-10).map((turn) => ({ role: turn.role, text: turn.original, language: turn.language })),
+            history: turns.slice(-10).map((turn) => ({ role: turn.role, text: turn.original, language: turn.language })),
           }),
         });
         const result = (await response.json()) as { text?: string; error?: { message?: string } };
@@ -873,7 +923,7 @@ export function HerApp() {
     if (context && context.state !== "closed") await context.close().catch(() => undefined);
     setAudioLevel(0.05);
     setReplyState("idle");
-    const captured = transcriptRef.current.trim();
+    const captured = finishSpeechTranscript(transcriptRef.current);
     if (submit) await submitMessage(captured || input || "这张照片让我觉得很熟悉。", blob);
     else {
       setLiveTranscript("");
@@ -942,8 +992,7 @@ export function HerApp() {
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.onresult = (event) => {
-          let text = "";
-          for (let index = 0; index < event.results.length; index += 1) text += event.results[index][0].transcript;
+          const text = formatSpeechRecognitionResults(event.results);
           transcriptRef.current = text;
           setLiveTranscript(text);
         };
@@ -1921,7 +1970,24 @@ export function HerApp() {
                   const offset = index - cardIndex;
                   if (Math.abs(offset) > 2) return null;
                   return (
-                    <article key={card.id} className={`${styles.memoryCard} ${offset === 0 ? styles.memoryCardActive : ""}`} style={{ "--card-offset": offset } as CSSProperties} onClick={() => offset !== 0 && setCardIndex(index)}>
+                    <article
+                      key={card.id}
+                      className={`${styles.memoryCard} ${offset === 0 ? styles.memoryCardActive : ""}`}
+                      style={{ "--card-offset": offset } as CSSProperties}
+                      tabIndex={offset === 0 ? 0 : -1}
+                      aria-label={offset === 0 ? `展开阅读${card.title}` : `切换到${card.title}`}
+                      onClick={(event) => {
+                        if ((event.target as HTMLElement).closest("button")) return;
+                        if (offset !== 0) setCardIndex(index);
+                        else setReadingCard(card);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+                        event.preventDefault();
+                        if (offset !== 0) setCardIndex(index);
+                        else setReadingCard(card);
+                      }}
+                    >
                       {offset === 0 && (
                         <button
                           className={styles.cardDeleteButton}
@@ -2021,6 +2087,67 @@ export function HerApp() {
                 <div className={styles.previewActions}><button onClick={() => void confirmPreview()} disabled={confirming} aria-label="保存到回廊">{confirming ? "…" : "✓"}</button><button onClick={() => void navigator.clipboard.writeText(`${preview.title}\n\n${preview.summary}`)} aria-label="复制摘要">▣</button><button onClick={() => setPreview(null)} disabled={confirming} aria-label="关闭预览">×</button></div>
               </>
             ) : null}
+          </article>
+        </div>
+      )}
+
+      {readingCard && (
+        <div
+          className={styles.memoryReaderBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="memory-reader-title"
+          onClick={() => setReadingCard(null)}
+        >
+          <img className={styles.memoryReaderAmbient} src={readingCard.imageUrl} alt="" aria-hidden="true" />
+          <button
+            type="button"
+            className={styles.memoryReaderClose}
+            onClick={() => setReadingCard(null)}
+            aria-label="关闭沉浸阅读"
+          >
+            ×
+          </button>
+          <article className={styles.memoryReader} onClick={(event) => event.stopPropagation()}>
+            <header className={styles.memoryReaderHero}>
+              <img src={readingCard.imageUrl} alt={`${readingCard.title}的记忆封面`} />
+              <div>
+                <span>一段被留住的记忆</span>
+                <h2 id="memory-reader-title">{readingCard.title}</h2>
+                <p>{readingCard.summary}</p>
+                <time>{readingCard.date} · {readingCard.time} · {readingCard.duration}</time>
+              </div>
+            </header>
+            {readingCard.diary && (
+              <section className={styles.memoryReaderDiary}>
+                <span>记忆札记</span>
+                <blockquote>{readingCard.diary}</blockquote>
+              </section>
+            )}
+            <section className={styles.memoryReaderConversation} aria-label="完整对话">
+              <div className={styles.memoryReaderSectionTitle}>
+                <span>完整对话</span>
+                <small>{readingCard.turns.length} 段话语</small>
+              </div>
+              <div className={styles.memoryReaderTurns}>
+                {readingCard.turns.map((turn) => (
+                  <article
+                    key={turn.id}
+                    className={`${styles.memoryReaderTurn} ${turn.role === "user" ? styles.memoryReaderTurnUser : ""}`}
+                  >
+                    <span>{turn.speakerName ?? (turn.role === "user" ? "你" : "Her")}</span>
+                    <p>{turn.original}</p>
+                    <button
+                      type="button"
+                      onClick={() => playTurn(turn)}
+                      aria-label={turn.audioBlob ? "播放已保存语音" : "播放这段话语"}
+                    >
+                      ▶
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
           </article>
         </div>
       )}

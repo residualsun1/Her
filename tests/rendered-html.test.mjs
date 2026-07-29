@@ -159,6 +159,16 @@ test("starter preview is removed and project modules are present", async () => {
   assert.match(herApp, /setSentEcho\(message\)[\s\S]*?setReplyState\("holding"\)[\s\S]*?USER_WORDS_HOLD_MS[\s\S]*?fetch\("\/api\/chat"/);
   assert.match(herApp, /className=\{styles\.sentEcho\}/);
   assert.match(appStyles, /@keyframes userWordsIn/);
+  assert.match(herApp, /const formatSpeechRecognitionResults[\s\S]*?result\.isFinal[\s\S]*?"，"/);
+  assert.match(herApp, /const finishSpeechTranscript[\s\S]*?replace\(\S+[\s\S]*?"。"/);
+  assert.match(herApp, /recognition\.onresult[\s\S]*?formatSpeechRecognitionResults\(event\.results\)/);
+  assert.match(herApp, /history: turns\.slice\(-10\)/);
+  assert.doesNotMatch(herApp, /history: nextTurns\.slice/);
+  assert.match(herApp, /setReadingCard\(card\)/);
+  assert.match(herApp, /className=\{styles\.memoryReaderBackdrop\}[\s\S]*?完整对话/);
+  assert.match(appStyles, /\.memoryReaderBackdrop \{[\s\S]*?position: fixed;[\s\S]*?z-index: 70/);
+  assert.match(liveProvider, /Never repeat, quote, paraphrase, or restate an earlier assistant reply/);
+  assert.match(liveProvider, /removeRepeatedAssistantLead\(completion\.text, previousAssistant\)/);
   assert.doesNotMatch(herApp, /预览 AI|上传另一张图片|保存记忆/);
   assert.match(herApp, /conversationTimer[\s\S]*?formatClock\(elapsed\)/);
   assert.match(herApp, /uploadMemoryButton[\s\S]*?aria-label="上传图片"/);

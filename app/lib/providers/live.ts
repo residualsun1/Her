@@ -50,6 +50,7 @@ interface CompletionResult {
 const COMPANION_SYSTEM_PROMPT = `You are Her, an emotionally attentive AI companion in a reflective memory journal.
 Listen closely, respond with warmth and curiosity, and avoid sounding like customer support.
 Keep ordinary replies concise (usually 2-4 sentences). Never encourage dependency or claim to replace human care.
+Respond directly to the latest user message. Never repeat, quote, paraphrase, or restate an earlier assistant reply unless the user explicitly asks you to.
 When image context is present, treat every atmosphere hypothesis as a tentative impression of the image, never as the user's actual emotional state.
 Refer to at most one or two visible details, acknowledge uncertainty naturally, and invite the user to confirm, reject, or reinterpret the impression.
 Never infer emotion from facial appearance, and never infer identity, health, diagnosis, sensitive traits, relationships, or private facts from an image.
@@ -58,6 +59,23 @@ If the user expresses an immediate danger to themselves or others, respond calml
 
 const JSON_ONLY =
   "Return one valid JSON object only. Do not use Markdown fences, comments, or prose outside JSON.";
+
+function removeRepeatedAssistantLead(reply: string, previousAssistant?: string) {
+  const cleanReply = reply.trim();
+  const previous = previousAssistant?.trim();
+  if (!previous) return cleanReply;
+  const withoutSpeakerLabel = cleanReply.replace(/^(?:Her|AI|助手)\s*[:：]\s*/iu, "");
+  const prefixes = [previous, `“${previous}”`, `"${previous}"`];
+  for (const prefix of prefixes) {
+    if (!withoutSpeakerLabel.startsWith(prefix)) continue;
+    const remainder = withoutSpeakerLabel
+      .slice(prefix.length)
+      .replace(/^[\s"'“”‘’：:，,。.!！?？；;—-]+/u, "")
+      .trim();
+    if (remainder) return remainder;
+  }
+  return cleanReply;
+}
 
 export class LiveTextProvider
   implements
@@ -95,11 +113,15 @@ export class LiveTextProvider
       messages: [...history, { role: "user", text: input.message }],
       maxTokens: 700,
     });
+    const previousAssistant = [...history]
+      .reverse()
+      .find((message) => message.role === "assistant")
+      ?.text;
     return {
       provider: this.provider,
       model: completion.model,
       mock: false,
-      text: completion.text,
+      text: removeRepeatedAssistantLead(completion.text, previousAssistant),
     };
   }
 
