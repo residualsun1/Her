@@ -52,6 +52,11 @@ import styles from "./HerApp.module.css";
 
 const ParticleGarden = lazy(() => import("./ParticleGarden"));
 const USER_WORDS_HOLD_MS = 2_000;
+const DEFAULT_MUSIC_TRACK: MusicTrack = {
+  id: "song-on-the-beach",
+  name: "Song On The Beach",
+  url: "/audio/song-on-the-beach.mp3",
+};
 
 const HIDDEN_SAMPLE_GARDEN_KEY = "her-hidden-sample-garden";
 const HIDDEN_SAMPLE_CARDS_KEY = "her-hidden-sample-cards";
@@ -251,10 +256,10 @@ export function HerApp() {
   const [particleZoom, setParticleZoom] = useState(1);
   const [calendarMonth, setCalendarMonth] = useState(new Date(2025, 11, 1));
   const [selectedDate, setSelectedDate] = useState("2025-12-04");
-  const [musicUrl, setMusicUrl] = useState<string | null>(null);
-  const [musicName, setMusicName] = useState("尚未选择音乐");
+  const [musicUrl, setMusicUrl] = useState<string | null>(DEFAULT_MUSIC_TRACK.url);
+  const [musicName, setMusicName] = useState(DEFAULT_MUSIC_TRACK.name);
   const [musicPlaying, setMusicPlaying] = useState(false);
-  const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([]);
+  const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([DEFAULT_MUSIC_TRACK]);
   const [musicListOpen, setMusicListOpen] = useState(true);
   const [particleInfo, setParticleInfo] = useState("正在准备粒子");
   const [notice, setNotice] = useState<string | null>(null);
@@ -2359,6 +2364,7 @@ export function HerApp() {
           className={styles.hiddenAudio}
           ref={musicAudioRef}
           src={musicUrl}
+          preload="metadata"
           loop
           onPlay={() => { setMusicPlaying(true); startMusicAnalysis(); }}
           onPause={() => { setMusicPlaying(false); stopMusicAnalysis(); }}

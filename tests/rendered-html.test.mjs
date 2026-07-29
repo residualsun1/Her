@@ -147,6 +147,9 @@ test("product modules and critical interaction contracts are present", async () 
   assert.match(herApp, /average \* 1\.15 \+ bass \* 0\.62/);
   assert.match(herApp, /主体音乐律动/);
   assert.match(herApp, /音乐列表/);
+  assert.match(herApp, /const DEFAULT_MUSIC_TRACK[\s\S]*?Song On The Beach[\s\S]*?\/audio\/song-on-the-beach\.mp3/);
+  assert.match(herApp, /useState<MusicTrack\[\]>\(\[DEFAULT_MUSIC_TRACK\]\)/);
+  assert.match(herApp, /preload="metadata"/);
   assert.match(herApp, /\.mp3,.flac/);
   assert.match(herApp, /aria-label="上传更多图片"[\s\S]*?aria-hidden="true">↥/);
   assert.match(herApp, /deleteMemoryButton[\s\S]*?aria-hidden="true">×/);
@@ -282,5 +285,6 @@ test("product modules and critical interaction contracts are present", async () 
   assert.match(appStyles, /\.parameterNote/);
   assert.match(particleStyles, /\.canvas[\s\S]*opacity: 1/);
   assert.match(store, /indexedDB/);
+  await access(new URL("public/audio/song-on-the-beach.mp3", root));
   await assert.rejects(access(new URL("app/_sites-preview/SkeletonPreview.tsx", root)));
 });
