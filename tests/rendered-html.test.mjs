@@ -120,6 +120,7 @@ test("product modules and critical interaction contracts are present", async () 
   assert.match(viteConfig, /cloudflare\(\{/);
   assert.doesNotMatch(viteConfig, /localBindingConfig|compatibility_flags/);
   const workerDeployment = JSON.parse(wranglerConfig);
+  assert.equal(workerDeployment.name, "her");
   assert.equal(workerDeployment.workers_dev, true);
   assert.equal(workerDeployment.preview_urls, false);
   assert.deepEqual(workerDeployment.compatibility_flags, ["nodejs_compat"]);

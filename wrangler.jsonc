@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "her-ai-memory-garden",
+  "name": "her",
   "workers_dev": true,
   "preview_urls": false,
   "compatibility_date": "2026-07-29",

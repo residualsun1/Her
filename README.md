@@ -86,8 +86,8 @@ npm audit --omit=dev
 公开生产环境使用 Cloudflare Workers，`wrangler.jsonc` 是唯一的 Worker 运行配置源；`.openai/hosting.json` 保留为 Sites 私有版本与回滚通道。首次连接 Cloudflare 后，可以执行：
 
 ```powershell
-npx vinext deploy --name her-ai-memory-garden
-npx wrangler secret bulk .env.local --name her-ai-memory-garden
+npx vinext deploy --name her
+npx wrangler secret bulk .env.local --name her
 ```
 
 仅在环境变量发生变化时重新同步机密。`.env.local` 始终只保存在本地，不进入 Git。
