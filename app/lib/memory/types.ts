@@ -34,6 +34,14 @@ export interface ModelReference {
   model: string;
 }
 
+export type AtmosphereConfidence = "low" | "medium" | "high";
+
+export interface StoredAtmosphereHypothesis {
+  label: string;
+  evidence: string;
+  confidence: AtmosphereConfidence;
+}
+
 export interface ImageCrop {
   /** Normalized focal point, from 0 to 1. */
   x: number;
@@ -54,7 +62,11 @@ export interface GardenImage {
 
 export interface ImageContext {
   description: BilingualText;
+  observedDetails: string[];
+  atmosphereHypotheses: StoredAtmosphereHypothesis[];
+  dominantColors: string[];
   possibleTopics: BilingualText[];
+  openingQuestion: BilingualText;
   model?: ModelReference;
   /** Image context must never exist unless the user opted in to vision upload. */
   userConsented: true;

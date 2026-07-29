@@ -14,6 +14,7 @@ import {
 import { memoryStore } from "@/app/lib/memory/store";
 import type {
   CalendarDate,
+  ImageContext as StoredImageContext,
   SessionRecord,
   Turn as StoredTurn,
 } from "@/app/lib/memory/types";
@@ -26,6 +27,30 @@ type View = "conversation" | "garden" | "memory" | "music";
 type MemoryTab = "cards" | "calendar";
 type ReplyState = "idle" | "listening" | "holding" | "thinking" | "speaking" | "ready";
 type ProviderOption = { provider: string; configured: boolean; liveAdapterImplemented: boolean };
+type ProviderCapability = {
+  capability: string;
+  provider: string;
+  mode: "mock" | "live";
+  configured: boolean;
+  model: string | null;
+};
+
+type AtmosphereHypothesis = {
+  label: string;
+  evidence: string;
+  confidence: "low" | "medium" | "high";
+};
+
+type ClientImageContext = {
+  description: string;
+  objects: string[];
+  atmosphereHypotheses: AtmosphereHypothesis[];
+  dominantColors: string[];
+  possibleTopics: string[];
+  openingQuestion: string;
+  provider?: string;
+  model?: string;
+};
 
 type ChatTurn = {
   id: string;
@@ -73,6 +98,7 @@ type GardenVisualItem = {
   title: string;
   imageUrl: string;
   precomposed?: boolean;
+  imageContext?: ClientImageContext;
 };
 
 type DeleteTarget =
@@ -233,6 +259,24 @@ const formatClock = (seconds: number) => `${pad(Math.floor(seconds / 60))}:${pad
 const localDateKey = (date = new Date()) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` as CalendarDate;
 
+const storedImageContextToClient = (
+  context: StoredImageContext | undefined,
+): ClientImageContext | undefined => {
+  if (!context) return undefined;
+  return {
+    description: context.description.original,
+    objects: context.observedDetails ?? [],
+    atmosphereHypotheses: context.atmosphereHypotheses ?? [],
+    dominantColors: context.dominantColors ?? [],
+    possibleTopics: (context.possibleTopics ?? []).map((topic) => topic.original),
+    openingQuestion:
+      context.openingQuestion?.original ??
+      "这幅画面也许留着某种情绪，但我不想替你决定。重新看见它时，你有什么感觉？",
+    provider: context.model?.provider,
+    model: context.model?.model,
+  };
+};
+
 const readHiddenSampleIds = (key: string) => {
   try {
     const value = JSON.parse(window.localStorage.getItem(key) ?? "[]");
@@ -263,7 +307,7 @@ export function HerApp() {
   const [liveTranscript, setLiveTranscript] = useState("");
   const [elapsed, setElapsed] = useState(3);
   const [recordingElapsed, setRecordingElapsed] = useState(0);
-  const [provider, setProvider] = useState("deepseek");
+  const [provider, setProvider] = useState("qwen");
   const [providerMode, setProviderMode] = useState<"mock" | "live">("mock");
   const [providerOptions, setProviderOptions] = useState<ProviderOption[]>([
     "deepseek", "qwen", "openai", "anthropic", "gemini",
@@ -271,9 +315,17 @@ export function HerApp() {
   const [voiceStyle, setVoiceStyle] = useState("intimate");
   const [visionEnabled, setVisionEnabled] = useState(true);
   const [saveVoice, setSaveVoice] = useState(true);
-  const [imageContext, setImageContext] = useState<{ description: string; possibleTopics: string[] } | null>({
+  const [imageContext, setImageContext] = useState<ClientImageContext | null>({
     description: "安静的冬日雪夜里，一盏温暖的路灯正在发光。",
+    objects: ["雪地", "路灯", "夜色"],
+    atmosphereHypotheses: [{
+      label: "安静而温暖",
+      evidence: "深色夜景里只有一处暖光。",
+      confidence: "medium",
+    }],
+    dominantColors: ["黑色", "蓝色", "暖黄色"],
     possibleTopics: ["冬夜", "归家", "为某个人留着的一盏灯"],
+    openingQuestion: "暖光让我隐约想到一种被等待的感觉，但这只是猜测。它对你来说意味着什么？",
   });
   const [audioLevel, setAudioLevel] = useState(0.06);
   const [audioBands, setAudioBands] = useState({ bass: 0.02, mid: 0.015, treble: 0.01 });
@@ -382,10 +434,19 @@ export function HerApp() {
     let active = true;
     void fetch("/api/providers")
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("provider status unavailable")))
-      .then((result: { providers?: Array<ProviderOption & { mode?: "mock" | "live" }> }) => {
+      .then((result: {
+        capabilities?: ProviderCapability[];
+        providers?: Array<ProviderOption & { mode?: "mock" | "live" }>;
+      }) => {
         if (!active || !result.providers?.length) return;
         setProviderOptions(result.providers);
         setProviderMode(result.providers[0]?.mode === "live" ? "live" : "mock");
+        const chatCapability = result.capabilities?.find(
+          (capability) => capability.capability === "chat",
+        );
+        if (chatCapability?.provider && chatCapability.configured) {
+          setProvider(chatCapability.provider);
+        }
       })
       .catch(() => undefined);
     return () => { active = false; };
@@ -417,6 +478,7 @@ export function HerApp() {
         id: garden.id,
         title: garden.title?.original ?? garden.image.filename.replace(/\.[^.]+$/, ""),
         imageUrl: gardenUrls.get(garden.id)!,
+        imageContext: storedImageContextToClient(garden.imageContext),
       })),
       ...SAMPLE_GARDEN.filter((item) => !hiddenGardenIds.has(item.id)),
     ];
@@ -580,6 +642,9 @@ export function HerApp() {
           }),
         });
         const result = (await response.json()) as { text?: string; error?: { message?: string } };
+        if (!response.ok || !result.text) {
+          throw new Error(result.error?.message ?? "chat provider unavailable");
+        }
         const text = result.text ?? "我在。告诉我，这张图片里什么最像是仍然活着的？";
         const assistantTurn: ChatTurn = {
           id: crypto.randomUUID(),
@@ -595,10 +660,11 @@ export function HerApp() {
         setTurns((items) => [...items, {
           id: crypto.randomUUID(), role: "assistant", original: fallback, language: "zh", createdAt: (elapsed + 1) * 1000,
         }]);
+        flashNotice("AI 暂时没有回应，这句话来自本地陪伴模式。");
         speak(fallback);
       }
     },
-    [elapsed, imageContext, provider, replyState, saveVoice, speak, stopSpeechPlayback, turns],
+    [elapsed, flashNotice, imageContext, provider, replyState, saveVoice, speak, stopSpeechPlayback, turns],
   );
 
   const stopRecorder = useCallback(async () => {
@@ -795,7 +861,7 @@ export function HerApp() {
     currentGardenIdRef.current = garden.id;
     setGardenItems((items) => [{ id: garden.id, title: file.name, imageUrl: objectUrl }, ...items]);
 
-    let context: { description: string; possibleTopics: string[] } | null = null;
+    let context: ClientImageContext | null = null;
     if (visionEnabled) {
       try {
         const contentBase64 = file.size <= 5_500_000 ? await blobToBase64(file) : undefined;
@@ -815,16 +881,60 @@ export function HerApp() {
             },
           }),
         });
-        const result = (await response.json()) as { description?: string; possibleTopics?: string[] };
-        if (result.description) context = { description: result.description, possibleTopics: result.possibleTopics ?? [] };
+        const result = (await response.json()) as Partial<ClientImageContext> & {
+          error?: { message?: string };
+        };
+        if (!response.ok || !result.description || !result.openingQuestion) {
+          throw new Error(result.error?.message ?? "image context unavailable");
+        }
+        context = {
+          description: result.description,
+          objects: result.objects ?? [],
+          atmosphereHypotheses: result.atmosphereHypotheses ?? [],
+          dominantColors: result.dominantColors ?? [],
+          possibleTopics: result.possibleTopics ?? [],
+          openingQuestion: result.openingQuestion,
+          provider: result.provider,
+          model: result.model,
+        };
+        await memoryStore.updateGardenItem(garden.id, {
+          image: {
+            ...garden.image,
+            dominantColors: context.dominantColors,
+          },
+          imageContext: {
+            description: { original: context.description, originalLanguage: "zh" },
+            observedDetails: context.objects,
+            atmosphereHypotheses: context.atmosphereHypotheses,
+            dominantColors: context.dominantColors,
+            possibleTopics: context.possibleTopics.map((topic) => ({
+              original: topic,
+              originalLanguage: "zh",
+            })),
+            openingQuestion: {
+              original: context.openingQuestion,
+              originalLanguage: "zh",
+            },
+            ...(context.provider && context.model
+              ? { model: { provider: context.provider, model: context.model } }
+              : {}),
+            userConsented: true,
+          },
+        });
+        setGardenItems((items) =>
+          items.map((item) =>
+            item.id === garden.id ? { ...item, imageContext: context ?? undefined } : item,
+          ),
+        );
       } catch {
         context = null;
+        flashNotice("图片已保存在本机，但 AI 暂时没有读懂它。你仍然可以继续对话。");
       }
     }
     setImageContext(context);
-    const welcome = context?.description
-      ? `我一直在看这里：${context.description} 今天为什么选择了它？`
-      : "我正和你一起看着这段记忆。今天为什么选择这张图片？";
+    const welcome =
+      context?.openingQuestion ??
+      "我正和你一起看着这段记忆。它对你来说，留住了什么感受？";
     const assistantTurn: ChatTurn = {
       id: crypto.randomUUID(), role: "assistant", original: welcome, language: "zh", createdAt: 0,
     };
@@ -1274,12 +1384,15 @@ export function HerApp() {
     setImageUrl(item.imageUrl);
     setImagePrecomposed(Boolean(item.precomposed));
     setImageTitle(item.title);
+    setImageContext(item.imageContext ?? null);
     currentGardenIdRef.current = SAMPLE_GARDEN.some((sample) => sample.id === item.id) ? undefined : item.id;
     draftSessionIdRef.current = undefined;
     setTurns([{
       id: crypto.randomUUID(),
       role: "assistant",
-      original: "我记得这张图片。现在重新回到这里，什么感觉变得不一样了？",
+      original:
+        item.imageContext?.openingQuestion ??
+        "我记得这张图片。现在重新回到这里，什么感觉变得不一样了？",
       language: "zh",
       createdAt: 0,
     }]);

@@ -38,12 +38,21 @@ export interface ImageContextInput {
   language?: SupportedLanguage;
 }
 
+export type AtmosphereConfidence = "low" | "medium" | "high";
+
+export interface ImageAtmosphereHypothesis {
+  label: string;
+  evidence: string;
+  confidence: AtmosphereConfidence;
+}
+
 export interface ImageContext extends ProviderMeta {
   description: string;
   objects: string[];
-  mood: string[];
+  atmosphereHypotheses: ImageAtmosphereHypothesis[];
   dominantColors: string[];
   possibleTopics: string[];
+  openingQuestion: string;
 }
 
 export interface ImageContextProvider {
@@ -88,7 +97,11 @@ export interface ChatInput {
   history?: ChatMessage[];
   imageContext?: Pick<
     ImageContext,
-    "description" | "objects" | "mood" | "possibleTopics"
+    | "description"
+    | "objects"
+    | "atmosphereHypotheses"
+    | "possibleTopics"
+    | "openingQuestion"
   >;
   replyLanguage?: SupportedLanguage;
 }

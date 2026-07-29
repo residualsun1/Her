@@ -8,11 +8,11 @@ import {
 } from "./types";
 
 const DEFAULT_PROVIDERS: Record<Capability, ProviderName> = {
-  chat: "deepseek",
+  chat: "qwen",
   image: "qwen",
   asr: "qwen",
   tts: "qwen",
-  summary: "deepseek",
+  summary: "qwen",
 };
 
 const PROVIDER_ENV: Record<Capability, string> = {
@@ -41,7 +41,7 @@ const CREDENTIAL_ENV: Record<ProviderName, string[]> = {
 
 const DEFAULT_LIVE_MODELS: Record<ProviderName, string> = {
   deepseek: "deepseek-v4-flash",
-  qwen: "qwen-plus",
+  qwen: "qwen3.7-plus",
   openai: "gpt-5-mini",
   anthropic: "claude-sonnet-4-6",
   gemini: "gemini-2.5-flash",
@@ -152,7 +152,17 @@ export function getProviderBaseUrl(provider: ProviderName): string {
   const configured = BASE_URL_ENV[provider]
     .map(envValue)
     .find((value): value is string => Boolean(value));
-  return (configured ?? DEFAULT_BASE_URLS[provider]).replace(/\/+$/, "");
+  const value = configured ?? DEFAULT_BASE_URLS[provider];
+  if (provider !== "qwen") return value.replace(/\/+$/, "");
+
+  const withProtocol = /^https?:\/\//i.test(value)
+    ? value
+    : `https://${value}`;
+  const parsed = new URL(withProtocol);
+  if (parsed.pathname === "/" || parsed.pathname === "") {
+    parsed.pathname = "/compatible-mode/v1";
+  }
+  return parsed.toString().replace(/\/+$/, "");
 }
 
 export function isLiveCapabilityImplemented(
@@ -185,7 +195,7 @@ export function getConfiguredModel(
   const capabilityOverride = envValue(MODEL_ENV[capability]);
   if (capabilityOverride) return capabilityOverride;
   if (capability === "image" && provider === "qwen") {
-    return envValue("QWEN_IMAGE_MODEL") ?? "qwen-vl-plus";
+    return envValue("QWEN_IMAGE_MODEL") ?? "qwen3.7-plus";
   }
   if (!isLiveCapabilityImplemented(capability, provider)) return null;
   return envValue(PROVIDER_MODEL_ENV[provider]) ?? DEFAULT_LIVE_MODELS[provider];

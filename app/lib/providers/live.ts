@@ -10,6 +10,7 @@ import type {
   ChatProvider,
   ChatResult,
   ChatStreamEvent,
+  ImageAtmosphereHypothesis,
   ImageContext,
   ImageContextInput,
   ImageContextProvider,
@@ -43,6 +44,10 @@ interface CompletionResult {
 const COMPANION_SYSTEM_PROMPT = `You are Her, an emotionally attentive AI companion in a reflective memory journal.
 Listen closely, respond with warmth and curiosity, and avoid sounding like customer support.
 Keep ordinary replies concise (usually 2-4 sentences). Never encourage dependency or claim to replace human care.
+When image context is present, treat every atmosphere hypothesis as a tentative impression of the image, never as the user's actual emotional state.
+Refer to at most one or two visible details, acknowledge uncertainty naturally, and invite the user to confirm, reject, or reinterpret the impression.
+Never infer emotion from facial appearance, and never infer identity, health, diagnosis, sensitive traits, relationships, or private facts from an image.
+If the user corrects an image interpretation, accept the correction immediately and use the user's words as the source of truth.
 If the user expresses an immediate danger to themselves or others, respond calmly and encourage local emergency or trusted-person support.`;
 
 const JSON_ONLY =
@@ -193,7 +198,7 @@ export class LiveQwenImageProvider implements ImageContextProvider {
     const dataUrl = content.startsWith("data:")
       ? content
       : `data:${mimeType};base64,${content}`;
-    const model = getConfiguredModel("image", "live", this.provider) ?? "qwen-vl-plus";
+    const model = getConfiguredModel("image", "live", this.provider) ?? "qwen3.7-plus";
     const payload = await postJson(
       `${getProviderBaseUrl(this.provider)}/chat/completions`,
       {
@@ -207,7 +212,16 @@ export class LiveQwenImageProvider implements ImageContextProvider {
           messages: [
             {
               role: "system",
-              content: `Analyze the image as context for a private memory conversation. ${JSON_ONLY} Schema: {"description":string,"objects":string[],"mood":string[],"dominantColors":string[],"possibleTopics":string[]}. Use ${languageLabel(input.language ?? "en")}. Be observational and tentative; do not infer identity, diagnoses, sensitive traits, or private facts.`,
+              content: `Analyze only the visible image as context for a private memory conversation. ${JSON_ONLY}
+Schema: {"description":string,"objects":string[],"atmosphereHypotheses":[{"label":string,"evidence":string,"confidence":"low"|"medium"|"high"}],"dominantColors":string[],"possibleTopics":string[],"openingQuestion":string}.
+Use ${languageLabel(input.language ?? "en")}.
+Rules:
+- description and objects must contain observable visual details only.
+- atmosphereHypotheses describe possible qualities of the scene, never the user's actual mood. Base each one on visible color, light, composition, weather, setting, or objects.
+- Do not infer emotion from a face or body, even when people appear.
+- Do not infer identity, health, diagnosis, sensitive traits, relationships, location, intent, or private facts.
+- Use low confidence for ambiguous images and never use certainty words.
+- openingQuestion must be one short, gentle question that mentions at most one visible detail, clearly leaves room for being wrong, and asks the user what the moment meant or felt like to them.`,
             },
             {
               role: "user",
@@ -221,6 +235,7 @@ export class LiveQwenImageProvider implements ImageContextProvider {
             },
           ],
           response_format: { type: "json_object" },
+          enable_thinking: false,
           max_tokens: 900,
         }),
       },
@@ -229,15 +244,30 @@ export class LiveQwenImageProvider implements ImageContextProvider {
     );
     const text = extractOpenAICompatibleText(payload, "image", this.provider);
     const value = parseJsonObject(text, "image", this.provider);
+    const atmosphereHypotheses = hypothesisArray(
+      value.atmosphereHypotheses,
+    );
+    const description = requiredString(
+      value.description,
+      "description",
+      "image",
+      this.provider,
+    );
     return {
       provider: this.provider,
       model,
       mock: false,
-      description: requiredString(value.description, "description", "image", this.provider),
+      description,
       objects: stringArray(value.objects, 20),
-      mood: stringArray(value.mood, 10),
+      atmosphereHypotheses,
       dominantColors: stringArray(value.dominantColors, 10),
       possibleTopics: stringArray(value.possibleTopics, 10),
+      openingQuestion:
+        optionalString(value.openingQuestion) ??
+        fallbackOpeningQuestion(
+          input.language,
+          atmosphereHypotheses[0]?.label,
+        ),
     };
   }
 }
@@ -290,6 +320,9 @@ async function completeOpenAICompatible(
   }
   if (provider === "deepseek") {
     body.thinking = { type: "disabled" };
+  }
+  if (provider === "qwen") {
+    body.enable_thinking = false;
   }
   if (input.json) body.response_format = { type: "json_object" };
 
@@ -564,6 +597,41 @@ function stringArray(value: unknown, limit: number): string[] {
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, limit);
+}
+
+function hypothesisArray(
+  value: unknown,
+): ImageAtmosphereHypothesis[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const label = optionalString(item.label);
+      const evidence = optionalString(item.evidence);
+      if (!label || !evidence) return null;
+      const confidence =
+        item.confidence === "high" || item.confidence === "medium"
+          ? item.confidence
+          : "low";
+      return { label, evidence, confidence };
+    })
+    .filter((item): item is ImageAtmosphereHypothesis => item !== null)
+    .slice(0, 5);
+}
+
+function fallbackOpeningQuestion(
+  language: SupportedLanguage | undefined,
+  atmosphere?: string,
+): string {
+  const chinese = (language ?? "en").toLowerCase().startsWith("zh");
+  if (chinese) {
+    return atmosphere
+      ? `画面让我隐约想到“${atmosphere}”，但这只是一个猜测。你当时真实的感受是什么？`
+      : "我只能看见画面里的线索，却不知道它对你的意义。你拍下它时，心里是什么感觉？";
+  }
+  return atmosphere
+    ? `The scene suggests “${atmosphere}” to me, though that is only a guess. What did it actually feel like to you?`
+    : "I can see the image, but not what it meant to you. What did the moment actually feel like?";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -58,7 +58,10 @@ function normalizeHistory(value: unknown): ChatMessage[] | undefined {
 
 function normalizeImageContext(
   value: unknown,
-): Pick<ImageContext, "description" | "objects" | "mood" | "possibleTopics"> | undefined {
+): Pick<
+  ImageContext,
+  "description" | "objects" | "atmosphereHypotheses" | "possibleTopics" | "openingQuestion"
+> | undefined {
   if (value === undefined) return undefined;
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw invalidRequest("imageContext must be an object.");
@@ -67,8 +70,13 @@ function normalizeImageContext(
   return {
     description: requireString(record.description, "imageContext.description", 2_000),
     objects: stringArray(record.objects),
-    mood: stringArray(record.mood),
+    atmosphereHypotheses: atmosphereHypothesisArray(
+      record.atmosphereHypotheses ?? record.mood,
+    ),
     possibleTopics: stringArray(record.possibleTopics),
+    openingQuestion:
+      optionalString(record.openingQuestion, "imageContext.openingQuestion", 1_000) ??
+      "这只是对画面氛围的一种猜测，你愿意告诉我当时真实的感受吗？",
   };
 }
 
@@ -79,4 +87,46 @@ function stringArray(value: unknown): string[] {
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 20);
+}
+
+function atmosphereHypothesisArray(
+  value: unknown,
+): ImageContext["atmosphereHypotheses"] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === "string" && item.trim()) {
+        return {
+          label: item.trim(),
+          evidence: "来自画面整体氛围的低置信度线索。",
+          confidence: "low" as const,
+        };
+      }
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+      const record = item as Record<string, unknown>;
+      const label =
+        optionalString(record.label, "imageContext.atmosphereHypotheses.label", 100) ??
+        "";
+      if (!label) return null;
+      const confidence =
+        record.confidence === "high" || record.confidence === "medium"
+          ? record.confidence
+          : "low";
+      return {
+        label,
+        evidence:
+          optionalString(
+            record.evidence,
+            "imageContext.atmosphereHypotheses.evidence",
+            500,
+          ) ?? "来自画面整体氛围的低置信度线索。",
+        confidence,
+      };
+    })
+    .filter(
+      (
+        item,
+      ): item is ImageContext["atmosphereHypotheses"][number] => item !== null,
+    )
+    .slice(0, 5);
 }

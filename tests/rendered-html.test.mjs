@@ -51,10 +51,32 @@ test("mock provider routes keep the demo runnable without API keys", async () =>
   assert.equal(chat.mock, true);
   assert.equal(chat.provider, "deepseek");
   assert.ok(chat.text.length > 20);
+
+  const imageResponse = await request("/api/image-context", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      consent: true,
+      language: "zh",
+      image: {
+        name: "winter.jpg",
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+      },
+    }),
+  });
+  assert.equal(imageResponse.status, 200);
+  const imageContext = await imageResponse.json();
+  assert.ok(imageContext.description.length > 10);
+  assert.ok(imageContext.openingQuestion.includes("？"));
+  assert.ok(Array.isArray(imageContext.atmosphereHypotheses));
+  assert.ok(imageContext.atmosphereHypotheses.length > 0);
+  assert.equal(imageContext.mood, undefined);
 });
 
 test("starter preview is removed and project modules are present", async () => {
-  const [page, layout, packageJson, herApp, particle, gpu, particleConfig, particleStyles, appStyles, store] = await Promise.all([
+  const [page, layout, packageJson, herApp, particle, gpu, particleConfig, particleStyles, appStyles, store, providerEnv, liveProvider] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
@@ -65,6 +87,8 @@ test("starter preview is removed and project modules are present", async () => {
     readFile(new URL("app/components/ParticleGarden.module.css", root), "utf8"),
     readFile(new URL("app/components/HerApp.module.css", root), "utf8"),
     readFile(new URL("app/lib/memory/store.ts", root), "utf8"),
+    readFile(new URL("app/lib/providers/env.ts", root), "utf8"),
+    readFile(new URL("app/lib/providers/live.ts", root), "utf8"),
   ]);
 
   assert.match(page, /<HerApp \/>/);
@@ -134,6 +158,13 @@ test("starter preview is removed and project modules are present", async () => {
   assert.doesNotMatch(appStyles, /\.immersiveStage \.immersiveToggle small \{[\s\S]*?display: none/);
   assert.match(appStyles, /\.gardenQuestion \{[\s\S]*?right: 2\.2vw;[\s\S]*?width: min\(390px, 32vw\)/);
   assert.match(appStyles, /\.gardenQuestion > p \{[\s\S]*?font-size: clamp\(15px, 1\.35vw, 19px\)/);
+  assert.match(providerEnv, /chat: "qwen"/);
+  assert.match(providerEnv, /summary: "qwen"/);
+  assert.match(providerEnv, /qwen3\.7-plus/);
+  assert.match(providerEnv, /parsed\.pathname = "\/compatible-mode\/v1"/);
+  assert.match(liveProvider, /atmosphereHypotheses/);
+  assert.match(liveProvider, /never as the user's actual emotional state/);
+  assert.match(herApp, /openingQuestion/);
   assert.match(herApp, /gardenWheelLockRef/);
   assert.match(herApp, /if \(gardenDragRef\.current\.moved\)/);
   assert.doesNotMatch(herApp, /suppressGardenOpenUntilRef/);

@@ -90,9 +90,20 @@ export class MockProvider
       ...mockMeta(this.provider),
       description: pick(descriptions, seed),
       objects: ["memory subject", "soft light", "dark background"],
-      mood: ["intimate", "reflective", "quiet"],
+      atmosphereHypotheses: [
+        {
+          label: isChineseLanguage(input.language) ? "安静而内省" : "quiet and reflective",
+          evidence: isChineseLanguage(input.language)
+            ? "柔和光线与深色背景让画面显得克制。"
+            : "Soft light and a dark background make the scene feel restrained.",
+          confidence: "medium",
+        },
+      ],
       dominantColors: ["midnight black", "cool blue", "soft silver"],
       possibleTopics: ["memory", "time", "the sound of this moment"],
+      openingQuestion: isChineseLanguage(input.language)
+        ? "画面里的微光让我想到一种安静的停顿，但这只是我的感受。你拍下它时，心里更接近什么？"
+        : "The soft light suggests a quiet pause to me, though that is only an impression. What did it feel like to you?",
     };
   }
 
