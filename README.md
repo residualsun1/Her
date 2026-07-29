@@ -85,6 +85,8 @@ npm audit --omit=dev
 
 公开生产环境使用 Cloudflare Workers，`wrangler.jsonc` 是唯一的 Worker 运行配置源；`.openai/hosting.json` 保留为 Sites 私有版本与回滚通道。首次连接 Cloudflare 后，可以执行：
 
+公开地址：<https://her.sonder53231323.workers.dev>
+
 ```powershell
 npx vinext deploy --name her
 npx wrangler secret bulk .env.local --name her
