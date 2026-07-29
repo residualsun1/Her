@@ -82,3 +82,12 @@ npm audit --omit=dev
 ```
 
 `npm test` 会先完成生产构建，再检查服务端渲染、mock 接口和关键交互契约。项目通过 `.openai/hosting.json` 绑定 Sites；每次发布对应一个 Git 提交和一个可回溯版本，因此上线不会阻止后续协作，新的修改仍按“开发、验证、提交、发布”的流程迭代。
+
+公开生产环境使用 Cloudflare Workers，`wrangler.jsonc` 是唯一的 Worker 运行配置源；`.openai/hosting.json` 保留为 Sites 私有版本与回滚通道。首次连接 Cloudflare 后，可以执行：
+
+```powershell
+npx vinext deploy --name her-ai-memory-garden
+npx wrangler secret bulk .env.local --name her-ai-memory-garden
+```
+
+仅在环境变量发生变化时重新同步机密。`.env.local` 始终只保存在本地，不进入 Git。

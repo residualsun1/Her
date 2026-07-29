@@ -89,10 +89,12 @@ test("mock provider routes keep the demo runnable without API keys", async () =>
 });
 
 test("product modules and critical interaction contracts are present", async () => {
-  const [page, layout, packageJson, herApp, herUtils, calendarPanel, particle, gpu, particleConfig, particleStyles, appStyles, store, providerEnv, liveProvider, ttsRoute, worker] = await Promise.all([
+  const [page, layout, packageJson, viteConfig, wranglerConfig, herApp, herUtils, calendarPanel, particle, gpu, particleConfig, particleStyles, appStyles, store, providerEnv, liveProvider, ttsRoute, worker] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
+    readFile(new URL("vite.config.ts", root), "utf8"),
+    readFile(new URL("wrangler.jsonc", root), "utf8"),
     readFile(new URL("app/components/HerApp.tsx", root), "utf8"),
     readFile(new URL("app/components/her-app/utils.ts", root), "utf8"),
     readFile(new URL("app/components/her-app/CalendarPanel.tsx", root), "utf8"),
@@ -114,6 +116,13 @@ test("product modules and critical interaction contracts are present", async () 
   assert.match(packageJson, /@react-three\/fiber/);
   assert.match(packageJson, /"three"/);
   assert.doesNotMatch(packageJson, /drizzle|tailwindcss|eslint-config-next|"next"/);
+  assert.match(viteConfig, /sites\(\)/);
+  assert.match(viteConfig, /cloudflare\(\{/);
+  assert.doesNotMatch(viteConfig, /localBindingConfig|compatibility_flags/);
+  const workerDeployment = JSON.parse(wranglerConfig);
+  assert.equal(workerDeployment.workers_dev, true);
+  assert.equal(workerDeployment.preview_urls, false);
+  assert.deepEqual(workerDeployment.compatibility_flags, ["nodejs_compat"]);
   assert.match(calendarPanel, /aria-label="上个月"/);
   assert.match(herApp, /粒子数量/);
   assert.match(herApp, /粒子基础大小/);
