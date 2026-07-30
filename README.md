@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./public/brand/her-icon.png" width="180" alt="Her project icon" />
+</p>
+
 # Her
 
 Her 是一个以图像记忆为入口的中文 AI 语音陪伴产品。用户可以上传照片，将其转化为可交互的粒子画面；模型结合用户主动提供的图片语境展开对话，并把完成的对话保存为可沉浸阅读的记忆。
