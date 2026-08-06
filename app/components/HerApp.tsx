@@ -1512,7 +1512,7 @@ export function HerApp() {
     }
   };
 
-  const startMusicAnalysis = () => {
+  const startMusicAnalysis = async () => {
     const audio = musicAudioRef.current;
     if (!audio) return;
     let context = musicAudioContextRef.current;
@@ -1520,7 +1520,14 @@ export function HerApp() {
       context = new AudioContext();
       musicAudioContextRef.current = context;
     }
-    if (context.state === "suspended") void context.resume();
+    if (context.state === "suspended") {
+      try {
+        await context.resume();
+      } catch {
+        return;
+      }
+    }
+    if (context.state !== "running") return;
     let source = musicSourceRef.current;
     if (!source) {
       source = context.createMediaElementSource(audio);
@@ -1563,6 +1570,49 @@ export function HerApp() {
     setAudioLevel(0.05);
     setAudioBands({ bass: 0.02, mid: 0.015, treble: 0.01 });
   };
+
+  useEffect(() => {
+    const audioElement = musicAudioRef.current;
+    if (!audioElement) return;
+    const audio: HTMLAudioElement = audioElement;
+    let disposed = false;
+
+    function removeUnlockListeners() {
+      window.removeEventListener("click", unlockPlayback);
+      window.removeEventListener("keydown", unlockPlayback);
+    }
+
+    function startPlayback() {
+      if (disposed) return;
+      if (!audio.paused) {
+        removeUnlockListeners();
+        return;
+      }
+      void audio.play()
+        .then(removeUnlockListeners)
+        .catch(() => undefined);
+    }
+
+    function unlockPlayback(event: Event) {
+      const target = event.target;
+      const musicControl = target instanceof Element && target.closest(`.${styles.musicPlayer}`);
+      if (musicControl && audio.paused) return;
+      startPlayback();
+    }
+
+    void audio.play()
+      .then(removeUnlockListeners)
+      .catch(() => {
+        if (disposed) return;
+        window.addEventListener("click", unlockPlayback);
+        window.addEventListener("keydown", unlockPlayback);
+      });
+
+    return () => {
+      disposed = true;
+      removeUnlockListeners();
+    };
+  }, []);
 
   const handleMusicPlay = async () => {
     const audio = musicAudioRef.current;
@@ -1845,23 +1895,21 @@ export function HerApp() {
               {replyState === "thinking" && <div className={styles.thinking}>对方正在思考 <span>·</span><span>·</span><span>·</span></div>}
               {sentEcho && <div className={styles.sentEcho} aria-live="polite"><p>{sentEcho}</p></div>}
               {!sentEcho && replyState !== "holding" && replyState !== "thinking" && currentAssistant && (
-                <article className={`${styles.replyPosition} ${conversationFromGarden ? styles.gardenQuestion : ""}`}>
-                  <MonoLineBeam
-                    radius={20}
-                    className={`${styles.replyCard} ${replyState === "speaking" ? styles.replySpeaking : ""}`}
-                  >
-                    <div className={styles.assistantReply}>
-                      <ThinkingOrb
-                        state="working"
-                        size={64}
-                        speed={1}
-                        theme="dark"
-                        className={styles.thinkingOrb}
-                        aria-label="AI is responding"
-                      />
-                      <p>{currentAssistant.original}</p>
-                    </div>
-                  </MonoLineBeam>
+                <article
+                  className={`${styles.replyPosition} ${conversationFromGarden ? styles.gardenQuestion : ""} ${replyState === "speaking" ? styles.replySpeaking : ""}`}
+                  aria-live="polite"
+                >
+                  <div className={styles.assistantReply}>
+                    <ThinkingOrb
+                      state="working"
+                      size={64}
+                      speed={1}
+                      theme="dark"
+                      className={styles.thinkingOrb}
+                      aria-label="AI is responding"
+                    />
+                    <p>{currentAssistant.original}</p>
+                  </div>
                 </article>
               )}
               {replyState === "listening" && liveTranscript && (
@@ -2397,9 +2445,10 @@ export function HerApp() {
           className={styles.hiddenAudio}
           ref={musicAudioRef}
           src={musicUrl}
-          preload="metadata"
+          preload="auto"
+          autoPlay
           loop
-          onPlay={() => { setMusicPlaying(true); startMusicAnalysis(); }}
+          onPlay={() => { setMusicPlaying(true); void startMusicAnalysis(); }}
           onPause={() => { setMusicPlaying(false); stopMusicAnalysis(); }}
           onEnded={() => { setMusicPlaying(false); stopMusicAnalysis(); }}
           onError={() => { setMusicPlaying(false); stopMusicAnalysis(); flashNotice("无法播放这个音乐文件。"); }}

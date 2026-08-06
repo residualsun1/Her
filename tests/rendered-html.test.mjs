@@ -164,7 +164,9 @@ test("product modules and critical interaction contracts are present", async () 
   assert.match(herApp, /音乐列表/);
   assert.match(herApp, /const DEFAULT_MUSIC_TRACK[\s\S]*?Song On The Beach[\s\S]*?\/audio\/song-on-the-beach\.mp3/);
   assert.match(herApp, /useState<MusicTrack\[\]>\(\[DEFAULT_MUSIC_TRACK\]\)/);
-  assert.match(herApp, /preload="metadata"/);
+  assert.match(herApp, /preload="auto"[\s\S]*?autoPlay/);
+  assert.match(herApp, /function unlockPlayback[\s\S]*?window\.addEventListener\("click"[\s\S]*?window\.addEventListener\("keydown"/);
+  assert.match(herApp, /const startMusicAnalysis = async[\s\S]*?await context\.resume\(\)[\s\S]*?context\.state !== "running"/);
   assert.match(herApp, /\.mp3,.flac/);
   assert.match(herApp, /aria-label="上传更多图片"[\s\S]*?aria-hidden="true">↥/);
   assert.match(herApp, /deleteMemoryButton[\s\S]*?aria-hidden="true">×/);
@@ -188,7 +190,7 @@ test("product modules and critical interaction contracts are present", async () 
   assert.match(herApp, /getByteFrequencyData/);
   assert.match(herApp, /const stopListening[\s\S]*?const blobPromise = stopRecorder\(\);[\s\S]*?getTracks\(\)\.forEach[\s\S]*?primeSpeechPlayback\(\);[\s\S]*?await blobPromise/);
   assert.match(herApp, /await resumeAudioContext\(context\)/);
-  assert.match(appStyles, /\.replyCard \{[\s\S]*?background: transparent/);
+  assert.doesNotMatch(appStyles, /\.replyCard/);
   assert.match(appStyles, /--silver: #e7e8ea/);
   assert.doesNotMatch(appStyles, /#89f5cf|137,\s*245,\s*207/);
   assert.match(appStyles, /\.galleryPage \.uploadMore \{[\s\S]*?bottom: 22px;[\s\S]*?left: 50%/);
@@ -228,9 +230,10 @@ test("product modules and critical interaction contracts are present", async () 
   assert.match(herApp, /conversationTimer[\s\S]*?formatClock\(elapsed\)/);
   assert.match(herApp, /uploadMemoryButton[\s\S]*?aria-label="上传图片"/);
   assert.match(herApp, /留住记忆/);
-  assert.equal((herApp.match(/<MonoLineBeam/g) ?? []).length, 5);
+  assert.equal((herApp.match(/<MonoLineBeam/g) ?? []).length, 4);
   assert.match(herApp, /className=\{styles\.inputBeam\}[\s\S]*?className=\{`\$\{styles\.inputBar\}/);
-  assert.match(herApp, /className=\{`\$\{styles\.replyPosition\}[\s\S]*?<MonoLineBeam/);
+  assert.match(herApp, /className=\{`\$\{styles\.replyPosition\}[\s\S]*?className=\{styles\.assistantReply\}/);
+  assert.doesNotMatch(herApp, /styles\.replyPosition[\s\S]{0,500}<MonoLineBeam/);
   assert.match(monoLineBeam, /data-beam-type="line"/);
   assert.match(monoLineBeam, /data-beam-color="mono"/);
   assert.match(monoLineBeam, /data-beam-strength="0\.7"/);

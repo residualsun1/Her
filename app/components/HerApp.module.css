@@ -328,21 +328,6 @@
   pointer-events: none;
 }
 
-.replyCard {
-  width: 100%;
-  padding: 22px 28px 24px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 20px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 44%),
-    rgba(8, 9, 11, 0.72);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.055),
-    0 28px 90px rgba(0, 0, 0, 0.5);
-  -webkit-backdrop-filter: blur(28px) saturate(125%);
-  backdrop-filter: blur(28px) saturate(125%);
-}
-
 .transcriptPosition {
   top: 52%;
 }
@@ -1214,7 +1199,6 @@
   .iconButton { grid-column: 2; }
   .conversationTimer { top: 76px; }
   .replyPosition { top: 30%; }
-  .replyCard { padding: 18px 20px 20px; }
   .assistantReply > p { font-size: 18px; }
   .conversationControls { bottom: 69px; }
   .sessionBar { width: min(300px, 100%); grid-template-columns: 38px minmax(0, 1fr) 38px; gap: 6px; }
@@ -1281,7 +1265,6 @@
 
 @media (max-height: 760px) and (min-width: 821px) {
   .replyPosition { top: 29%; }
-  .replyCard { padding-top: 16px; padding-bottom: 18px; }
   .assistantReply > p { font-size: 19px; }
   .conversationControls { bottom: 14px; }
   .inputBeam,
@@ -2003,19 +1986,6 @@
   animation: questionMistIn 1.15s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.gardenQuestion .replyCard {
-  padding: 20px 22px 22px;
-  border-color: rgba(255, 255, 255, 0.11);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.038), transparent 46%),
-    rgba(8, 9, 11, 0.64);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.045),
-    0 26px 80px rgba(0, 0, 0, 0.46);
-  -webkit-backdrop-filter: blur(26px) saturate(120%);
-  backdrop-filter: blur(26px) saturate(120%);
-}
-
 .gardenQuestion .assistantReply > p {
   margin-right: 0;
   margin-left: 0;
@@ -2489,10 +2459,6 @@
     top: 43%;
     right: 12px;
     width: min(72vw, 330px);
-  }
-
-  .gardenQuestion .replyCard {
-    padding: 16px 18px 18px;
   }
 
   .gardenQuestion .assistantReply {
