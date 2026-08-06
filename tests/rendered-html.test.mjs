@@ -119,6 +119,7 @@ test("product modules and critical interaction contracts are present", async () 
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.match(packageJson, /@react-three\/fiber/);
   assert.match(packageJson, /"three"/);
+  assert.match(packageJson, /"thinking-orbs": "0\.2\.0"/);
   assert.doesNotMatch(packageJson, /drizzle|tailwindcss|eslint-config-next|"next"/);
   assert.match(viteConfig, /sites\(\)/);
   assert.match(viteConfig, /cloudflare\(\{/);
@@ -177,7 +178,11 @@ test("product modules and critical interaction contracts are present", async () 
   assert.doesNotMatch(herApp, /salon/i);
   assert.doesNotMatch(herApp, /api\/translate|点击翻译/);
   assert.doesNotMatch(herApp, /replyActions/);
-  assert.match(appStyles, /\.replySpeaking \.miniWave i[\s\S]*?--voice-amplitude/);
+  assert.match(herApp, /import \{ ThinkingOrb \} from "thinking-orbs"/);
+  assert.match(herApp, /<ThinkingOrb[\s\S]*?state="working"[\s\S]*?size=\{64\}[\s\S]*?speed=\{1\}[\s\S]*?theme="dark"/);
+  assert.doesNotMatch(herApp, /VOICE_WAVE_PROFILE|miniWave/);
+  assert.match(appStyles, /\.assistantReply \{[\s\S]*?grid-template-columns: 64px minmax\(0, 1fr\)/);
+  assert.match(appStyles, /\.thinkingOrb \{[\s\S]*?width: 64px;[\s\S]*?height: 64px/);
   assert.match(herApp, /\/api\/tts\/synthesize/);
   assert.match(herApp, /decodeAudioData/);
   assert.match(herApp, /getByteFrequencyData/);
@@ -236,7 +241,7 @@ test("product modules and critical interaction contracts are present", async () 
   assert.doesNotMatch(herApp, /<span>\{immersiveMode \? "显示界面" : "隐藏界面"\}<\/span>/);
   assert.doesNotMatch(appStyles, /\.immersiveStage \.immersiveToggle small \{[\s\S]*?display: none/);
   assert.match(appStyles, /\.gardenQuestion \{[\s\S]*?right: 2\.2vw;[\s\S]*?width: min\(390px, 32vw\)/);
-  assert.match(appStyles, /\.gardenQuestion \.replyCard > p \{[\s\S]*?font-size: clamp\(15px, 1\.35vw, 19px\)/);
+  assert.match(appStyles, /\.gardenQuestion \.assistantReply > p \{[\s\S]*?font-size: clamp\(15px, 1\.35vw, 19px\)/);
   assert.match(providerEnv, /chat: "qwen"/);
   assert.match(providerEnv, /summary: "qwen"/);
   assert.match(providerEnv, /qwen3\.7-plus/);

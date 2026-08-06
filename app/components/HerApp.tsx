@@ -1,6 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { ThinkingOrb } from "thinking-orbs";
 import type {
   CSSProperties,
   PointerEvent as ReactPointerEvent,
@@ -61,7 +62,6 @@ const DEFAULT_MUSIC_TRACK: MusicTrack = {
 
 const HIDDEN_SAMPLE_GARDEN_KEY = "her-hidden-sample-garden";
 const HIDDEN_SAMPLE_CARDS_KEY = "her-hidden-sample-cards";
-const VOICE_WAVE_PROFILE = [0.72, 1.05, 1.42, 0.94, 1.68, 1.18, 1.52, 0.88, 1.34, 1.02, 0.76];
 
 const PARAMETER_NOTES = {
   particleCount: "调高会让图像更细腻，也更消耗 GPU；出现卡顿时优先降低。",
@@ -1850,8 +1850,17 @@ export function HerApp() {
                     radius={20}
                     className={`${styles.replyCard} ${replyState === "speaking" ? styles.replySpeaking : ""}`}
                   >
-                    <div className={styles.miniWave} aria-hidden="true">{VOICE_WAVE_PROFILE.map((shape, index) => <i key={index} style={{ "--voice-amplitude": Math.max(0.4, 0.3 + visualAudioLevel * shape) } as CSSProperties} />)}</div>
-                    <p>{currentAssistant.original}</p>
+                    <div className={styles.assistantReply}>
+                      <ThinkingOrb
+                        state="working"
+                        size={64}
+                        speed={1}
+                        theme="dark"
+                        className={styles.thinkingOrb}
+                        aria-label="AI is responding"
+                      />
+                      <p>{currentAssistant.original}</p>
+                    </div>
                   </MonoLineBeam>
                 </article>
               )}

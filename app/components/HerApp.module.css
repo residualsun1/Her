@@ -364,9 +364,26 @@
   backdrop-filter: blur(24px) saturate(115%);
 }
 
-.replyCard > p {
+.assistantReply {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+  text-align: left;
+}
+
+.thinkingOrb {
+  width: 64px;
+  height: 64px;
+  flex: none;
+}
+
+.assistantReply > p {
+  min-width: 0;
   max-width: 580px;
-  margin: 11px auto 0;
+  margin: 0;
+  overflow-wrap: anywhere;
   color: rgba(225, 227, 230, 0.56);
   font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
   font-size: clamp(17px, 1.72vw, 23px);
@@ -376,35 +393,8 @@
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.68), 0 0 28px rgba(0, 0, 0, 0.34);
 }
 
-.replySpeaking > p {
+.replySpeaking .assistantReply > p {
   color: rgba(232, 234, 236, 0.64);
-}
-
-.miniWave {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  height: 20px;
-}
-
-.miniWave i {
-  width: 1px;
-  height: 5px;
-  background: rgba(226, 230, 231, 0.38);
-  transform: scaleY(0.45);
-  transform-origin: center;
-}
-
-.miniWave i:nth-child(3n) { animation-delay: -0.7s; }
-.miniWave i:nth-child(4n) { animation-delay: -0.35s; }
-.miniWave i:nth-child(5n) { height: 12px; }
-
-.replySpeaking .miniWave i {
-  background: rgba(225, 233, 231, 0.62);
-  transform: scaleY(var(--voice-amplitude, 0.45));
-  transition: transform 70ms linear, opacity 90ms linear;
-  opacity: min(0.92, var(--voice-amplitude, 0.45));
 }
 
 .thinking {
@@ -1225,7 +1215,7 @@
   .conversationTimer { top: 76px; }
   .replyPosition { top: 30%; }
   .replyCard { padding: 18px 20px 20px; }
-  .replyCard > p { font-size: 18px; }
+  .assistantReply > p { font-size: 18px; }
   .conversationControls { bottom: 69px; }
   .sessionBar { width: min(300px, 100%); grid-template-columns: 38px minmax(0, 1fr) 38px; gap: 6px; }
   .sentEcho { top: 52%; left: 18px; width: min(72vw, 330px); font-size: 16px; }
@@ -1292,7 +1282,7 @@
 @media (max-height: 760px) and (min-width: 821px) {
   .replyPosition { top: 29%; }
   .replyCard { padding-top: 16px; padding-bottom: 18px; }
-  .replyCard > p { font-size: 19px; }
+  .assistantReply > p { font-size: 19px; }
   .conversationControls { bottom: 14px; }
   .inputBeam,
   .inputBar { height: 44px; }
@@ -1436,7 +1426,7 @@
   backdrop-filter: blur(32px) saturate(140%);
 }
 
-.replyCard > p {
+.assistantReply > p {
   letter-spacing: 0.018em;
 }
 
@@ -2026,7 +2016,7 @@
   backdrop-filter: blur(26px) saturate(120%);
 }
 
-.gardenQuestion .replyCard > p {
+.gardenQuestion .assistantReply > p {
   margin-right: 0;
   margin-left: 0;
   color: rgba(225, 227, 230, 0.53);
@@ -2035,9 +2025,8 @@
   text-shadow: 0 1px 16px rgba(0, 0, 0, 0.92), 0 0 32px rgba(0, 0, 0, 0.58);
 }
 
-.gardenQuestion .miniWave {
-  justify-content: flex-start;
-  opacity: 0.48;
+.gardenQuestion .assistantReply {
+  gap: 18px;
 }
 
 .galleryPage {
@@ -2506,7 +2495,11 @@
     padding: 16px 18px 18px;
   }
 
-  .gardenQuestion .replyCard > p {
+  .gardenQuestion .assistantReply {
+    gap: 14px;
+  }
+
+  .gardenQuestion .assistantReply > p {
     font-size: 16px;
   }
 
@@ -2564,13 +2557,13 @@
   font-size: clamp(28px, 3.55vw, 52px);
 }
 
-.replyCard > p {
+.assistantReply > p {
   font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif !important;
   font-size: clamp(17px, 1.72vw, 23px);
   font-weight: 300 !important;
 }
 
-.gardenQuestion .replyCard > p {
+.gardenQuestion .assistantReply > p {
   font-size: clamp(15px, 1.35vw, 19px);
 }
 
