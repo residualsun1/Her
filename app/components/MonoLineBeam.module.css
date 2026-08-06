@@ -1,0 +1,95 @@
+.frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--mono-beam-radius, 16px);
+  isolation: isolate;
+}
+
+.runner {
+  position: absolute;
+  z-index: 4;
+  bottom: 0;
+  left: 0;
+  width: 34%;
+  min-width: 14px;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(170, 170, 170, 0.2) 18%,
+    rgba(255, 255, 255, 0.92) 50%,
+    rgba(185, 185, 185, 0.32) 78%,
+    transparent
+  );
+  box-shadow:
+    0 0 3px rgba(255, 255, 255, 0.5),
+    0 -2px 8px rgba(210, 210, 210, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-110%, 0, 0) scaleX(0.5);
+  transform-origin: center;
+  will-change: transform, opacity;
+  animation: monoLineBeam 3.1s linear infinite;
+}
+
+.runner::before {
+  content: "";
+  position: absolute;
+  inset: -9px -18px -5px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center bottom,
+    rgba(215, 215, 215, 0.28),
+    rgba(180, 180, 180, 0.09) 38%,
+    transparent 72%
+  );
+  filter: blur(4px);
+}
+
+@keyframes monoLineBeam {
+  0% {
+    opacity: 0;
+    transform: translate3d(-110%, 0, 0) scaleX(0.5);
+  }
+  12.5% {
+    opacity: 0;
+    transform: translate3d(-47%, 0, 0) scaleX(0.86);
+  }
+  20% {
+    opacity: 0.22;
+    transform: translate3d(-9%, 0, 0) scaleX(1.1);
+  }
+  32.5% {
+    opacity: 0.7;
+    transform: translate3d(54%, 0, 0) scaleX(1.36);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translate3d(142%, 0, 0) scaleX(1.5);
+  }
+  67.5% {
+    opacity: 0.7;
+    transform: translate3d(230%, 0, 0) scaleX(1.36);
+  }
+  80% {
+    opacity: 0.22;
+    transform: translate3d(293%, 0, 0) scaleX(1.1);
+  }
+  87.5% {
+    opacity: 0;
+    transform: translate3d(331%, 0, 0) scaleX(0.86);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(394%, 0, 0) scaleX(0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runner {
+    animation: none;
+    opacity: 0.42;
+    transform: translate3d(142%, 0, 0) scaleX(1.2);
+  }
+}

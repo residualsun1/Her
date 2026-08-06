@@ -48,6 +48,7 @@ import {
   storedImageContextToClient,
   storedSessionToCard,
 } from "./her-app/utils";
+import { MonoLineBeam } from "./MonoLineBeam";
 import styles from "./HerApp.module.css";
 
 const ParticleGarden = lazy(() => import("./ParticleGarden"));
@@ -1844,43 +1845,56 @@ export function HerApp() {
               {replyState === "thinking" && <div className={styles.thinking}>对方正在思考 <span>·</span><span>·</span><span>·</span></div>}
               {sentEcho && <div className={styles.sentEcho} aria-live="polite"><p>{sentEcho}</p></div>}
               {!sentEcho && replyState !== "holding" && replyState !== "thinking" && currentAssistant && (
-                <article className={`${styles.replyCard} ${conversationFromGarden ? styles.gardenQuestion : ""} ${replyState === "speaking" ? styles.replySpeaking : ""}`}>
-                  <div className={styles.miniWave} aria-hidden="true">{VOICE_WAVE_PROFILE.map((shape, index) => <i key={index} style={{ "--voice-amplitude": Math.max(0.4, 0.3 + visualAudioLevel * shape) } as CSSProperties} />)}</div>
-                  <p>{currentAssistant.original}</p>
+                <article className={`${styles.replyPosition} ${conversationFromGarden ? styles.gardenQuestion : ""}`}>
+                  <MonoLineBeam
+                    radius={20}
+                    className={`${styles.replyCard} ${replyState === "speaking" ? styles.replySpeaking : ""}`}
+                  >
+                    <div className={styles.miniWave} aria-hidden="true">{VOICE_WAVE_PROFILE.map((shape, index) => <i key={index} style={{ "--voice-amplitude": Math.max(0.4, 0.3 + visualAudioLevel * shape) } as CSSProperties} />)}</div>
+                    <p>{currentAssistant.original}</p>
+                  </MonoLineBeam>
                 </article>
               )}
-              {replyState === "listening" && liveTranscript && <div className={styles.transcriptCard}>{liveTranscript}</div>}
+              {replyState === "listening" && liveTranscript && (
+                <div className={styles.transcriptPosition}>
+                  <MonoLineBeam radius={16} className={styles.transcriptCard}>
+                    {liveTranscript}
+                  </MonoLineBeam>
+                </div>
+              )}
 
               <div className={styles.conversationControls}>
-                <div className={`${styles.inputBar} ${replyState === "listening" ? styles.inputListening : ""}`}>
-                  <input
-                    value={input}
-                    disabled={replyState === "holding" || replyState === "thinking"}
-                    onChange={(event) => setInput(event.target.value)}
-                    onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && void submitMessage(input)}
-                    placeholder={replyState === "listening" ? "正在聆听…" : "在这里输入…"}
-                    aria-label="输入消息"
-                  />
-                  <button
-                    className={styles.micButton}
-                    disabled={replyState === "holding" || replyState === "thinking"}
-                    onPointerDown={handleMicPointerDown}
-                    onPointerUp={handleMicPointerUp}
-                    onPointerCancel={() => void stopListening(false)}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      if (replyState === "listening" || captureStartingRef.current) void stopListening(true);
-                      else {
-                        recordingStartedRef.current = performance.now();
-                        void beginListening();
-                      }
-                    }}
-                    aria-label={replyState === "listening" ? "结束录音" : "开始录音"}
-                  >
-                    <span className={styles.micGlyph} />
-                  </button>
-                </div>
+                <MonoLineBeam radius={16} className={styles.inputBeam}>
+                  <div className={`${styles.inputBar} ${replyState === "listening" ? styles.inputListening : ""}`}>
+                    <input
+                      value={input}
+                      disabled={replyState === "holding" || replyState === "thinking"}
+                      onChange={(event) => setInput(event.target.value)}
+                      onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && void submitMessage(input)}
+                      placeholder={replyState === "listening" ? "正在聆听…" : "在这里输入…"}
+                      aria-label="输入消息"
+                    />
+                    <button
+                      className={styles.micButton}
+                      disabled={replyState === "holding" || replyState === "thinking"}
+                      onPointerDown={handleMicPointerDown}
+                      onPointerUp={handleMicPointerUp}
+                      onPointerCancel={() => void stopListening(false)}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        if (replyState === "listening" || captureStartingRef.current) void stopListening(true);
+                        else {
+                          recordingStartedRef.current = performance.now();
+                          void beginListening();
+                        }
+                      }}
+                      aria-label={replyState === "listening" ? "结束录音" : "开始录音"}
+                    >
+                      <span className={styles.micGlyph} />
+                    </button>
+                  </div>
+                </MonoLineBeam>
                 {replyState === "listening" && (
                   <div className={styles.recordingTools}>
                     <span><b className={styles.recordingDot} /> 录音 {formatClock(Math.max(1, recordingElapsed))}</span>
@@ -1888,10 +1902,20 @@ export function HerApp() {
                   </div>
                 )}
                 <div className={styles.sessionBar}>
-                  <button className={styles.uploadMemoryButton} onClick={() => fileInputRef.current?.click()} aria-label="上传图片">
-                    <span className={styles.imageUploadIcon} aria-hidden="true"><i /></span>
-                  </button>
-                  <button className={styles.saveButton} onClick={() => void saveMemory()}>留住记忆 <span>›</span></button>
+                  <MonoLineBeam
+                    radius={12}
+                    className={`${styles.sessionBeam} ${styles.uploadBeam}`}
+                  >
+                    <button className={styles.uploadMemoryButton} onClick={() => fileInputRef.current?.click()} aria-label="上传图片">
+                      <span className={styles.imageUploadIcon} aria-hidden="true"><i /></span>
+                    </button>
+                  </MonoLineBeam>
+                  <MonoLineBeam
+                    radius={12}
+                    className={`${styles.sessionBeam} ${styles.saveBeam}`}
+                  >
+                    <button className={styles.saveButton} onClick={() => void saveMemory()}>留住记忆 <span>›</span></button>
+                  </MonoLineBeam>
                   <button className={styles.closeButton} onClick={() => { cancelPendingReply(); void stopListening(false); setTurns([]); setElapsed(0); draftSessionIdRef.current = undefined; }} aria-label="结束对话">×</button>
                 </div>
               </div>

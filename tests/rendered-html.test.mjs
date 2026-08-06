@@ -109,6 +109,10 @@ test("product modules and critical interaction contracts are present", async () 
     readFile(new URL("app/api/tts/synthesize/route.ts", root), "utf8"),
     readFile(new URL("worker/index.ts", root), "utf8"),
   ]);
+  const [monoLineBeam, monoLineBeamStyles] = await Promise.all([
+    readFile(new URL("app/components/MonoLineBeam.tsx", root), "utf8"),
+    readFile(new URL("app/components/MonoLineBeam.module.css", root), "utf8"),
+  ]);
 
   assert.match(page, /<HerApp \/>/);
   assert.match(layout, /AI 记忆花园/);
@@ -219,11 +223,20 @@ test("product modules and critical interaction contracts are present", async () 
   assert.match(herApp, /conversationTimer[\s\S]*?formatClock\(elapsed\)/);
   assert.match(herApp, /uploadMemoryButton[\s\S]*?aria-label="上传图片"/);
   assert.match(herApp, /留住记忆/);
+  assert.equal((herApp.match(/<MonoLineBeam/g) ?? []).length, 5);
+  assert.match(herApp, /className=\{styles\.inputBeam\}[\s\S]*?className=\{`\$\{styles\.inputBar\}/);
+  assert.match(herApp, /className=\{`\$\{styles\.replyPosition\}[\s\S]*?<MonoLineBeam/);
+  assert.match(monoLineBeam, /data-beam-type="line"/);
+  assert.match(monoLineBeam, /data-beam-color="mono"/);
+  assert.match(monoLineBeam, /data-beam-strength="0\.7"/);
+  assert.match(monoLineBeamStyles, /animation: monoLineBeam 3\.1s linear infinite/);
+  assert.match(monoLineBeamStyles, /32\.5% \{[\s\S]*?opacity: 0\.7/);
+  assert.match(appStyles, /\.sessionBeam \{[\s\S]*?height: 38px;[\s\S]*?border-radius: 12px/);
   assert.match(herApp, /immersiveIcon[\s\S]*?<i \/><i \/><i \/><i \/>/);
   assert.doesNotMatch(herApp, /<span>\{immersiveMode \? "显示界面" : "隐藏界面"\}<\/span>/);
   assert.doesNotMatch(appStyles, /\.immersiveStage \.immersiveToggle small \{[\s\S]*?display: none/);
   assert.match(appStyles, /\.gardenQuestion \{[\s\S]*?right: 2\.2vw;[\s\S]*?width: min\(390px, 32vw\)/);
-  assert.match(appStyles, /\.gardenQuestion > p \{[\s\S]*?font-size: clamp\(15px, 1\.35vw, 19px\)/);
+  assert.match(appStyles, /\.gardenQuestion \.replyCard > p \{[\s\S]*?font-size: clamp\(15px, 1\.35vw, 19px\)/);
   assert.match(providerEnv, /chat: "qwen"/);
   assert.match(providerEnv, /summary: "qwen"/);
   assert.match(providerEnv, /qwen3\.7-plus/);
