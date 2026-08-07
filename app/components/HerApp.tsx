@@ -54,7 +54,9 @@ import styles from "./HerApp.module.css";
 
 const ParticleGarden = lazy(() => import("./ParticleGarden"));
 const USER_WORDS_HOLD_MS = 2_000;
-const SPEECH_PREPARE_TIMEOUT_MS = 5_000;
+const QWEN_SPEECH_REQUEST_TIMEOUT_MS = 8_000;
+const QWEN_SPEECH_FIRST_CHUNK_TIMEOUT_MS = 6_000;
+const QWEN_SPEECH_START_DEADLINE_MS = 14_000;
 const DEFAULT_MUSIC_TRACK: MusicTrack = {
   id: "song-on-the-beach",
   name: "Song On The Beach",
@@ -285,6 +287,7 @@ export function HerApp() {
   const speechAnalyserFrameRef = useRef<number | null>(null);
   const speechRequestRef = useRef(0);
   const speechCacheRef = useRef<Map<string, Blob>>(new Map());
+  const speechFetchControllerRef = useRef<AbortController | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const transcriptRef = useRef("");
   const replyDelayRunRef = useRef(0);
@@ -366,7 +369,8 @@ export function HerApp() {
     speechStreamReaderRef.current = null;
     speechAnalyserRef.current?.disconnect();
     speechAnalyserRef.current = null;
-    window.speechSynthesis?.cancel();
+    speechFetchControllerRef.current?.abort();
+    speechFetchControllerRef.current = null;
     setAudioLevel(0.05);
     setAudioBands({ bass: 0.02, mid: 0.015, treble: 0.01 });
   }, []);
@@ -384,7 +388,7 @@ export function HerApp() {
       const context = getSpeechAudioContext();
       if (context.state !== "running") void context.resume().catch(() => undefined);
     } catch {
-      // Browser speech remains available as a clearly labeled fallback.
+      // A later user gesture can still unlock the Qwen audio context.
     }
   }, [getSpeechAudioContext]);
 
@@ -397,35 +401,54 @@ export function HerApp() {
       const cacheKey = `${voiceStyle}:${spokenLanguage}:${text}`;
       const cached = speechCacheRef.current.get(cacheKey);
       if (cached) return { kind: "buffered", blob: cached };
-      const response = await fetch("/api/tts/synthesize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          voiceId: voiceStyle,
-          language: spokenLanguage,
-          stream: preferStreaming,
-        }),
-      });
-      if (!response.ok) throw new Error("TTS provider unavailable");
-      if (preferStreaming && response.body) {
-        const sampleRate = Number(response.headers.get("X-Her-TTS-Sample-Rate"));
-        return {
-          kind: "pcm-stream",
-          stream: response.body,
-          sampleRate: Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : 24_000,
-        };
+      const controller = new AbortController();
+      speechFetchControllerRef.current?.abort();
+      speechFetchControllerRef.current = controller;
+      const timeout = window.setTimeout(
+        () => controller.abort(),
+        QWEN_SPEECH_REQUEST_TIMEOUT_MS,
+      );
+      try {
+        const response = await fetch("/api/tts/synthesize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            voiceId: voiceStyle,
+            language: spokenLanguage,
+            provider: "qwen",
+            stream: preferStreaming,
+          }),
+          signal: controller.signal,
+        });
+        const responseProvider = response.headers.get("X-Her-TTS-Provider");
+        if (!response.ok || responseProvider !== "qwen") {
+          throw new Error("Qwen TTS provider unavailable");
+        }
+        if (preferStreaming && response.body) {
+          const sampleRate = Number(response.headers.get("X-Her-TTS-Sample-Rate"));
+          return {
+            kind: "pcm-stream",
+            stream: response.body,
+            sampleRate: Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : 24_000,
+          };
+        }
+        const blob = await response.blob();
+        if (!blob.size || !blob.type.startsWith("audio/")) {
+          throw new Error("Qwen TTS returned invalid audio");
+        }
+        speechCacheRef.current.set(cacheKey, blob);
+        if (speechCacheRef.current.size > 18) {
+          const oldest = speechCacheRef.current.keys().next().value;
+          if (oldest) speechCacheRef.current.delete(oldest);
+        }
+        return { kind: "buffered", blob };
+      } finally {
+        window.clearTimeout(timeout);
+        if (speechFetchControllerRef.current === controller) {
+          speechFetchControllerRef.current = null;
+        }
       }
-      const blob = await response.blob();
-      if (!blob.size || !blob.type.startsWith("audio/")) {
-        throw new Error("TTS provider returned invalid audio");
-      }
-      speechCacheRef.current.set(cacheKey, blob);
-      if (speechCacheRef.current.size > 18) {
-        const oldest = speechCacheRef.current.keys().next().value;
-        if (oldest) speechCacheRef.current.delete(oldest);
-      }
-      return { kind: "buffered", blob };
     },
     [voiceStyle],
   );
@@ -547,7 +570,7 @@ export function HerApp() {
         }
       });
       void speechStreamReaderRef.current?.cancel().catch(() => undefined);
-      window.speechSynthesis?.cancel();
+      speechFetchControllerRef.current?.abort();
       void audioContextRef.current?.close();
       void musicAudioContextRef.current?.close();
       void speechAudioContextRef.current?.close();
@@ -588,18 +611,28 @@ export function HerApp() {
     (
       text: string,
       onEnd?: () => void,
-      voiceOffset = 0,
+      _voiceOffset = 0,
       languageOverride?: "en" | "zh",
-      preparedAudio?: PreparedSpeechAudio | null,
+      preparedAudio?: PreparedSpeechAudio | Promise<PreparedSpeechAudio>,
       onStart?: () => void,
     ) => {
       stopSpeechPlayback();
+      void _voiceOffset;
       const speechRun = speechRequestRef.current;
       const spokenLanguage = languageOverride ?? "zh";
+      let qwenStartTimer: number | null = null;
+      let qwenAbandoned = false;
       setReplyState("thinking");
+
+      const clearQwenStartTimer = () => {
+        if (qwenStartTimer === null) return;
+        window.clearTimeout(qwenStartTimer);
+        qwenStartTimer = null;
+      };
 
       const beginPlayback = () => {
         if (speechRun !== speechRequestRef.current) return false;
+        clearQwenStartTimer();
         setReplyState("speaking");
         onStart?.();
         return true;
@@ -607,6 +640,7 @@ export function HerApp() {
 
       const finish = () => {
         if (speechRun !== speechRequestRef.current) return;
+        clearQwenStartTimer();
         if (speechPulseRef.current) {
           window.clearInterval(speechPulseRef.current);
           speechPulseRef.current = null;
@@ -617,35 +651,14 @@ export function HerApp() {
         onEnd?.();
       };
 
-      const fallbackToBrowserVoice = () => {
-        if (speechRun !== speechRequestRef.current) return;
-        if (!("speechSynthesis" in window)) {
-          finish();
-          return;
-        }
-        const utterance = new SpeechSynthesisUtterance(text);
-        const voices = window.speechSynthesis
-          .getVoices()
-          .filter((voice) => voice.lang.toLowerCase().startsWith(spokenLanguage === "en" ? "en" : "zh"));
-        if (voices.length) {
-          utterance.voice = voices[
-            (voiceOffset + (voiceStyle === "reflective" ? 1 : 0)) %
-              voices.length
-          ];
-        }
-        utterance.lang = spokenLanguage === "en" ? "en-US" : "zh-CN";
-        utterance.rate = voiceStyle === "intimate" ? 0.9 : voiceStyle === "bright" ? 1.03 : 0.95;
-        utterance.pitch = voiceStyle === "reflective" ? 0.9 : 1;
-        utterance.onstart = () => {
-          if (!beginPlayback()) return;
-          speechPulseRef.current = window.setInterval(
-            () => setAudioLevel(0.28 + Math.random() * 0.58),
-            90,
-          );
-        };
-        utterance.onend = finish;
-        utterance.onerror = finish;
-        window.speechSynthesis.speak(utterance);
+      const handleQwenVoiceFailure = () => {
+        if (qwenAbandoned || speechRun !== speechRequestRef.current) return;
+        qwenAbandoned = true;
+        clearQwenStartTimer();
+        speechFetchControllerRef.current?.abort();
+        void speechStreamReaderRef.current?.cancel().catch(() => undefined);
+        finish();
+        flashNotice("Qwen 语音暂时没有准备好，文字内容仍可正常阅读。");
       };
 
       const playSynthesizedAudio = async (blob: Blob) => {
@@ -725,6 +738,24 @@ export function HerApp() {
         let nextStartTime = context.currentTime + 0.06;
         let playbackStarted = false;
         let streamFinished = false;
+
+        const readFirstChunk = () =>
+          new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
+            const timeout = window.setTimeout(() => {
+              void reader.cancel().catch(() => undefined);
+              reject(new Error("Qwen TTS first audio chunk timed out"));
+            }, QWEN_SPEECH_FIRST_CHUNK_TIMEOUT_MS);
+            void reader.read().then(
+              (result) => {
+                window.clearTimeout(timeout);
+                resolve(result);
+              },
+              (error: unknown) => {
+                window.clearTimeout(timeout);
+                reject(error);
+              },
+            );
+          });
 
         const releaseStreamingAudio = () => {
           if (speechAnalyserRef.current !== analyser) return;
@@ -808,8 +839,12 @@ export function HerApp() {
         };
 
         try {
+          let awaitingFirstChunk = true;
           while (speechRun === speechRequestRef.current) {
-            const { done, value } = await reader.read();
+            const { done, value } = awaitingFirstChunk
+              ? await readFirstChunk()
+              : await reader.read();
+            awaitingFirstChunk = false;
             if (done) break;
             if (value?.length) schedulePcm(value);
           }
@@ -835,29 +870,35 @@ export function HerApp() {
       };
 
       const synthesize = async () => {
-        const audio =
-          preparedAudio ??
-          await Promise.race<PreparedSpeechAudio | null>([
-            prepareSynthesizedSpeech(text, spokenLanguage, true),
-            new Promise<null>((resolve) => {
-              window.setTimeout(() => resolve(null), SPEECH_PREPARE_TIMEOUT_MS);
-            }),
-          ]);
-        if (!audio) {
-          fallbackToBrowserVoice();
-          return;
+        let firstError: unknown;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          if (qwenAbandoned || speechRun !== speechRequestRef.current) return;
+          try {
+            const audio =
+              attempt === 0 && preparedAudio
+                ? await preparedAudio
+                : await prepareSynthesizedSpeech(text, spokenLanguage, true);
+            if (audio.kind === "pcm-stream") {
+              await playStreamingPcm(audio.stream, audio.sampleRate);
+            } else {
+              await playSynthesizedAudio(audio.blob);
+            }
+            return;
+          } catch (error) {
+            if (qwenAbandoned || speechRun !== speechRequestRef.current) return;
+            firstError ??= error;
+          }
         }
-        if (audio.kind === "pcm-stream") {
-          await playStreamingPcm(audio.stream, audio.sampleRate);
-        } else {
-          await playSynthesizedAudio(audio.blob);
-        }
+        throw firstError ?? new Error("Qwen TTS unavailable");
       };
 
-      if (preparedAudio === null) fallbackToBrowserVoice();
-      else void synthesize().catch(fallbackToBrowserVoice);
+      qwenStartTimer = window.setTimeout(
+        handleQwenVoiceFailure,
+        QWEN_SPEECH_START_DEADLINE_MS,
+      );
+      void synthesize().catch(handleQwenVoiceFailure);
     },
-    [getSpeechAudioContext, prepareSynthesizedSpeech, stopSpeechPlayback, voiceStyle],
+    [flashNotice, getSpeechAudioContext, prepareSynthesizedSpeech, stopSpeechPlayback],
   );
 
   const playTurn = useCallback((turn: ChatTurn) => {
@@ -917,9 +958,11 @@ export function HerApp() {
           throw new Error(result.error?.message ?? "chat provider unavailable");
         }
         const text = result.text;
+        const audio = prepareSynthesizedSpeech(text, "zh", true);
+        void audio.catch(() => undefined);
         return {
           text,
-          audio: prepareSynthesizedSpeech(text, "zh", true).catch(() => null),
+          audio,
         };
       })()
         .then((value) => ({ value, error: null as Error | null }))
@@ -949,14 +992,8 @@ export function HerApp() {
         };
         setTurns((items) => [...items, assistantTurn]);
         setReplyState("ready");
-        const preparedAudio = await Promise.race<PreparedSpeechAudio | null>([
-          preparedReply.value.audio,
-          new Promise<null>((resolve) => {
-            window.setTimeout(() => resolve(null), SPEECH_PREPARE_TIMEOUT_MS);
-          }),
-        ]);
         if (replyRun !== replyDelayRunRef.current) return;
-        speak(text, undefined, 0, "zh", preparedAudio);
+        speak(text, undefined, 0, "zh", preparedReply.value.audio);
       } catch {
         const fallback = "也许图像只是入口，真正的记忆就藏在它身后。";
         setTurns((items) => [...items, {

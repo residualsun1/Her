@@ -183,7 +183,7 @@ export class MockProvider
       status: 501,
       capability: "tts",
       provider: this.provider,
-      hint: "Connect a tested live TTS adapter or use an explicitly labeled browser speech fallback.",
+      hint: "Configure the live Qwen TTS adapter to enable synthesized speech.",
     });
   }
 
