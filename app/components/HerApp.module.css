@@ -350,18 +350,43 @@
 }
 
 .assistantReply {
+  position: relative;
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
   gap: 24px;
   min-width: 0;
   text-align: left;
+  isolation: isolate;
+}
+
+.assistantReply::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: -20px -36px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(3, 4, 6, 0.44) 0%,
+    rgba(3, 4, 6, 0.24) 46%,
+    transparent 76%
+  );
+  filter: blur(11px);
+  pointer-events: none;
+}
+
+.assistantReply > * {
+  position: relative;
+  z-index: 1;
 }
 
 .thinkingOrb {
   width: 64px;
   height: 64px;
   flex: none;
+  filter:
+    drop-shadow(0 1px 1px rgba(0, 0, 0, 0.96))
+    drop-shadow(0 0 8px rgba(0, 0, 0, 0.72));
 }
 
 .assistantReply > p {
@@ -369,17 +394,20 @@
   max-width: 580px;
   margin: 0;
   overflow-wrap: anywhere;
-  color: rgba(225, 227, 230, 0.56);
+  color: rgba(248, 249, 250, 0.92);
   font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
   font-size: clamp(17px, 1.72vw, 23px);
   font-weight: 300;
   line-height: 1.65;
   letter-spacing: 0.018em;
-  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.68), 0 0 28px rgba(0, 0, 0, 0.34);
+  text-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.98),
+    0 2px 10px rgba(0, 0, 0, 0.92),
+    0 0 28px rgba(0, 0, 0, 0.68);
 }
 
 .replySpeaking .assistantReply > p {
-  color: rgba(232, 234, 236, 0.64);
+  color: rgba(255, 255, 255, 0.98);
 }
 
 .thinking {
@@ -387,16 +415,34 @@
   z-index: 4;
   top: 28%;
   left: 50%;
-  color: rgba(255, 255, 255, 0.55);
-  font-family: var(--font-display), Georgia, serif;
-  font-size: 15px;
-  letter-spacing: 0.08em;
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
   transform: translateX(-50%);
+  isolation: isolate;
 }
 
-.thinking span { animation: blink 1s infinite; }
-.thinking span:nth-child(2) { animation-delay: 150ms; }
-.thinking span:nth-child(3) { animation-delay: 300ms; }
+.thinking::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: -20px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(3, 4, 6, 0.5) 0%,
+    rgba(3, 4, 6, 0.22) 48%,
+    transparent 76%
+  );
+  filter: blur(9px);
+  pointer-events: none;
+}
+
+.thinking > * {
+  position: relative;
+  z-index: 1;
+}
 
 .sentEcho {
   position: absolute;
@@ -1989,10 +2035,13 @@
 .gardenQuestion .assistantReply > p {
   margin-right: 0;
   margin-left: 0;
-  color: rgba(225, 227, 230, 0.53);
+  color: rgba(248, 249, 250, 0.92);
   font-size: clamp(15px, 1.35vw, 19px);
   line-height: 1.72;
-  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.92), 0 0 32px rgba(0, 0, 0, 0.58);
+  text-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.98),
+    0 2px 12px rgba(0, 0, 0, 0.94),
+    0 0 32px rgba(0, 0, 0, 0.72);
 }
 
 .gardenQuestion .assistantReply {

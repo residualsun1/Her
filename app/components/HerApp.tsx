@@ -54,6 +54,7 @@ import styles from "./HerApp.module.css";
 
 const ParticleGarden = lazy(() => import("./ParticleGarden"));
 const USER_WORDS_HOLD_MS = 2_000;
+const SPEECH_PREPARE_TIMEOUT_MS = 5_000;
 const DEFAULT_MUSIC_TRACK: MusicTrack = {
   id: "song-on-the-beach",
   name: "Song On The Beach",
@@ -315,6 +316,8 @@ export function HerApp() {
   const revealTimerRef = useRef<number | null>(null);
 
   const currentAssistant = [...turns].reverse().find((turn) => turn.role === "assistant");
+  const waitingForAssistant =
+    replyState === "thinking" && turns.at(-1)?.role !== "assistant";
   const visualAudioLevel = Math.min(1, audioLevel);
   const updateParticleTuning = useCallback(<Key extends keyof ParticleTuning,>(
     key: Key,
@@ -834,7 +837,16 @@ export function HerApp() {
       const synthesize = async () => {
         const audio =
           preparedAudio ??
-          await prepareSynthesizedSpeech(text, spokenLanguage, true);
+          await Promise.race<PreparedSpeechAudio | null>([
+            prepareSynthesizedSpeech(text, spokenLanguage, true),
+            new Promise<null>((resolve) => {
+              window.setTimeout(() => resolve(null), SPEECH_PREPARE_TIMEOUT_MS);
+            }),
+          ]);
+        if (!audio) {
+          fallbackToBrowserVoice();
+          return;
+        }
         if (audio.kind === "pcm-stream") {
           await playStreamingPcm(audio.stream, audio.sampleRate);
         } else {
@@ -928,8 +940,6 @@ export function HerApp() {
           throw preparedReply.error ?? new Error("chat provider unavailable");
         }
         const { text } = preparedReply.value;
-        const preparedAudio = await preparedReply.value.audio;
-        if (replyRun !== replyDelayRunRef.current) return;
         const assistantTurn: ChatTurn = {
           id: crypto.randomUUID(),
           role: "assistant",
@@ -938,6 +948,14 @@ export function HerApp() {
           createdAt: (elapsed + 1) * 1000,
         };
         setTurns((items) => [...items, assistantTurn]);
+        setReplyState("ready");
+        const preparedAudio = await Promise.race<PreparedSpeechAudio | null>([
+          preparedReply.value.audio,
+          new Promise<null>((resolve) => {
+            window.setTimeout(() => resolve(null), SPEECH_PREPARE_TIMEOUT_MS);
+          }),
+        ]);
+        if (replyRun !== replyDelayRunRef.current) return;
         speak(text, undefined, 0, "zh", preparedAudio);
       } catch {
         const fallback = "也许图像只是入口，真正的记忆就藏在它身后。";
@@ -1892,9 +1910,20 @@ export function HerApp() {
           )}
 
           {(!conversationFromGarden || conversationChromeVisible) && <div className={`${styles.conversationUi} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
-              {replyState === "thinking" && <div className={styles.thinking}>对方正在思考 <span>·</span><span>·</span><span>·</span></div>}
+              {waitingForAssistant && (
+                <div className={styles.thinking} role="status" aria-label="AI 正在思考">
+                  <ThinkingOrb
+                    state="working"
+                    size={64}
+                    speed={1}
+                    theme="dark"
+                    className={styles.thinkingOrb}
+                    aria-label="AI 正在思考"
+                  />
+                </div>
+              )}
               {sentEcho && <div className={styles.sentEcho} aria-live="polite"><p>{sentEcho}</p></div>}
-              {!sentEcho && replyState !== "holding" && replyState !== "thinking" && currentAssistant && (
+              {!sentEcho && replyState !== "holding" && !waitingForAssistant && currentAssistant && (
                 <article
                   className={`${styles.replyPosition} ${conversationFromGarden ? styles.gardenQuestion : ""} ${replyState === "speaking" ? styles.replySpeaking : ""}`}
                   aria-live="polite"
