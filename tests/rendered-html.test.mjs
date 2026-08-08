@@ -191,6 +191,11 @@ test("product modules and critical interaction contracts are present", async () 
   assert.match(appStyles, /\.assistantReply::before \{[\s\S]*?radial-gradient[\s\S]*?filter: blur\(11px\)/);
   assert.match(appStyles, /\.thinking::before \{[\s\S]*?radial-gradient[\s\S]*?filter: blur\(9px\)/);
   assert.doesNotMatch(herApp, /对方正在思考/);
+  assert.match(herApp, /role="status" aria-live="polite" aria-label="对方正在输入"/);
+  assert.match(herApp, /className=\{styles\.typingDots\}[\s\S]*?<i>\.<\/i><i>\.<\/i><i>\.<\/i>/);
+  assert.match(appStyles, /\.typingDots i:nth-child\(2\) \{ animation-delay: 180ms; \}/);
+  assert.match(appStyles, /\.typingDots i:nth-child\(3\) \{ animation-delay: 360ms; \}/);
+  assert.match(appStyles, /@keyframes typingDotAppear/);
   assert.match(herApp, /\/api\/tts\/synthesize/);
   assert.match(herApp, /decodeAudioData/);
   assert.match(herApp, /getByteFrequencyData/);

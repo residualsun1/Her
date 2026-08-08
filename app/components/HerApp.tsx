@@ -1948,15 +1948,21 @@ export function HerApp() {
 
           {(!conversationFromGarden || conversationChromeVisible) && <div className={`${styles.conversationUi} ${conversationFromGarden ? styles.delayedChrome : ""}`}>
               {waitingForAssistant && (
-                <div className={styles.thinking} role="status" aria-label="AI 正在思考">
+                <div className={styles.thinking} role="status" aria-live="polite" aria-label="对方正在输入">
                   <ThinkingOrb
                     state="working"
                     size={64}
                     speed={1}
                     theme="dark"
                     className={styles.thinkingOrb}
-                    aria-label="AI 正在思考"
+                    aria-hidden="true"
                   />
+                  <p className={styles.typingStatus} aria-hidden="true">
+                    对方正在输入
+                    <span className={styles.typingDots}>
+                      <i>.</i><i>.</i><i>.</i>
+                    </span>
+                  </p>
                 </div>
               )}
               {sentEcho && <div className={styles.sentEcho} aria-live="polite"><p>{sentEcho}</p></div>}
