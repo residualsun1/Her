@@ -15,7 +15,7 @@ async function request(path = "/", init = {}) {
   );
 }
 
-test("server-renders the Her memory garden shell", async () => {
+test("server-renders the Her shell", async () => {
   const response = await request();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -24,7 +24,8 @@ test("server-renders the Her memory garden shell", async () => {
   assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
   const html = await response.text();
 
-  assert.match(html, /<title>Her — AI 记忆花园<\/title>/i);
+  assert.match(html, /<title>Her<\/title>/i);
+  assert.doesNotMatch(html, /记忆花园|Memory Garden/i);
   assert.match(html, />记忆</);
   assert.match(html, /留住记忆/);
   assert.match(html, /这张照片里有一种温柔/);
@@ -115,7 +116,8 @@ test("product modules and critical interaction contracts are present", async () 
   ]);
 
   assert.match(page, /<HerApp \/>/);
-  assert.match(layout, /AI 记忆花园/);
+  assert.match(layout, /title: "Her"/);
+  assert.doesNotMatch(layout, /记忆花园|Memory Garden/i);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.match(packageJson, /@react-three\/fiber/);
   assert.match(packageJson, /"three"/);
